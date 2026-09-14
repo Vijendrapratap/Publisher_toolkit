@@ -44,7 +44,7 @@ app/api/books/[id]/generate/route.test.ts
 app/dashboard/page.tsx                    # book list
 app/dashboard/books/new/page.tsx          # upload form
 app/dashboard/books/[id]/page.tsx         # book detail + generate + creative set + download
-middleware.ts                             # Clerk route protection
+proxy.ts                                  # Clerk route protection (Next.js 16 middleware rename)
 e2e/generate-creatives.spec.ts            # Playwright e2e
 ```
 
@@ -340,7 +340,7 @@ git commit -m "feat: add Prisma schema for Book/CreativeSet/AdCopy/CreativeImage
 ### Task 3: Clerk Auth Integration
 
 **Files:**
-- Create: `middleware.ts`, `lib/auth.ts`, `lib/auth.test.ts`, `app/sign-in/[[...sign-in]]/page.tsx`, `app/sign-up/[[...sign-up]]/page.tsx`
+- Create: `proxy.ts`, `lib/auth.ts`, `lib/auth.test.ts`, `app/sign-in/[[...sign-in]]/page.tsx`, `app/sign-up/[[...sign-up]]/page.tsx`
 - Modify: `app/layout.tsx` (wrap with `<ClerkProvider>`), `.env.example`
 
 **Interfaces:**
@@ -411,9 +411,12 @@ export async function requireCurrentPublisherId(): Promise<string> {
 }
 ```
 
-- [ ] **Step 5: Write `middleware.ts` to protect `/dashboard` and `/api/books`**
+- [ ] **Step 5: Write `proxy.ts` to protect `/dashboard` and `/api/books`**
+
+Next.js 16 renamed `middleware.ts` to `proxy.ts` (same mechanism, new file name — confirmed against Clerk's current docs, which still use a default export and `export const config`, not the generic `proxy()`/`proxyConfig` naming some other frameworks use):
 
 ```ts
+// proxy.ts (project root)
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
 const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/api/books(.*)'])
@@ -426,6 +429,7 @@ export const config = {
   matcher: [
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     '/(api|trpc)(.*)',
+    '/__clerk/(.*)',
   ],
 }
 ```
