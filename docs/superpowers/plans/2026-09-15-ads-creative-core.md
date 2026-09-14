@@ -35,7 +35,7 @@ lib/ai/generateAdCopy.ts          # generateAdCopy()
 lib/ai/generateAdCopy.test.ts
 lib/templates/specs.ts            # CREATIVE_SIZES, AdPlatform type
 lib/templates/CreativeTemplate.tsx        # shared JSX template component
-lib/compositing/renderCreativeImages.ts   # renderCreativeImages()
+lib/compositing/renderCreativeImages.tsx  # renderCreativeImages()
 lib/compositing/renderCreativeImages.test.ts
 app/api/books/route.ts                    # POST create book
 app/api/books/route.test.ts
@@ -317,18 +317,18 @@ describe('database schema', () => {
 })
 ```
 
-- [ ] **Step 2: Run migration and run the test to verify it fails first (no tables yet)**
+- [ ] **Step 5: Run migration and run the test to verify it fails first (no tables yet)**
 
 Run: `dotenv -e .env.test -- npx prisma migrate dev --name init` (creates tables)
 Then temporarily verify the test setup is wired by running: `dotenv -e .env.test -- npx vitest run lib/db.test.ts`
-Expected: after `migrate dev`, this PASSES immediately since the schema is already correct — that's fine here since schema and test were authored together; the meaningful gate is Step 5.
+Expected: after `migrate dev`, this PASSES immediately since the schema is already correct — that's fine here since schema and test were authored together; the meaningful gate is Step 6.
 
-- [ ] **Step 5: Run the test to confirm it passes against the real database**
+- [ ] **Step 6: Run the test to confirm it passes against the real database**
 
 Run: `dotenv -e .env.test -- npx vitest run lib/db.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add prisma lib/db.ts lib/db.test.ts .env.test.example 2>/dev/null; git add -A
@@ -1144,7 +1144,7 @@ git commit -m "feat: generate per-platform ad copy with Claude, retry-once-then-
 ### Task 8: Creative Templates + Image Rendering
 
 **Files:**
-- Create: `lib/templates/specs.ts`, `lib/templates/CreativeTemplate.tsx`, `lib/compositing/renderCreativeImages.ts`, `lib/compositing/renderCreativeImages.test.ts`, `lib/compositing/pngSize.ts`
+- Create: `lib/templates/specs.ts`, `lib/templates/CreativeTemplate.tsx`, `lib/compositing/renderCreativeImages.tsx`, `lib/compositing/renderCreativeImages.test.ts`, `lib/compositing/pngSize.ts`
 
 **Interfaces:**
 - Consumes: `AdPlatform` (Task 7).
@@ -1154,7 +1154,7 @@ git commit -m "feat: generate per-platform ad copy with Claude, retry-once-then-
 export interface CreativeSizeSpec { key: string; platform: AdPlatform; width: number; height: number }
 export const CREATIVE_SIZES: CreativeSizeSpec[]
 
-// lib/compositing/renderCreativeImages.ts
+// lib/compositing/renderCreativeImages.tsx
 export interface RenderedCreativeImage { sizeKey: string; platform: AdPlatform; width: number; height: number; pngBuffer: Buffer }
 export async function renderCreativeImages(input: { coverImageUrl: string; title: string; author: string }): Promise<RenderedCreativeImage[]>
 ```
@@ -1271,7 +1271,7 @@ describe('renderCreativeImages', () => {
 Run: `npx vitest run lib/compositing/renderCreativeImages.test.ts`
 Expected: FAIL — `./renderCreativeImages` has no exports yet.
 
-- [ ] **Step 6: Implement `lib/compositing/renderCreativeImages.ts`**
+- [ ] **Step 6: Implement `lib/compositing/renderCreativeImages.tsx`** (must be `.tsx`, not `.ts` — it contains JSX)
 
 ```ts
 import { ImageResponse } from 'next/og'
@@ -1320,8 +1320,6 @@ export async function renderCreativeImages(input: {
   return results
 }
 ```
-
-Note: `renderCreativeImages.ts` must be a `.tsx` file (JSX in an `ImageResponse` call) — name it `lib/compositing/renderCreativeImages.tsx` and update the test's import path accordingly.
 
 - [ ] **Step 7: Run test to verify it passes**
 
@@ -1504,7 +1502,7 @@ git commit -m "feat: add generate-creatives endpoint tying together copy and ima
 ### Task 10: Creative Set Display + Download
 
 **Files:**
-- Create: `lib/creativeSets/queries.ts`, `lib/creativeSets/queries.test.ts`
+- Create: `lib/creativeSets/queries.ts`, `lib/creativeSets/queries.test.ts`, `app/dashboard/books/[id]/GenerateButton.tsx`
 - Modify: `app/dashboard/books/[id]/page.tsx`
 
 **Interfaces:**
@@ -1748,5 +1746,5 @@ git commit -m "test: add e2e coverage for the upload-to-generate-creatives flow"
 ## Self-Review Notes
 
 - **Spec coverage:** publisher auth/tenancy (Task 3, 6), book upload with cover extraction + manual fallback (Task 4, 5), ad copy generation with retry-once-then-blank (Task 7), template compositing at the spec's exact sizes (Task 8), tying it together with the same error-handling rules (Task 9), viewing/downloading (Task 10), e2e flow (Task 11). Ads connectors (Meta/Google OAuth + push) are explicitly deferred to a follow-up plan, per the scope split agreed with the user.
-- **Type consistency checked:** `AdPlatform` defined once in `lib/ai/generateAdCopy.ts` and imported everywhere else (`lib/templates/specs.ts`, `lib/compositing/renderCreativeImages.ts`) rather than redefined. `ExtractedBookAssets`, `AdCopyResult`, `RenderedCreativeImage`, `CreativeSizeSpec` are each defined once and reused by name across tasks.
+- **Type consistency checked:** `AdPlatform` defined once in `lib/ai/generateAdCopy.ts` and imported everywhere else (`lib/templates/specs.ts`, `lib/compositing/renderCreativeImages.tsx`) rather than redefined. `ExtractedBookAssets`, `AdCopyResult`, `RenderedCreativeImage`, `CreativeSizeSpec` are each defined once and reused by name across tasks.
 - **No placeholders:** every step has runnable code; no "add error handling" left unspecified — the specific retry/fallback rules from the spec are implemented directly in Tasks 4, 5, 7, and 9.
