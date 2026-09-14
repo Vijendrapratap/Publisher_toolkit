@@ -200,12 +200,14 @@ git commit -m "chore: scaffold Next.js app for Ads Creative service"
 
 - [ ] **Step 1: Install Prisma and set up a test database URL**
 
+`prisma`'s `latest` npm dist-tag currently resolves to an `8.0.0-rc.*` pre-release with a substantially different CLI — pin to the latest stable `7.10.0` for both packages instead (re-check `npm view prisma dist-tags` if this is stale by the time you read it):
+
 ```bash
-npm install prisma@latest @prisma/client@latest
+npm install prisma@7.10.0 @prisma/client@7.10.0
 npx prisma init --datasource-provider postgresql
 ```
 
-Set `DATABASE_URL` in `.env.test` to point at a local Postgres (e.g. `postgresql://postgres:postgres@localhost:5432/ads_creative_test`). Note: the engineer running this task needs a local Postgres reachable at that URL (e.g. `docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres`).
+Set `DATABASE_URL` in `.env.test` to point at a local Postgres reachable at `postgresql://postgres:postgres@localhost:5432/ads_creative_test`. How you get a local Postgres depends on the environment — Docker, apt, or a Postgres-as-an-npm-package tool (e.g. `embedded-postgres`) are all valid; pick whatever actually works in the environment you're running in and document it in your report, since later tasks with their own DB-backed tests (5, 6, 9, 10) will reuse the same running instance and connection string rather than each reinventing this step.
 
 - [ ] **Step 2: Write `prisma/schema.prisma`**
 
