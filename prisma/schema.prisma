@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Book {
+  id            String        @id @default(cuid())
+  publisherId   String
+  title         String?
+  author        String?
+  blurb         String?
+  pdfUrl        String
+  frontCoverUrl String?
+  backCoverUrl  String?
+  createdAt     DateTime      @default(now())
+  creativeSets  CreativeSet[]
+
+  @@index([publisherId])
+}
+
+model CreativeSet {
+  id        String          @id @default(cuid())
+  bookId    String
+  book      Book            @relation(fields: [bookId], references: [id])
+  createdAt DateTime        @default(now())
+  adCopies  AdCopy[]
+  images    CreativeImage[]
+
+  @@index([bookId])
+}
+
+model AdCopy {
+  id            String      @id @default(cuid())
+  creativeSetId String
+  creativeSet   CreativeSet @relation(fields: [creativeSetId], references: [id])
+  platform      String
+  headline      String
+  primaryText   String
+  description   String
+
+  @@index([creativeSetId])
+}
+
+model CreativeImage {
+  id            String      @id @default(cuid())
+  creativeSetId String
+  creativeSet   CreativeSet @relation(fields: [creativeSetId], references: [id])
+  platform      String
+  sizeKey       String
+  width         Int
+  height        Int
+  imageUrl      String
+
+  @@index([creativeSetId])
+}
