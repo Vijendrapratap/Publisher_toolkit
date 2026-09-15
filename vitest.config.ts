@@ -4,6 +4,6 @@ import path from 'node:path'
 
 export default defineConfig({
   plugins: [react()],
-  test: { environment: 'node' },
+  test: { environment: 'node', exclude: ['node_modules/**', 'e2e/**'] },
   resolve: { alias: { '@': path.resolve(__dirname, '.') } },
 })
