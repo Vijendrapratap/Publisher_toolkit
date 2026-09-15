@@ -100,4 +100,27 @@ describe('POST /api/books', () => {
       'image/jpeg'
     )
   })
+
+  it('rejects a pdf field that is not a File', async () => {
+    const form = new FormData()
+    form.append('pdf', 'not-a-file')
+    const res = await POST(new Request('http://localhost/api/books', { method: 'POST', body: form }))
+    expect(res.status).toBe(400)
+    expect(prisma.book.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects a pdf over the size limit', async () => {
+    const oversized = new Blob([new Uint8Array(25 * 1024 * 1024 + 1)], { type: 'application/pdf' })
+    const res = await POST(formDataRequest({ pdf: oversized }))
+    expect(res.status).toBe(400)
+    expect(prisma.book.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects a cover image with a disallowed content type', async () => {
+    const pdfBlob = new Blob([Buffer.from('%PDF-1.4 fake')], { type: 'application/pdf' })
+    const badCover = new Blob([Buffer.from('<svg/>')], { type: 'image/svg+xml' })
+    const res = await POST(formDataRequest({ pdf: pdfBlob, frontCover: badCover }))
+    expect(res.status).toBe(400)
+    expect(prisma.book.create).not.toHaveBeenCalled()
+  })
 })
