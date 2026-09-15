@@ -39,7 +39,7 @@ export async function startEmbeddedDb(databases) {
     const client = pg.getPgClient()
     try {
       await client.connect()
-      await client.query(`CREATE DATABASE "${name}"`)
+      await client.query(`CREATE DATABASE ${client.escapeIdentifier(name)}`)
     } catch (err) {
       if (!String(err?.message ?? err).includes('already exists')) throw err
     } finally {

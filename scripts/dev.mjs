@@ -18,15 +18,27 @@ if (migrate.status !== 0) {
   process.exit(migrate.status ?? 1)
 }
 
-const next = spawn('npx', ['next', 'dev', ...process.argv.slice(2)], { stdio: 'inherit', env })
-const shutdown = async () => {
-  next.kill('SIGTERM')
-  await stop()
-  process.exit(0)
-}
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
-next.on('exit', async (code) => {
+// detached so `next` (and npx) leads its own process group — next dev spawns
+// a next-server and turbopack workers that don't die with their immediate
+// parent, so shutdown has to signal the whole group, not just this child.
+const next = spawn('npx', ['next', 'dev', ...process.argv.slice(2)], {
+  stdio: 'inherit',
+  env,
+  detached: true,
+})
+
+let stopping = false
+const shutdown = async (code) => {
+  if (stopping) return
+  stopping = true
+  try {
+    process.kill(-next.pid, 'SIGTERM')
+  } catch {
+    // Group already gone — nothing to signal.
+  }
   await stop()
   process.exit(code ?? 0)
-})
+}
+process.on('SIGINT', () => shutdown(0))
+process.on('SIGTERM', () => shutdown(0))
+next.on('exit', (code) => shutdown(code ?? 0))
