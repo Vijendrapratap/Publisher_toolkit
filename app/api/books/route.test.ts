@@ -17,6 +17,7 @@ vi.mock('@/lib/db', () => ({
 
 import { POST } from './route'
 import { prisma } from '@/lib/db'
+import { uploadToBlob } from '@/lib/blob'
 
 function formDataRequest(fields: Record<string, Blob>) {
   const form = new FormData()
@@ -52,5 +53,51 @@ describe('POST /api/books', () => {
     const json = await res.json()
 
     expect(json.needsManualCover).toBe(true)
+  })
+
+  it('uses the manually-supplied front cover instead of the extracted PNG when both are present', async () => {
+    const pdfBlob = new Blob([Buffer.from('%PDF-1.4 fake')], { type: 'application/pdf' })
+    const manualFrontCoverBytes = Buffer.from('manual-front-cover-bytes')
+    const manualFrontCoverBlob = new Blob([manualFrontCoverBytes], { type: 'image/jpeg' })
+
+    const res = await POST(
+      formDataRequest({ pdf: pdfBlob, frontCover: manualFrontCoverBlob })
+    )
+    const json = await res.json()
+
+    expect(json.needsManualCover).toBe(false)
+    expect(uploadToBlob).toHaveBeenCalledWith(
+      expect.stringContaining('-front.png'),
+      manualFrontCoverBytes,
+      'image/jpeg'
+    )
+    expect(uploadToBlob).not.toHaveBeenCalledWith(
+      expect.stringContaining('-front.png'),
+      Buffer.from('png'),
+      'image/png'
+    )
+  })
+
+  it('falls back to the manually-supplied front cover when extraction finds no cover', async () => {
+    const { extractBookAssets } = await import('@/lib/pdf/extract')
+    vi.mocked(extractBookAssets).mockResolvedValueOnce({
+      title: null, author: null, blurb: null, frontCoverPng: null, backCoverPng: null,
+    })
+
+    const pdfBlob = new Blob([Buffer.from('%PDF-1.4 fake')], { type: 'application/pdf' })
+    const manualFrontCoverBytes = Buffer.from('manual-front-cover-bytes')
+    const manualFrontCoverBlob = new Blob([manualFrontCoverBytes], { type: 'image/jpeg' })
+
+    const res = await POST(
+      formDataRequest({ pdf: pdfBlob, frontCover: manualFrontCoverBlob })
+    )
+    const json = await res.json()
+
+    expect(json.needsManualCover).toBe(false)
+    expect(uploadToBlob).toHaveBeenCalledWith(
+      expect.stringContaining('-front.png'),
+      manualFrontCoverBytes,
+      'image/jpeg'
+    )
   })
 })
