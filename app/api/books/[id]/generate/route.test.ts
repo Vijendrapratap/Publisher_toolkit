@@ -14,8 +14,6 @@ vi.mock('@/lib/db', () => ({
     creativeSet: {
       create: vi.fn().mockResolvedValue({ id: 'set_1' }),
     },
-    adCopy: { createMany: vi.fn() },
-    creativeImage: { createMany: vi.fn() },
   },
 }))
 
@@ -45,8 +43,19 @@ describe('POST /api/books/:id/generate', () => {
 
     expect(res.status).toBe(201)
     expect(json.creativeSetId).toBe('set_1')
-    expect(prisma.adCopy.createMany).toHaveBeenCalled()
-    expect(prisma.creativeImage.createMany).toHaveBeenCalled()
+    expect(prisma.creativeSet.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bookId: 'book_1',
+          adCopies: { createMany: { data: [{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }] } },
+          images: {
+            createMany: {
+              data: [{ platform: 'META', sizeKey: 'meta_feed_1080x1080', width: 1080, height: 1080, imageUrl: 'https://blob.example/img.png' }],
+            },
+          },
+        }),
+      })
+    )
   })
 
   it('still creates the creative set with no copy rows if copy generation fails', async () => {
@@ -57,7 +66,11 @@ describe('POST /api/books/:id/generate', () => {
 
     const res = await POST(new Request('http://localhost'), ctx('book_1'))
     expect(res.status).toBe(201)
-    expect(prisma.adCopy.createMany).toHaveBeenCalledWith({ data: [] })
+    expect(prisma.creativeSet.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ adCopies: { createMany: { data: [] } } }),
+      })
+    )
   })
 
   it('returns 404 when the book does not belong to the caller', async () => {
