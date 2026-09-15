@@ -18,8 +18,11 @@
   "license": "ISC",
   "dependencies": {
     "@clerk/nextjs": "^7.9.2",
+    "@napi-rs/canvas": "^1.0.9",
     "@prisma/client": "^6.19.3",
     "next": "^16.3.5",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
     "prisma": "^6.19.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
