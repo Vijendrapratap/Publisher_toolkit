@@ -1,5 +1,5 @@
 'use client'
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AlertCircle, Check, Sparkles } from 'lucide-react'
@@ -10,9 +10,27 @@ import type { AdPlatform } from '@/lib/services/ads/copy'
 import { PLATFORMS, TEMPLATES, TONES, type CopyTone, type TemplateKey } from '@/lib/services/ads/options'
 import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
 import { sampleAdCopy } from '@/lib/services/ads/sampleCopy'
+import { nextRadioIndex } from '@/lib/ui/radioKeys'
 
 const sizesFor = (platform: AdPlatform) =>
   CREATIVE_SIZES.filter((s) => s.platform === platform).map((s) => `${s.width}×${s.height}`)
+
+// Roving-tabindex arrow key contract for a role="radio" group: moves selection
+// and focus together, and leaves other keys (Tab, Enter, Space) untouched.
+function handleRadioKeyDown<K extends string>(
+  e: KeyboardEvent<HTMLButtonElement>,
+  keys: readonly K[],
+  index: number,
+  select: (key: K) => void
+) {
+  const next = nextRadioIndex(e.key, index, keys.length)
+  if (next === null) return
+  e.preventDefault()
+  select(keys[next])
+  const group = e.currentTarget.closest('[role="radiogroup"]')
+  const target = group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]
+  target?.focus()
+}
 
 export function ConfigureForm({
   projectId,
@@ -120,7 +138,7 @@ export function ConfigureForm({
         <fieldset>
           <legend className="font-display text-lg font-semibold">Copy tone</legend>
           <div role="radiogroup" aria-label="Copy tone" className="mt-4 grid gap-3 sm:grid-cols-3">
-            {TONES.map((t) => {
+            {TONES.map((t, i) => {
               const selected = copyTone === t.key
               return (
                 <button
@@ -128,7 +146,16 @@ export function ConfigureForm({
                   type="button"
                   role="radio"
                   aria-checked={selected}
+                  tabIndex={selected ? 0 : -1}
                   onClick={() => setCopyTone(t.key)}
+                  onKeyDown={(e) =>
+                    handleRadioKeyDown(
+                      e,
+                      TONES.map((tone) => tone.key),
+                      i,
+                      setCopyTone
+                    )
+                  }
                   className={cn(
                     'flex flex-col items-start gap-1 rounded-2xl border p-4 text-left transition-all',
                     selected ? 'border-accent bg-accent-soft/50 ring-2 ring-accent/30' : 'border-line bg-surface hover:border-accent/40'
@@ -152,7 +179,7 @@ export function ConfigureForm({
         <fieldset>
           <legend className="font-display text-lg font-semibold">Design template</legend>
           <div role="radiogroup" aria-label="Design template" className="mt-4 grid gap-4 sm:grid-cols-3">
-            {TEMPLATES.map((t) => {
+            {TEMPLATES.map((t, i) => {
               const selected = templateKey === t.key
               return (
                 <button
@@ -160,7 +187,16 @@ export function ConfigureForm({
                   type="button"
                   role="radio"
                   aria-checked={selected}
+                  tabIndex={selected ? 0 : -1}
                   onClick={() => setTemplateKey(t.key)}
+                  onKeyDown={(e) =>
+                    handleRadioKeyDown(
+                      e,
+                      TEMPLATES.map((tpl) => tpl.key),
+                      i,
+                      setTemplateKey
+                    )
+                  }
                   className={cn(
                     'flex flex-col overflow-hidden rounded-2xl border text-left transition-all',
                     selected ? 'border-accent ring-2 ring-accent/30' : 'border-line hover:border-accent/40'
