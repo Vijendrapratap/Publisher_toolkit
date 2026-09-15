@@ -6,6 +6,7 @@
 // Usage: node scripts/test-db.mjs
 // Leaves the server running in the foreground; stop with Ctrl-C or by killing
 // the process. Data persists across restarts in .pgdata/ (gitignored).
+import { existsSync } from 'node:fs'
 import EmbeddedPostgres from 'embedded-postgres'
 
 const DATA_DIR = new URL('../.pgdata', import.meta.url).pathname
@@ -21,7 +22,11 @@ const pg = new EmbeddedPostgres({
 })
 
 async function main() {
-  await pg.initialise()
+  // Data persists in .pgdata/ across restarts — only initdb on first run,
+  // since re-running initialise() against an already-populated dir errors.
+  if (!existsSync(`${DATA_DIR}/PG_VERSION`)) {
+    await pg.initialise()
+  }
   await pg.start()
 
   try {
