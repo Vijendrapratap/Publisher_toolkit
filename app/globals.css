@@ -1,1 +1,73 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+
+  --color-canvas: oklch(0.985 0.006 80);
+  --color-surface: oklch(1 0 0);
+  --color-surface-2: oklch(0.965 0.008 80);
+  --color-ink: oklch(0.22 0.02 60);
+  --color-ink-muted: oklch(0.48 0.02 60);
+  --color-line: oklch(0.91 0.01 80);
+  --color-accent: oklch(0.52 0.13 40);
+  --color-accent-strong: oklch(0.45 0.13 40);
+  --color-accent-soft: oklch(0.95 0.03 45);
+  --color-on-accent: oklch(0.99 0 0);
+  --color-danger: oklch(0.55 0.2 27);
+  --color-success: oklch(0.52 0.11 150);
+
+  --color-tint-ads: oklch(0.93 0.05 45);
+  --color-tint-trailer: oklch(0.93 0.04 295);
+  --color-tint-audiobook: oklch(0.93 0.05 160);
+  --color-tint-landing: oklch(0.93 0.045 235);
+
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 2px oklch(0.2 0.02 60 / 0.05), 0 8px 24px -12px oklch(0.2 0.02 60 / 0.16);
+  --shadow-lift: 0 2px 4px oklch(0.2 0.02 60 / 0.08), 0 20px 44px -18px oklch(0.2 0.02 60 / 0.3);
+}
+
+.dark {
+  --color-canvas: oklch(0.17 0.01 60);
+  --color-surface: oklch(0.21 0.012 60);
+  --color-surface-2: oklch(0.255 0.012 60);
+  --color-ink: oklch(0.95 0.008 80);
+  --color-ink-muted: oklch(0.73 0.015 70);
+  --color-line: oklch(0.32 0.012 60);
+  --color-accent: oklch(0.74 0.12 48);
+  --color-accent-strong: oklch(0.8 0.11 52);
+  --color-accent-soft: oklch(0.3 0.05 45);
+  --color-on-accent: oklch(0.18 0.02 60);
+  --color-danger: oklch(0.68 0.18 27);
+  --color-success: oklch(0.72 0.12 150);
+  --color-tint-ads: oklch(0.32 0.06 45);
+  --color-tint-trailer: oklch(0.32 0.05 295);
+  --color-tint-audiobook: oklch(0.32 0.06 160);
+  --color-tint-landing: oklch(0.32 0.05 235);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
