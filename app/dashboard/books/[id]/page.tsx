@@ -10,7 +10,7 @@ export default async function BookDetailPage({ params }: { params: Promise<{ id:
   const book = await getBookForPublisher(publisherId, id)
   if (!book) notFound()
 
-  const creativeSet = await getLatestCreativeSetForBook(book.id)
+  const creativeSet = await getLatestCreativeSetForBook(book.id, publisherId)
 
   return (
     <main className="p-8">

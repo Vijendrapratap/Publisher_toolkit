@@ -21,9 +21,17 @@ describe('getLatestCreativeSetForBook', () => {
       },
     })
 
-    const result = await getLatestCreativeSetForBook(book.id)
+    const result = await getLatestCreativeSetForBook(book.id, 'pub_1')
     expect(result?.id).toBe(latest.id)
     expect(result?.adCopies).toHaveLength(1)
     expect(result?.images).toHaveLength(1)
+  })
+
+  it('returns null when the book does not belong to the given publisher', async () => {
+    const book = await prisma.book.create({ data: { publisherId: 'pub_1', pdfUrl: 'x' } })
+    await prisma.creativeSet.create({ data: { bookId: book.id } })
+
+    const result = await getLatestCreativeSetForBook(book.id, 'pub_2')
+    expect(result).toBeNull()
   })
 })
