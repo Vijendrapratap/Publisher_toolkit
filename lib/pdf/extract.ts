@@ -40,31 +40,59 @@ export async function extractBookAssets(pdfBytes: Buffer): Promise<ExtractedBook
 
   if (doc.numPages < 1) return empty
 
-  const firstPage = await doc.getPage(1)
-  const firstPageText = await extractPageText(firstPage)
-  const lines = firstPageText.split(/\s{2,}|\n/).filter(Boolean)
-
-  const title = lines[0] ?? null
-  const authorLine = lines.find((l) => /^by\s+/i.test(l))
-  const author = authorLine ? authorLine.replace(/^by\s+/i, '') : null
-
+  let title: string | null = null
+  let author: string | null = null
   let frontCoverPng: Buffer | null = null
+
+  let firstPage: any = null
   try {
-    frontCoverPng = await renderPageToPng(firstPage)
+    firstPage = await doc.getPage(1)
   } catch {
-    frontCoverPng = null
+    firstPage = null
+  }
+
+  if (firstPage) {
+    try {
+      const firstPageText = await extractPageText(firstPage)
+      const lines = firstPageText.split(/\s{2,}|\n/).filter(Boolean)
+      title = lines[0] ?? null
+      const authorLine = lines.find((l) => /^by\s+/i.test(l))
+      author = authorLine ? authorLine.replace(/^by\s+/i, '') : null
+    } catch {
+      title = null
+      author = null
+    }
+
+    try {
+      frontCoverPng = await renderPageToPng(firstPage)
+    } catch {
+      frontCoverPng = null
+    }
   }
 
   let backCoverPng: Buffer | null = null
   let blurb: string | null = null
   if (doc.numPages > 1) {
-    const lastPage = await doc.getPage(doc.numPages)
+    let lastPage: any = null
     try {
-      backCoverPng = await renderPageToPng(lastPage)
+      lastPage = await doc.getPage(doc.numPages)
     } catch {
-      backCoverPng = null
+      lastPage = null
     }
-    blurb = (await extractPageText(lastPage)) || null
+
+    if (lastPage) {
+      try {
+        backCoverPng = await renderPageToPng(lastPage)
+      } catch {
+        backCoverPng = null
+      }
+
+      try {
+        blurb = (await extractPageText(lastPage)) || null
+      } catch {
+        blurb = null
+      }
+    }
   }
 
   return { title, author, blurb, frontCoverPng, backCoverPng }

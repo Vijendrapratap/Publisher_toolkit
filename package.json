@@ -21,7 +21,6 @@
     "@napi-rs/canvas": "^1.0.9",
     "@prisma/client": "^6.19.3",
     "next": "^16.3.5",
-    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.3.289",
     "prisma": "^6.19.3",
     "react": "^19.3.0",
@@ -35,6 +34,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv-cli": "^11.0.0",
     "embedded-postgres": "^16.14.0-beta.17",
+    "pdf-lib": "^1.17.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
