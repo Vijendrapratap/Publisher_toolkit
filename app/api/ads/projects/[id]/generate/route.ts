@@ -54,26 +54,30 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       })
     )
 
-    const creativeSet = await prisma.creativeSet.create({
+    await prisma.book.update({
+      where: { id: book.id },
       data: {
-        id: creativeSetId,
-        bookId: book.id,
-        adCopies: {
-          createMany: {
-            data: copyRows.map(({ platform, headline, primaryText, description }) => ({
-              platform,
-              headline,
-              primaryText,
-              description,
-            })),
+        status: 'generated',
+        creativeSets: {
+          create: {
+            id: creativeSetId,
+            adCopies: {
+              createMany: {
+                data: copyRows.map(({ platform, headline, primaryText, description }) => ({
+                  platform,
+                  headline,
+                  primaryText,
+                  description,
+                })),
+              },
+            },
+            images: { createMany: { data: images } },
           },
         },
-        images: { createMany: { data: images } },
       },
     })
-    await prisma.book.update({ where: { id: book.id }, data: { status: 'generated' } })
 
-    return NextResponse.json({ creativeSetId: creativeSet.id }, { status: 201 })
+    return NextResponse.json({ creativeSetId }, { status: 201 })
   } catch (err) {
     console.error('ads generation failed', err)
     return NextResponse.json(

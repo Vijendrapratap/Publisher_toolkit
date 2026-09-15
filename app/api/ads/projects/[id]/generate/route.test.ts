@@ -16,7 +16,6 @@ vi.mock('@/lib/providers/storage', () => ({
 }))
 vi.mock('@/lib/db', () => ({
   prisma: {
-    creativeSet: { create: vi.fn().mockResolvedValue({ id: 'set_1' }) },
     book: { update: vi.fn().mockResolvedValue({}) },
   },
 }))
@@ -41,35 +40,43 @@ describe('POST /api/ads/projects/:id/generate', () => {
     vi.mocked(generateAdCopy).mockResolvedValue([{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }])
 
     const res = await POST(new Request('http://localhost'), ctx('book_1'))
+    const json = await res.json()
 
     expect(res.status).toBe(201)
-    expect((await res.json()).creativeSetId).toBe('set_1')
+    expect(typeof json.creativeSetId).toBe('string')
+    expect(json.creativeSetId.length).toBeGreaterThan(0)
     expect(generateAdCopy).toHaveBeenCalledWith({ title: 'T', author: 'A', blurb: 'B' }, { tone: 'punchy', platforms: ['META'] })
     expect(renderCreativeImages).toHaveBeenCalledWith(
       expect.objectContaining({ coverImageUrl: 'data:image/png;base64,Y292ZXI=', templateKey: 'bold', platforms: ['META'] })
     )
-    expect(prisma.creativeSet.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          bookId: 'book_1',
-          adCopies: { createMany: { data: [{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }] } },
-        }),
-      })
-    )
-    expect(prisma.book.update).toHaveBeenCalledWith({ where: { id: 'book_1' }, data: { status: 'generated' } })
+    expect(prisma.book.update).toHaveBeenCalledWith({
+      where: { id: 'book_1' },
+      data: expect.objectContaining({
+        status: 'generated',
+        creativeSets: {
+          create: expect.objectContaining({
+            adCopies: { createMany: { data: [{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }] } },
+          }),
+        },
+      }),
+    })
   })
 
   it('writes a blank, editable copy row per platform when copy generation fails', async () => {
     vi.mocked(generateAdCopy).mockResolvedValue([])
     const res = await POST(new Request('http://localhost'), ctx('book_1'))
     expect(res.status).toBe(201)
-    expect(prisma.creativeSet.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          adCopies: { createMany: { data: [{ platform: 'META', headline: '', primaryText: '', description: '' }] } },
-        }),
-      })
-    )
+    expect(prisma.book.update).toHaveBeenCalledWith({
+      where: { id: 'book_1' },
+      data: expect.objectContaining({
+        status: 'generated',
+        creativeSets: {
+          create: expect.objectContaining({
+            adCopies: { createMany: { data: [{ platform: 'META', headline: '', primaryText: '', description: '' }] } },
+          }),
+        },
+      }),
+    })
   })
 
   it('returns a readable 500 and writes nothing when image rendering fails', async () => {
@@ -78,8 +85,15 @@ describe('POST /api/ads/projects/:id/generate', () => {
     const res = await POST(new Request('http://localhost'), ctx('book_1'))
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/couldn.t generate/i)
-    expect(prisma.creativeSet.create).not.toHaveBeenCalled()
     expect(prisma.book.update).not.toHaveBeenCalled()
+  })
+
+  it('returns a readable 500 and no partial state when the atomic write fails', async () => {
+    vi.mocked(generateAdCopy).mockResolvedValue([{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }])
+    vi.mocked(prisma.book.update).mockRejectedValue(new Error('db exploded'))
+    const res = await POST(new Request('http://localhost'), ctx('book_1'))
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toMatch(/couldn.t generate/i)
   })
 
   it('returns 404 when the book does not belong to the caller', async () => {
