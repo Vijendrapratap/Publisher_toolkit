@@ -2,7 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { isClerkConfigured } from '@/lib/auth'
 
-const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/api/ads/projects(.*)'])
+const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/api/ads(.*)'])
 
 // Local dev without real Clerk credentials (see lib/auth.ts): Clerk's own
 // middleware rejects the placeholder key outright, so skip it entirely and
