@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { requireCurrentPublisherId } from '@/lib/auth'
+import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
 import { GenerateButton } from './GenerateButton'

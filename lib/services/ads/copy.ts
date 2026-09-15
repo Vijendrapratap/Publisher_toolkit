@@ -1,5 +1,7 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { isAiConfigured } from '@/lib/providers/ai'
+import { sampleAdCopy } from './sampleCopy'
 
 export type AdPlatform = 'META' | 'GOOGLE' | 'AMAZON'
 
@@ -37,6 +39,7 @@ Amazon: straightforward, title/author forward.`,
 }
 
 export async function generateAdCopy(book: { title: string; author: string; blurb: string }): Promise<AdCopyResult[]> {
+  if (!isAiConfigured()) return sampleAdCopy(book)
   try {
     return await attemptGeneration(book)
   } catch {

@@ -1,6 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
-import { isClerkConfigured } from '@/lib/auth'
+import { isClerkConfigured } from '@/lib/providers/auth'
 
 const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/api/ads(.*)'])
 

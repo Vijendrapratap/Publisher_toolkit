@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireCurrentPublisherId } from '@/lib/auth'
+import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { generateAdCopy } from '@/lib/services/ads/copy'
 import { renderCreativeImages } from '@/lib/services/ads/render'

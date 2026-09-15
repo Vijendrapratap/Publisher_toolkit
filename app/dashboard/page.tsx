@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireCurrentPublisherId } from '@/lib/auth'
+import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBooksForPublisher } from '@/lib/services/ads/queries'
 
 // Per-publisher data — must never be statically prerendered/shared across users.

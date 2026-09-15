@@ -1,5 +1,5 @@
 import { ClerkProvider } from '@clerk/nextjs'
-import { isClerkConfigured } from '@/lib/auth'
+import { isClerkConfigured } from '@/lib/providers/auth'
 import './globals.css'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

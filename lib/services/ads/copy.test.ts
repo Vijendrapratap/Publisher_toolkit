@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('ai', async (importOriginal) => ({
   ...(await importOriginal<typeof import('ai')>()),
@@ -11,6 +11,9 @@ import { generateAdCopy } from './copy'
 const book = { title: 'The Lazy Developer', author: 'Jane Coder', blurb: 'A story about shipping less code.' }
 
 describe('generateAdCopy', () => {
+  beforeEach(() => { process.env.AI_GATEWAY_API_KEY = 'test-key' })
+  afterEach(() => { delete process.env.AI_GATEWAY_API_KEY; vi.mocked(generateText).mockReset() })
+
   it('returns copy for each platform on success', async () => {
     vi.mocked(generateText).mockResolvedValue({
       output: {
@@ -33,5 +36,12 @@ describe('generateAdCopy', () => {
     const result = await generateAdCopy(book)
     expect(result).toEqual([])
     expect(generateText).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses local sample copy without calling the model when AI is not configured', async () => {
+    delete process.env.AI_GATEWAY_API_KEY
+    const result = await generateAdCopy(book)
+    expect(result).toHaveLength(3)
+    expect(generateText).not.toHaveBeenCalled()
   })
 })

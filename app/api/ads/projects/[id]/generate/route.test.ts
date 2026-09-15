@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
+vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
 vi.mock('@/lib/services/ads/queries', () => ({
   getBookForPublisher: vi.fn().mockResolvedValue({
     id: 'book_1', title: 'T', author: 'A', blurb: 'B', frontCoverUrl: 'https://x/cover.png',
