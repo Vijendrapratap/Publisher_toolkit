@@ -44,4 +44,27 @@ describe('generateAdCopy', () => {
     expect(result).toHaveLength(3)
     expect(generateText).not.toHaveBeenCalled()
   })
+
+  it('includes the tone in the prompt and keeps only requested platforms', async () => {
+    vi.mocked(generateText).mockResolvedValue({
+      output: {
+        variants: [
+          { platform: 'META', headline: 'H', primaryText: 'P', description: 'D' },
+          { platform: 'GOOGLE', headline: 'H2', primaryText: 'P2', description: 'D2' },
+          { platform: 'AMAZON', headline: 'H3', primaryText: 'P3', description: 'D3' },
+        ],
+      },
+    } as any)
+
+    const result = await generateAdCopy(book, { tone: 'punchy', platforms: ['GOOGLE'] })
+
+    expect(result.map((r) => r.platform)).toEqual(['GOOGLE'])
+    expect(vi.mocked(generateText).mock.calls[0][0].prompt).toContain('Tone: punchy')
+  })
+
+  it('filters local sample copy to the requested platforms too', async () => {
+    delete process.env.AI_GATEWAY_API_KEY
+    const result = await generateAdCopy(book, { tone: 'bold', platforms: ['META', 'AMAZON'] })
+    expect(result.map((r) => r.platform)).toEqual(['META', 'AMAZON'])
+  })
 })

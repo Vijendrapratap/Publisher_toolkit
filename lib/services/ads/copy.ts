@@ -2,6 +2,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { isAiConfigured } from '@/lib/providers/ai'
 import { sampleAdCopy } from './sampleCopy'
+import type { CopyTone } from './options'
 
 export type AdPlatform = 'META' | 'GOOGLE' | 'AMAZON'
 
@@ -11,6 +12,8 @@ export interface AdCopyResult {
   primaryText: string
   description: string
 }
+
+type BookInput = { title: string; author: string; blurb: string }
 
 const adCopySchema = z.object({
   variants: z.array(
@@ -23,7 +26,7 @@ const adCopySchema = z.object({
   ),
 })
 
-async function attemptGeneration(book: { title: string; author: string; blurb: string }) {
+async function attemptGeneration(book: BookInput, tone: CopyTone) {
   const { output } = await generateText({
     model: 'anthropic/claude-sonnet-5',
     output: Output.object({ schema: adCopySchema }),
@@ -31,6 +34,7 @@ async function attemptGeneration(book: { title: string; author: string; blurb: s
 Book title: ${book.title}
 Author: ${book.author}
 Blurb: ${book.blurb}
+Tone: ${tone}
 Meta: casual, hook-driven headline (<=40 chars), primary text (<=125 chars).
 Google: benefit-driven headline (<=30 chars), description (<=90 chars).
 Amazon: straightforward, title/author forward.`,
@@ -38,13 +42,20 @@ Amazon: straightforward, title/author forward.`,
   return output.variants
 }
 
-export async function generateAdCopy(book: { title: string; author: string; blurb: string }): Promise<AdCopyResult[]> {
-  if (!isAiConfigured()) return sampleAdCopy(book)
+export async function generateAdCopy(
+  book: BookInput,
+  options: { tone?: CopyTone; platforms?: AdPlatform[] } = {}
+): Promise<AdCopyResult[]> {
+  const tone = options.tone ?? 'literary'
+  const wanted = (variants: AdCopyResult[]) =>
+    options.platforms?.length ? variants.filter((v) => options.platforms!.includes(v.platform)) : variants
+
+  if (!isAiConfigured()) return wanted(sampleAdCopy(book, tone))
   try {
-    return await attemptGeneration(book)
+    return wanted(await attemptGeneration(book, tone))
   } catch {
     try {
-      return await attemptGeneration(book)
+      return wanted(await attemptGeneration(book, tone))
     } catch {
       return []
     }

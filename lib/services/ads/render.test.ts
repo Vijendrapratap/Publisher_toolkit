@@ -20,4 +20,15 @@ describe('renderCreativeImages', () => {
       expect(height).toBe(spec.height)
     }
   })
+
+  it('renders only the sizes for the requested platforms, with the chosen template', async () => {
+    const images = await renderCreativeImages({
+      coverImageUrl: 'https://example.com/cover.png',
+      title: 'The Lazy Developer',
+      author: 'Jane Coder',
+      templateKey: 'minimal',
+      platforms: ['META'],
+    })
+    expect(images.map((i) => i.sizeKey)).toEqual(['meta_feed_1080x1080', 'meta_story_1080x1920'])
+  })
 })

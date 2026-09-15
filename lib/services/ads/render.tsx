@@ -1,7 +1,8 @@
 import { ImageResponse } from 'next/og'
-import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
-import { CreativeTemplate } from '@/lib/services/ads/CreativeTemplate'
-import type { AdPlatform } from '@/lib/services/ads/copy'
+import { CREATIVE_SIZES } from './sizes'
+import { CreativeTemplate } from './CreativeTemplate'
+import { getTemplate } from './options'
+import type { AdPlatform } from './copy'
 
 export interface RenderedCreativeImage {
   sizeKey: string
@@ -15,10 +16,16 @@ export async function renderCreativeImages(input: {
   coverImageUrl: string
   title: string
   author: string
+  templateKey?: string
+  platforms?: AdPlatform[]
 }): Promise<RenderedCreativeImage[]> {
-  const results: RenderedCreativeImage[] = []
+  const { palette } = getTemplate(input.templateKey ?? 'classic')
+  const sizes = input.platforms?.length
+    ? CREATIVE_SIZES.filter((s) => input.platforms!.includes(s.platform))
+    : CREATIVE_SIZES
 
-  for (const spec of CREATIVE_SIZES) {
+  const results: RenderedCreativeImage[] = []
+  for (const spec of sizes) {
     const response = new ImageResponse(
       (
         <CreativeTemplate
@@ -27,19 +34,18 @@ export async function renderCreativeImages(input: {
           author={input.author}
           width={spec.width}
           height={spec.height}
+          palette={palette}
         />
       ),
       { width: spec.width, height: spec.height }
     )
-    const arrayBuffer = await response.arrayBuffer()
     results.push({
       sizeKey: spec.key,
       platform: spec.platform,
       width: spec.width,
       height: spec.height,
-      pngBuffer: Buffer.from(arrayBuffer),
+      pngBuffer: Buffer.from(await response.arrayBuffer()),
     })
   }
-
   return results
 }
