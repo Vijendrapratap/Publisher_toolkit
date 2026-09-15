@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
-import { uploadToBlob } from '@/lib/blob'
+import { storeFile } from '@/lib/providers/storage'
 import { prisma } from '@/lib/db'
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
@@ -44,11 +44,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const data: { frontCoverUrl?: string; backCoverUrl?: string } = {}
   if (frontCover) {
     const bytes = Buffer.from(await frontCover.arrayBuffer())
-    data.frontCoverUrl = (await uploadToBlob(`books/${publisherId}/${Date.now()}-front.png`, bytes, frontCover.type)).url
+    data.frontCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-front.png`, bytes, frontCover.type)).url
   }
   if (backCover) {
     const bytes = Buffer.from(await backCover.arrayBuffer())
-    data.backCoverUrl = (await uploadToBlob(`books/${publisherId}/${Date.now()}-back.png`, bytes, backCover.type)).url
+    data.backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, bytes, backCover.type)).url
   }
 
   const updated = await prisma.book.update({ where: { id: book.id }, data })

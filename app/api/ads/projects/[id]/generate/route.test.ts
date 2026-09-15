@@ -8,7 +8,11 @@ vi.mock('@/lib/services/ads/queries', () => ({
 }))
 vi.mock('@/lib/services/ads/copy', () => ({ generateAdCopy: vi.fn() }))
 vi.mock('@/lib/services/ads/render', () => ({ renderCreativeImages: vi.fn() }))
-vi.mock('@/lib/blob', () => ({ uploadToBlob: vi.fn().mockResolvedValue({ url: 'https://blob.example/img.png' }) }))
+vi.mock('@/lib/providers/storage', () => ({
+  storeFile: vi.fn().mockResolvedValue({ url: 'https://blob.example/img.png' }),
+  readStoredFile: vi.fn().mockResolvedValue({ data: Buffer.from('cover'), contentType: 'image/png' }),
+  toDataUri: vi.fn().mockReturnValue('data:image/png;base64,Y292ZXI='),
+}))
 vi.mock('@/lib/db', () => ({
   prisma: {
     creativeSet: {
@@ -43,6 +47,9 @@ describe('POST /api/ads/projects/:id/generate', () => {
 
     expect(res.status).toBe(201)
     expect(json.creativeSetId).toBe('set_1')
+    expect(renderCreativeImages).toHaveBeenCalledWith(
+      expect.objectContaining({ coverImageUrl: 'data:image/png;base64,Y292ZXI=' })
+    )
     expect(prisma.creativeSet.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

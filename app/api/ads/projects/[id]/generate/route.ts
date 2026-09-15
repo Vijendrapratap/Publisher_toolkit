@@ -3,7 +3,7 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { generateAdCopy } from '@/lib/services/ads/copy'
 import { renderCreativeImages } from '@/lib/services/ads/render'
-import { uploadToBlob } from '@/lib/blob'
+import { storeFile, readStoredFile, toDataUri } from '@/lib/providers/storage'
 import { prisma } from '@/lib/db'
 
 export const maxDuration = 300
@@ -19,17 +19,18 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'book has no cover image' }, { status: 400 })
   }
 
+  const coverDataUri = toDataUri(await readStoredFile(book.frontCoverUrl))
   const [adCopyVariants, renderedImages] = await Promise.all([
     generateAdCopy({ title: book.title ?? '', author: book.author ?? '', blurb: book.blurb ?? '' }),
-    renderCreativeImages({ coverImageUrl: book.frontCoverUrl, title: book.title ?? '', author: book.author ?? '' }),
+    renderCreativeImages({ coverImageUrl: coverDataUri, title: book.title ?? '', author: book.author ?? '' }),
   ])
 
   const creativeSetId = crypto.randomUUID()
 
   const uploadedImages = await Promise.all(
     renderedImages.map(async (img) => {
-      const { url } = await uploadToBlob(
-        `creatives/${creativeSetId}/${img.sizeKey}.png`,
+      const { url } = await storeFile(
+        `ads/${publisherId}/creatives/${creativeSetId}/${img.sizeKey}.png`,
         img.pngBuffer,
         'image/png'
       )

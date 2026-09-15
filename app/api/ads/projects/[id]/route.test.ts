@@ -4,14 +4,14 @@ vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mock
 vi.mock('@/lib/services/ads/queries', () => ({
   getBookForPublisher: vi.fn().mockResolvedValue({ id: 'book_1', publisherId: 'pub_1' }),
 }))
-vi.mock('@/lib/blob', () => ({ uploadToBlob: vi.fn().mockResolvedValue({ url: 'https://blob.example/file' }) }))
+vi.mock('@/lib/providers/storage', () => ({ storeFile: vi.fn().mockResolvedValue({ url: 'https://blob.example/file' }) }))
 vi.mock('@/lib/db', () => ({
   prisma: { book: { update: vi.fn().mockResolvedValue({ id: 'book_1' }) } },
 }))
 
 import { PATCH } from './route'
 import { prisma } from '@/lib/db'
-import { uploadToBlob } from '@/lib/blob'
+import { storeFile } from '@/lib/providers/storage'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 
 function ctx(id: string) {
@@ -34,7 +34,7 @@ describe('PATCH /api/ads/projects/:id', () => {
 
     expect(res.status).toBe(200)
     expect(json.id).toBe('book_1')
-    expect(uploadToBlob).toHaveBeenCalledWith(
+    expect(storeFile).toHaveBeenCalledWith(
       expect.stringContaining('-front.png'),
       Buffer.from('front-bytes'),
       'image/png'
@@ -83,7 +83,7 @@ describe('PATCH /api/ads/projects/:id', () => {
 
     expect(res.status).toBe(200)
     expect(json.id).toBe('book_1')
-    expect(uploadToBlob).toHaveBeenCalledTimes(1)
+    expect(storeFile).toHaveBeenCalledTimes(1)
     expect(prisma.book.update).toHaveBeenCalledWith({
       where: { id: 'book_1' },
       data: { frontCoverUrl: 'https://blob.example/file' },

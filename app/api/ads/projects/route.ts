@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { uploadToBlob } from '@/lib/blob'
+import { storeFile } from '@/lib/providers/storage'
 import { extractBookAssets } from '@/lib/services/ads/extract'
 import { prisma } from '@/lib/db'
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'pdf exceeds the 25MB size limit' }, { status: 400 })
   }
   const pdfBytes = Buffer.from(await pdfFile.arrayBuffer())
-  const { url: pdfUrl } = await uploadToBlob(`books/${publisherId}/${Date.now()}.pdf`, pdfBytes, 'application/pdf')
+  const { url: pdfUrl } = await storeFile(`ads/${publisherId}/${Date.now()}.pdf`, pdfBytes, 'application/pdf')
 
   const extracted = await extractBookAssets(pdfBytes)
 
@@ -51,17 +51,17 @@ export async function POST(request: Request) {
   let frontCoverUrl: string | null = null
   if (manualFrontCover) {
     const bytes = Buffer.from(await manualFrontCover.arrayBuffer())
-    frontCoverUrl = (await uploadToBlob(`books/${publisherId}/${Date.now()}-front.png`, bytes, manualFrontCover.type)).url
+    frontCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-front.png`, bytes, manualFrontCover.type)).url
   } else if (extracted.frontCoverPng) {
-    frontCoverUrl = (await uploadToBlob(`books/${publisherId}/${Date.now()}-front.png`, extracted.frontCoverPng, 'image/png')).url
+    frontCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-front.png`, extracted.frontCoverPng, 'image/png')).url
   }
 
   let backCoverUrl: string | null = null
   if (manualBackCover) {
     const bytes = Buffer.from(await manualBackCover.arrayBuffer())
-    backCoverUrl = (await uploadToBlob(`books/${publisherId}/${Date.now()}-back.png`, bytes, manualBackCover.type)).url
+    backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, bytes, manualBackCover.type)).url
   } else if (extracted.backCoverPng) {
-    backCoverUrl = (await uploadToBlob(`books/${publisherId}/${Date.now()}-back.png`, extracted.backCoverPng, 'image/png')).url
+    backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, extracted.backCoverPng, 'image/png')).url
   }
 
   const book = await prisma.book.create({

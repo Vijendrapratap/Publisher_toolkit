@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
-vi.mock('@/lib/blob', () => ({ uploadToBlob: vi.fn().mockResolvedValue({ url: 'https://blob.example/file' }) }))
+vi.mock('@/lib/providers/storage', () => ({ storeFile: vi.fn().mockResolvedValue({ url: 'https://blob.example/file' }) }))
 vi.mock('@/lib/services/ads/extract', () => ({
   extractBookAssets: vi.fn().mockResolvedValue({
     title: 'Test Book',
@@ -17,7 +17,7 @@ vi.mock('@/lib/db', () => ({
 
 import { POST } from './route'
 import { prisma } from '@/lib/db'
-import { uploadToBlob } from '@/lib/blob'
+import { storeFile } from '@/lib/providers/storage'
 
 function formDataRequest(fields: Record<string, Blob>) {
   const form = new FormData()
@@ -66,12 +66,12 @@ describe('POST /api/ads/projects', () => {
     const json = await res.json()
 
     expect(json.needsManualCover).toBe(false)
-    expect(uploadToBlob).toHaveBeenCalledWith(
+    expect(storeFile).toHaveBeenCalledWith(
       expect.stringContaining('-front.png'),
       manualFrontCoverBytes,
       'image/jpeg'
     )
-    expect(uploadToBlob).not.toHaveBeenCalledWith(
+    expect(storeFile).not.toHaveBeenCalledWith(
       expect.stringContaining('-front.png'),
       Buffer.from('png'),
       'image/png'
@@ -94,7 +94,7 @@ describe('POST /api/ads/projects', () => {
     const json = await res.json()
 
     expect(json.needsManualCover).toBe(false)
-    expect(uploadToBlob).toHaveBeenCalledWith(
+    expect(storeFile).toHaveBeenCalledWith(
       expect.stringContaining('-front.png'),
       manualFrontCoverBytes,
       'image/jpeg'
