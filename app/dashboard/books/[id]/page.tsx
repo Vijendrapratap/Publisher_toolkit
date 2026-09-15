@@ -4,6 +4,9 @@ import { getBookForPublisher } from '@/lib/books/queries'
 import { getLatestCreativeSetForBook } from '@/lib/creativeSets/queries'
 import { GenerateButton } from './GenerateButton'
 
+// Per-publisher data — must never be statically prerendered/shared across users.
+export const dynamic = 'force-dynamic'
+
 export default async function BookDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const publisherId = await requireCurrentPublisherId()

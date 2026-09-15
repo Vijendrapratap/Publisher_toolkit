@@ -1,10 +1,17 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
+import { isClerkConfigured } from '@/lib/auth'
 
 const isProtectedRoute = createRouteMatcher(['/dashboard(.*)', '/api/books(.*)'])
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) await auth.protect()
-})
+// Local dev without real Clerk credentials (see lib/auth.ts): Clerk's own
+// middleware rejects the placeholder key outright, so skip it entirely and
+// let requireCurrentPublisherId()'s dev fallback handle auth downstream.
+export default isClerkConfigured()
+  ? clerkMiddleware(async (auth, req) => {
+      if (isProtectedRoute(req)) await auth.protect()
+    })
+  : () => NextResponse.next()
 
 export const config = {
   matcher: [

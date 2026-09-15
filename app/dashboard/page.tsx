@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { requireCurrentPublisherId } from '@/lib/auth'
 import { getBooksForPublisher } from '@/lib/books/queries'
 
+// Per-publisher data — must never be statically prerendered/shared across users.
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const publisherId = await requireCurrentPublisherId()
   const books = await getBooksForPublisher(publisherId)
