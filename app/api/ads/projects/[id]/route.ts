@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { storeFile } from '@/lib/providers/storage'
+import { projectUpdateSchema } from '@/lib/services/ads/options'
 import { prisma } from '@/lib/db'
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
@@ -13,6 +14,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const book = await getBookForPublisher(publisherId, id)
   if (!book) {
     return NextResponse.json({ error: 'not found' }, { status: 404 })
+  }
+
+  if (request.headers.get('content-type')?.includes('application/json')) {
+    const raw = await request.json().catch(() => null)
+    const parsed = projectUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid update' }, { status: 400 })
+    }
+    const update = parsed.data
+    const completesConfig = Boolean(update.platforms && update.copyTone && update.templateKey)
+    const updated = await prisma.book.update({
+      where: { id: book.id },
+      data: completesConfig ? { ...update, status: 'configured' } : update,
+    })
+    return NextResponse.json({ id: updated.id }, { status: 200 })
   }
 
   const form = await request.formData()

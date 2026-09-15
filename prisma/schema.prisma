@@ -16,7 +16,12 @@ model Book {
   pdfUrl        String
   frontCoverUrl String?
   backCoverUrl  String?
+  status        String        @default("uploaded")
+  platforms     String[]      @default(["META", "GOOGLE", "AMAZON"])
+  copyTone      String        @default("literary")
+  templateKey   String        @default("classic")
   createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
   creativeSets  CreativeSet[]
 
   @@index([publisherId])

@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Book" ADD COLUMN     "copyTone" TEXT NOT NULL DEFAULT 'literary',
+ADD COLUMN     "platforms" TEXT[] DEFAULT ARRAY['META', 'GOOGLE', 'AMAZON']::TEXT[],
+ADD COLUMN     "status" TEXT NOT NULL DEFAULT 'uploaded',
+ADD COLUMN     "templateKey" TEXT NOT NULL DEFAULT 'classic',
+ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

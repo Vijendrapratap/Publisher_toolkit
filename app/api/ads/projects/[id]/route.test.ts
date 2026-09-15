@@ -89,4 +89,46 @@ describe('PATCH /api/ads/projects/:id', () => {
       data: { frontCoverUrl: 'https://blob.example/file' },
     })
   })
+
+  function jsonRequest(body: unknown) {
+    return new Request('http://localhost/api/ads/projects/book_1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  it('updates edited book details from JSON', async () => {
+    const res = await PATCH(jsonRequest({ title: 'Better Title', blurb: 'New blurb' }), ctx('book_1'))
+    expect(res.status).toBe(200)
+    expect(prisma.book.update).toHaveBeenCalledWith({
+      where: { id: 'book_1' },
+      data: { title: 'Better Title', blurb: 'New blurb' },
+    })
+  })
+
+  it('saves a full configuration and marks the project configured', async () => {
+    const res = await PATCH(jsonRequest({ platforms: ['META', 'GOOGLE'], copyTone: 'punchy', templateKey: 'bold' }), ctx('book_1'))
+    expect(res.status).toBe(200)
+    expect(prisma.book.update).toHaveBeenCalledWith({
+      where: { id: 'book_1' },
+      data: { platforms: ['META', 'GOOGLE'], copyTone: 'punchy', templateKey: 'bold', status: 'configured' },
+    })
+  })
+
+  it('rejects an invalid configuration with a readable error', async () => {
+    const res = await PATCH(jsonRequest({ platforms: [] }), ctx('book_1'))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Choose at least one platform')
+    expect(prisma.book.update).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed JSON', async () => {
+    const req = new Request('http://localhost/api/ads/projects/book_1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{not json',
+    })
+    expect((await PATCH(req, ctx('book_1'))).status).toBe(400)
+  })
 })
