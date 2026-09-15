@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { storeFile } from '@/lib/providers/storage'
 import { extractBookAssets } from '@/lib/services/ads/extract'
+import { COVER_RULE, PDF_RULE } from '@/lib/services/ads/validation'
 import { prisma } from '@/lib/db'
-
-const MAX_PDF_BYTES = 25 * 1024 * 1024
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
-const ALLOWED_COVER_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
 export async function POST(request: Request) {
   const publisherId = await requireCurrentPublisherId()
@@ -19,7 +16,7 @@ export async function POST(request: Request) {
   if (!pdfFile) {
     return NextResponse.json({ error: 'pdf is required' }, { status: 400 })
   }
-  if (pdfFile.size > MAX_PDF_BYTES) {
+  if (pdfFile.size > PDF_RULE.maxBytes) {
     return NextResponse.json({ error: 'pdf exceeds the 25MB size limit' }, { status: 400 })
   }
   const pdfBytes = Buffer.from(await pdfFile.arrayBuffer())
@@ -40,10 +37,10 @@ export async function POST(request: Request) {
   if (manualBackCover instanceof File && manualBackCover.size === 0) manualBackCover = null
   for (const cover of [manualFrontCover, manualBackCover]) {
     if (!cover) continue
-    if (cover.size > MAX_IMAGE_BYTES) {
+    if (cover.size > COVER_RULE.maxBytes) {
       return NextResponse.json({ error: 'cover image exceeds the 10MB size limit' }, { status: 400 })
     }
-    if (!ALLOWED_COVER_TYPES.has(cover.type)) {
+    if (!COVER_RULE.accept.includes(cover.type)) {
       return NextResponse.json({ error: 'cover image must be png, jpeg, or webp' }, { status: 400 })
     }
   }
