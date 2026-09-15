@@ -59,3 +59,9 @@ export const adCopyUpdateSchema = z.object({
   primaryText: z.string().trim().max(500),
   description: z.string().trim().max(300),
 })
+
+export const COPY_LIMITS: Record<AdPlatform, { headline: number; primaryText: number; description: number }> = {
+  META: { headline: 40, primaryText: 125, description: 90 },
+  GOOGLE: { headline: 30, primaryText: 90, description: 90 },
+  AMAZON: { headline: 80, primaryText: 150, description: 90 },
+}
