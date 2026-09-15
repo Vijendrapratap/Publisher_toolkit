@@ -16,8 +16,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const form = await request.formData()
-  const frontCover = form.get('frontCover')
-  const backCover = form.get('backCover')
+  let frontCover = form.get('frontCover')
+  let backCover = form.get('backCover')
 
   if (frontCover !== null && !(frontCover instanceof File)) {
     return NextResponse.json({ error: 'frontCover must be a file' }, { status: 400 })
@@ -25,6 +25,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (backCover !== null && !(backCover instanceof File)) {
     return NextResponse.json({ error: 'backCover must be a file' }, { status: 400 })
   }
+  // An unselected <input type="file"> still submits as a zero-byte File — treat it as absent.
+  if (frontCover instanceof File && frontCover.size === 0) frontCover = null
+  if (backCover instanceof File && backCover.size === 0) backCover = null
   for (const cover of [frontCover, backCover]) {
     if (!cover) continue
     if (cover.size > MAX_IMAGE_BYTES) {

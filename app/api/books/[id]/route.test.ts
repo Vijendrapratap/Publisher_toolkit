@@ -72,4 +72,21 @@ describe('PATCH /api/books/:id', () => {
     expect(res.status).toBe(400)
     expect(prisma.book.update).not.toHaveBeenCalled()
   })
+
+  it('treats an unselected file input (zero-byte, application/octet-stream) as absent, not a validation failure', async () => {
+    // Browsers submit an <input type="file"> with nothing chosen as a zero-byte File
+    // with type application/octet-stream, not as a missing field.
+    const frontCover = new Blob([Buffer.from('front-bytes')], { type: 'image/png' })
+    const backCover = new Blob([], { type: 'application/octet-stream' })
+    const res = await PATCH(formDataRequest({ frontCover, backCover }), ctx('book_1'))
+    const json = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(json.id).toBe('book_1')
+    expect(uploadToBlob).toHaveBeenCalledTimes(1)
+    expect(prisma.book.update).toHaveBeenCalledWith({
+      where: { id: 'book_1' },
+      data: { frontCoverUrl: 'https://blob.example/file' },
+    })
+  })
 })

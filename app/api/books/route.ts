@@ -27,14 +27,17 @@ export async function POST(request: Request) {
 
   const extracted = await extractBookAssets(pdfBytes)
 
-  const manualFrontCover = form.get('frontCover')
-  const manualBackCover = form.get('backCover')
+  let manualFrontCover = form.get('frontCover')
+  let manualBackCover = form.get('backCover')
   if (manualFrontCover !== null && !(manualFrontCover instanceof File)) {
     return NextResponse.json({ error: 'frontCover must be a file' }, { status: 400 })
   }
   if (manualBackCover !== null && !(manualBackCover instanceof File)) {
     return NextResponse.json({ error: 'backCover must be a file' }, { status: 400 })
   }
+  // An unselected <input type="file"> still submits as a zero-byte File — treat it as absent.
+  if (manualFrontCover instanceof File && manualFrontCover.size === 0) manualFrontCover = null
+  if (manualBackCover instanceof File && manualBackCover.size === 0) manualBackCover = null
   for (const cover of [manualFrontCover, manualBackCover]) {
     if (!cover) continue
     if (cover.size > MAX_IMAGE_BYTES) {
