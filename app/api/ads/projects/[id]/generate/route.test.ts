@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
-vi.mock('@/lib/books/queries', () => ({
+vi.mock('@/lib/services/ads/queries', () => ({
   getBookForPublisher: vi.fn().mockResolvedValue({
     id: 'book_1', title: 'T', author: 'A', blurb: 'B', frontCoverUrl: 'https://x/cover.png',
   }),
 }))
-vi.mock('@/lib/ai/generateAdCopy', () => ({ generateAdCopy: vi.fn() }))
-vi.mock('@/lib/compositing/renderCreativeImages', () => ({ renderCreativeImages: vi.fn() }))
+vi.mock('@/lib/services/ads/copy', () => ({ generateAdCopy: vi.fn() }))
+vi.mock('@/lib/services/ads/render', () => ({ renderCreativeImages: vi.fn() }))
 vi.mock('@/lib/blob', () => ({ uploadToBlob: vi.fn().mockResolvedValue({ url: 'https://blob.example/img.png' }) }))
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -18,16 +18,16 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import { POST } from './route'
-import { generateAdCopy } from '@/lib/ai/generateAdCopy'
-import { renderCreativeImages } from '@/lib/compositing/renderCreativeImages'
+import { generateAdCopy } from '@/lib/services/ads/copy'
+import { renderCreativeImages } from '@/lib/services/ads/render'
 import { prisma } from '@/lib/db'
-import { getBookForPublisher } from '@/lib/books/queries'
+import { getBookForPublisher } from '@/lib/services/ads/queries'
 
 function ctx(id: string) {
   return { params: Promise.resolve({ id }) }
 }
 
-describe('POST /api/books/:id/generate', () => {
+describe('POST /api/ads/projects/:id/generate', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('creates a creative set with copy and images on success', async () => {

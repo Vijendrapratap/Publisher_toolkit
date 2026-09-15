@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { requireCurrentPublisherId } from '@/lib/auth'
-import { getBookForPublisher } from '@/lib/books/queries'
-import { getLatestCreativeSetForBook } from '@/lib/creativeSets/queries'
+import { getBookForPublisher } from '@/lib/services/ads/queries'
+import { getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
 import { GenerateButton } from './GenerateButton'
 
 // Per-publisher data — must never be statically prerendered/shared across users.

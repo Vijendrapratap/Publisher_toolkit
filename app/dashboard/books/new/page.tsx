@@ -12,7 +12,7 @@ export default function NewBookPage() {
   async function handleSubmit(formData: FormData) {
     setPending(true)
     setError(null)
-    const res = await fetch('/api/books', { method: 'POST', body: formData })
+    const res = await fetch('/api/ads/projects', { method: 'POST', body: formData })
     setPending(false)
     if (!res.ok) {
       setError('Something went wrong uploading your book. Please try again.')
@@ -31,7 +31,7 @@ export default function NewBookPage() {
     if (!bookId) return
     setPending(true)
     setError(null)
-    const res = await fetch(`/api/books/${bookId}`, { method: 'PATCH', body: formData })
+    const res = await fetch(`/api/ads/projects/${bookId}`, { method: 'PATCH', body: formData })
     setPending(false)
     if (!res.ok) {
       setError('Something went wrong uploading the cover. Please try again.')

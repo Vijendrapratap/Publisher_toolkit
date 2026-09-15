@@ -1,15 +1,25 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { prisma } from '@/lib/db'
-import { getLatestCreativeSetForBook } from './queries'
+import { getBooksForPublisher, getBookForPublisher, getLatestCreativeSetForBook } from './queries'
+
+afterEach(async () => {
+  await prisma.creativeImage.deleteMany()
+  await prisma.adCopy.deleteMany()
+  await prisma.creativeSet.deleteMany()
+  await prisma.book.deleteMany()
+})
+
+describe('book queries', () => {
+  it('only returns books belonging to the given publisher', async () => {
+    await prisma.book.create({ data: { publisherId: 'pub_a', pdfUrl: 'x' } })
+    const bookB = await prisma.book.create({ data: { publisherId: 'pub_b', pdfUrl: 'y' } })
+
+    expect(await getBooksForPublisher('pub_a')).toHaveLength(1)
+    expect(await getBookForPublisher('pub_a', bookB.id)).toBeNull()
+  })
+})
 
 describe('getLatestCreativeSetForBook', () => {
-  afterEach(async () => {
-    await prisma.creativeImage.deleteMany()
-    await prisma.adCopy.deleteMany()
-    await prisma.creativeSet.deleteMany()
-    await prisma.book.deleteMany()
-  })
-
   it('returns the most recent creative set with its copy and images', async () => {
     const book = await prisma.book.create({ data: { publisherId: 'pub_1', pdfUrl: 'x' } })
     await prisma.creativeSet.create({ data: { bookId: book.id } })
@@ -30,8 +40,6 @@ describe('getLatestCreativeSetForBook', () => {
   it('returns null when the book does not belong to the given publisher', async () => {
     const book = await prisma.book.create({ data: { publisherId: 'pub_1', pdfUrl: 'x' } })
     await prisma.creativeSet.create({ data: { bookId: book.id } })
-
-    const result = await getLatestCreativeSetForBook(book.id, 'pub_2')
-    expect(result).toBeNull()
+    expect(await getLatestCreativeSetForBook(book.id, 'pub_2')).toBeNull()
   })
 })

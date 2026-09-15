@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { renderCreativeImages } from './renderCreativeImages'
-import { CREATIVE_SIZES } from '@/lib/templates/specs'
+import { renderCreativeImages } from './render'
+import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
 import { readPngSize } from './pngSize'
 
 describe('renderCreativeImages', () => {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/auth'
 import { uploadToBlob } from '@/lib/blob'
-import { extractBookAssets } from '@/lib/pdf/extract'
+import { extractBookAssets } from '@/lib/services/ads/extract'
 import { prisma } from '@/lib/db'
 
 const MAX_PDF_BYTES = 25 * 1024 * 1024

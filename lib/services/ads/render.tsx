@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
-import { CREATIVE_SIZES } from '@/lib/templates/specs'
-import { CreativeTemplate } from '@/lib/templates/CreativeTemplate'
-import type { AdPlatform } from '@/lib/ai/generateAdCopy'
+import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
+import { CreativeTemplate } from '@/lib/services/ads/CreativeTemplate'
+import type { AdPlatform } from '@/lib/services/ads/copy'
 
 export interface RenderedCreativeImage {
   sizeKey: string

@@ -1,4 +1,4 @@
-import type { AdPlatform } from '@/lib/ai/generateAdCopy'
+import type { AdPlatform } from '@/lib/services/ads/copy'
 
 export interface CreativeSizeSpec {
   key: string

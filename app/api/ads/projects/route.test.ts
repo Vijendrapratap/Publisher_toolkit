@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
 vi.mock('@/lib/blob', () => ({ uploadToBlob: vi.fn().mockResolvedValue({ url: 'https://blob.example/file' }) }))
-vi.mock('@/lib/pdf/extract', () => ({
+vi.mock('@/lib/services/ads/extract', () => ({
   extractBookAssets: vi.fn().mockResolvedValue({
     title: 'Test Book',
     author: 'Test Author',
@@ -22,10 +22,10 @@ import { uploadToBlob } from '@/lib/blob'
 function formDataRequest(fields: Record<string, Blob>) {
   const form = new FormData()
   for (const [key, value] of Object.entries(fields)) form.append(key, value)
-  return new Request('http://localhost/api/books', { method: 'POST', body: form })
+  return new Request('http://localhost/api/ads/projects', { method: 'POST', body: form })
 }
 
-describe('POST /api/books', () => {
+describe('POST /api/ads/projects', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('creates a book from an uploaded PDF with extracted metadata', async () => {
@@ -44,7 +44,7 @@ describe('POST /api/books', () => {
   })
 
   it('flags needsManualCover when extraction finds no cover', async () => {
-    const { extractBookAssets } = await import('@/lib/pdf/extract')
+    const { extractBookAssets } = await import('@/lib/services/ads/extract')
     vi.mocked(extractBookAssets).mockResolvedValueOnce({
       title: null, author: null, blurb: null, frontCoverPng: null, backCoverPng: null,
     })
@@ -79,7 +79,7 @@ describe('POST /api/books', () => {
   })
 
   it('falls back to the manually-supplied front cover when extraction finds no cover', async () => {
-    const { extractBookAssets } = await import('@/lib/pdf/extract')
+    const { extractBookAssets } = await import('@/lib/services/ads/extract')
     vi.mocked(extractBookAssets).mockResolvedValueOnce({
       title: null, author: null, blurb: null, frontCoverPng: null, backCoverPng: null,
     })
@@ -104,7 +104,7 @@ describe('POST /api/books', () => {
   it('rejects a pdf field that is not a File', async () => {
     const form = new FormData()
     form.append('pdf', 'not-a-file')
-    const res = await POST(new Request('http://localhost/api/books', { method: 'POST', body: form }))
+    const res = await POST(new Request('http://localhost/api/ads/projects', { method: 'POST', body: form }))
     expect(res.status).toBe(400)
     expect(prisma.book.create).not.toHaveBeenCalled()
   })

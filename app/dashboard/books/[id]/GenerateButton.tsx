@@ -8,7 +8,7 @@ export function GenerateButton({ bookId }: { bookId: string }) {
 
   async function handleClick() {
     setPending(true)
-    await fetch(`/api/books/${bookId}/generate`, { method: 'POST' })
+    await fetch(`/api/ads/projects/${bookId}/generate`, { method: 'POST' })
     setPending(false)
     router.refresh()
   }

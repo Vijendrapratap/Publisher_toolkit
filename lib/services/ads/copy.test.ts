@@ -6,7 +6,7 @@ vi.mock('ai', async (importOriginal) => ({
 }))
 
 import { generateText } from 'ai'
-import { generateAdCopy } from './generateAdCopy'
+import { generateAdCopy } from './copy'
 
 const book = { title: 'The Lazy Developer', author: 'Jane Coder', blurb: 'A story about shipping less code.' }
 

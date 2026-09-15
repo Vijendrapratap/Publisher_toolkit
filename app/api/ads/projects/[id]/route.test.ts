@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
-vi.mock('@/lib/books/queries', () => ({
+vi.mock('@/lib/services/ads/queries', () => ({
   getBookForPublisher: vi.fn().mockResolvedValue({ id: 'book_1', publisherId: 'pub_1' }),
 }))
 vi.mock('@/lib/blob', () => ({ uploadToBlob: vi.fn().mockResolvedValue({ url: 'https://blob.example/file' }) }))
@@ -12,7 +12,7 @@ vi.mock('@/lib/db', () => ({
 import { PATCH } from './route'
 import { prisma } from '@/lib/db'
 import { uploadToBlob } from '@/lib/blob'
-import { getBookForPublisher } from '@/lib/books/queries'
+import { getBookForPublisher } from '@/lib/services/ads/queries'
 
 function ctx(id: string) {
   return { params: Promise.resolve({ id }) }
@@ -21,10 +21,10 @@ function ctx(id: string) {
 function formDataRequest(fields: Record<string, Blob>) {
   const form = new FormData()
   for (const [key, value] of Object.entries(fields)) form.append(key, value)
-  return new Request('http://localhost/api/books/book_1', { method: 'PATCH', body: form })
+  return new Request('http://localhost/api/ads/projects/book_1', { method: 'PATCH', body: form })
 }
 
-describe('PATCH /api/books/:id', () => {
+describe('PATCH /api/ads/projects/:id', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('uploads a front cover and updates the book', async () => {

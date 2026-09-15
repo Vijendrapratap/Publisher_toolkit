@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/auth'
-import { getBookForPublisher } from '@/lib/books/queries'
-import { generateAdCopy } from '@/lib/ai/generateAdCopy'
-import { renderCreativeImages } from '@/lib/compositing/renderCreativeImages'
+import { getBookForPublisher } from '@/lib/services/ads/queries'
+import { generateAdCopy } from '@/lib/services/ads/copy'
+import { renderCreativeImages } from '@/lib/services/ads/render'
 import { uploadToBlob } from '@/lib/blob'
 import { prisma } from '@/lib/db'
 

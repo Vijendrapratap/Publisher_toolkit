@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/auth'
-import { getBookForPublisher } from '@/lib/books/queries'
+import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { uploadToBlob } from '@/lib/blob'
 import { prisma } from '@/lib/db'
 
