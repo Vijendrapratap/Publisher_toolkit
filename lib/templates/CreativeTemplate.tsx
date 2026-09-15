@@ -11,7 +11,9 @@ export function CreativeTemplate({
   width: number
   height: number
 }) {
-  const isBanner = height <= 250 && width > height
+  // Row layout only for genuinely wide/short banner shapes (e.g. 728x90).
+  // A squarish or portrait size like 300x250 needs the stacked/column layout.
+  const isBanner = width / height >= 2
   return (
     <div
       style={{
