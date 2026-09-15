@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { prisma } from '@/lib/db'
-import { getBooksForPublisher, getBookForPublisher, getLatestCreativeSetForBook } from './queries'
+import { getBooksForPublisher, getBookForPublisher, getLatestCreativeSetForBook, getAdCopyForPublisher } from './queries'
 
 afterEach(async () => {
   await prisma.creativeImage.deleteMany()
@@ -41,5 +41,19 @@ describe('getLatestCreativeSetForBook', () => {
     const book = await prisma.book.create({ data: { publisherId: 'pub_1', pdfUrl: 'x' } })
     await prisma.creativeSet.create({ data: { bookId: book.id } })
     expect(await getLatestCreativeSetForBook(book.id, 'pub_2')).toBeNull()
+  })
+})
+
+describe('getAdCopyForPublisher', () => {
+  it("finds a copy row only through its book's publisher", async () => {
+    const book = await prisma.book.create({ data: { publisherId: 'pub_1', pdfUrl: 'x' } })
+    const set = await prisma.creativeSet.create({
+      data: { bookId: book.id, adCopies: { create: [{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }] } },
+      include: { adCopies: true },
+    })
+    const copyId = set.adCopies[0].id
+
+    expect((await getAdCopyForPublisher('pub_1', copyId))?.id).toBe(copyId)
+    expect(await getAdCopyForPublisher('pub_2', copyId)).toBeNull()
   })
 })

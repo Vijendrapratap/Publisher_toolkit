@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import type { Book } from '@prisma/client'
+import type { Book, AdCopy } from '@prisma/client'
 
 export function getBooksForPublisher(publisherId: string): Promise<Book[]> {
   return prisma.book.findMany({ where: { publisherId }, orderBy: { createdAt: 'desc' } })
@@ -15,4 +15,8 @@ export function getLatestCreativeSetForBook(bookId: string, publisherId: string)
     orderBy: { createdAt: 'desc' },
     include: { adCopies: true, images: true },
   })
+}
+
+export function getAdCopyForPublisher(publisherId: string, copyId: string): Promise<AdCopy | null> {
+  return prisma.adCopy.findFirst({ where: { id: copyId, creativeSet: { book: { publisherId } } } })
 }

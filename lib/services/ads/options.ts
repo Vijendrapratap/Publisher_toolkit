@@ -53,3 +53,9 @@ export const projectUpdateSchema = z
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, 'Nothing to update')
+
+export const adCopyUpdateSchema = z.object({
+  headline: z.string().trim().max(150),
+  primaryText: z.string().trim().max(500),
+  description: z.string().trim().max(300),
+})
