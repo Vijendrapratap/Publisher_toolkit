@@ -1,5 +1,5 @@
 {
-  "name": "ads-creative-core",
+  "name": "publisher-toolkit",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -7,9 +7,11 @@
     "doc": "docs"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev.mjs",
+    "dev:next": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:test": "node scripts/test-db.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
