@@ -43,7 +43,7 @@ export function Dropzone({
     const Icon = isImage ? ImageIcon : FileText
     return (
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">{label}</span>
+        <label htmlFor={id} className="text-sm font-medium">{label}</label>
         <div className="flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-card">
           <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent shadow-subtle">
             <Icon className="size-5" aria-hidden />
@@ -67,7 +67,7 @@ export function Dropzone({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
+      <label htmlFor={id} className="text-sm font-medium">{label}</label>
       <input
         id={id}
         type="file"

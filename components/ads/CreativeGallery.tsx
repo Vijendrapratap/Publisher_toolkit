@@ -37,12 +37,12 @@ export function CreativeGallery({ images, platformLabel }: { images: GalleryImag
                 <Expand className="size-4" aria-hidden />
               </span>
             </button>
-            <div className="flex items-center justify-between gap-2 border-t border-line px-4 py-3">
-              <span className="flex flex-col">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-3">
+              <span className="flex min-w-0 flex-col">
                 <span className="text-sm font-medium">{img.width}×{img.height}</span>
-                <span className="font-mono text-[11px] text-ink-muted">{img.sizeKey}</span>
+                <span className="truncate font-mono text-[11px] text-ink-muted">{img.sizeKey}</span>
               </span>
-              <a href={img.imageUrl} download={`${img.sizeKey}.png`} className={buttonClasses({ variant: 'ghost', size: 'sm' })}>
+              <a href={img.imageUrl} download={`${img.sizeKey}.png`} className={buttonClasses({ variant: 'ghost', size: 'sm', className: 'shrink-0' })}>
                 <Download className="size-4" aria-hidden /> Download
               </a>
             </div>

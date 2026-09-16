@@ -46,10 +46,10 @@ export default async function HubPage() {
                     href={`/ads/${p.id}`}
                     className="flex h-full flex-col overflow-hidden rounded-card bg-surface shadow-card transition-all hover:-translate-y-0.5 hover:shadow-lift"
                   >
-                    <span className="grid aspect-[4/3] place-items-center bg-surface-2 shadow-inset">
+                    <span className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-surface-2 shadow-inset">
                       {p.frontCoverUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.frontCoverUrl} alt="" className="size-full object-cover" />
+                        <img src={p.frontCoverUrl} alt="" className="absolute inset-0 size-full object-cover" />
                       ) : (
                         <BookImage className="size-8 text-ink-muted" aria-hidden />
                       )}

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { extractBookAssets } from './extract'
 import { buildFixturePdf } from './testFixtures'
+import { projectUpdateSchema } from './options'
 
 describe('extractBookAssets', () => {
   it('extracts title/author text and renders front/back cover images', async () => {
@@ -62,5 +63,30 @@ describe('extractBookAssets', () => {
     // null, without throwing and without clobbering the first-page results.
     expect(result.backCoverPng).toBeNull()
     expect(result.blurb).toBeNull()
+  })
+
+  it('clamps an over-long title and blurb to the update schema limits', async () => {
+    vi.resetModules()
+    const longText = 'x'.repeat(5000)
+    vi.doMock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+      getDocument: () => ({
+        promise: Promise.resolve({
+          numPages: 2,
+          getPage: () =>
+            Promise.resolve({
+              getViewport: () => ({ width: 10, height: 10 }),
+              render: () => ({ promise: Promise.resolve() }),
+              getTextContent: () => Promise.resolve({ items: [{ str: longText }] }),
+            }),
+        }),
+      }),
+    }))
+
+    const { extractBookAssets: extractLong } = await import('./extract')
+    const result = await extractLong(Buffer.from('irrelevant, pdfjs-dist is mocked'))
+
+    expect(result.title).toHaveLength(200)
+    expect(result.blurb).toHaveLength(2000)
+    expect(projectUpdateSchema.safeParse({ title: result.title, blurb: result.blurb }).success).toBe(true)
   })
 })

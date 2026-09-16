@@ -50,6 +50,10 @@ test('publisher creates ads end to end in local mode', async ({ page }) => {
   await expect(page.getByRole('img', { name: 'Meta ad, 1080×1080' }).first()).toBeVisible()
   await expect(page.getByRole('img', { name: 'Google ad, 728×90' }).first()).toBeVisible()
   await expect(page.getByRole('img', { name: 'Amazon ad, 300×250' }).first()).toBeVisible()
+  // Per-tile Download link must not be pushed outside its (overflow-hidden) tile.
+  const tileDownload = page.getByRole('link', { name: 'Download', exact: true }).first()
+  await tileDownload.scrollIntoViewIfNeeded()
+  await expect(tileDownload).toBeInViewport({ ratio: 1 })
   await shot(page, 'results-light')
 
   // Lightbox

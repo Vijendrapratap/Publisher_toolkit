@@ -19,6 +19,9 @@ export async function POST(request: Request) {
   if (pdfFile.size > PDF_RULE.maxBytes) {
     return NextResponse.json({ error: 'pdf exceeds the 25MB size limit' }, { status: 400 })
   }
+  if (!PDF_RULE.accept.includes(pdfFile.type)) {
+    return NextResponse.json({ error: 'pdf must be a PDF file' }, { status: 400 })
+  }
   const pdfBytes = Buffer.from(await pdfFile.arrayBuffer())
   const { url: pdfUrl } = await storeFile(`ads/${publisherId}/${Date.now()}.pdf`, pdfBytes, 'application/pdf')
 

@@ -116,6 +116,13 @@ describe('POST /api/ads/projects', () => {
     expect(prisma.book.create).not.toHaveBeenCalled()
   })
 
+  it('rejects a pdf with a disallowed content type', async () => {
+    const notAPdf = new Blob([Buffer.from('plain text')], { type: 'text/plain' })
+    const res = await POST(formDataRequest({ pdf: notAPdf }))
+    expect(res.status).toBe(400)
+    expect(prisma.book.create).not.toHaveBeenCalled()
+  })
+
   it('rejects a cover image with a disallowed content type', async () => {
     const pdfBlob = new Blob([Buffer.from('%PDF-1.4 fake')], { type: 'application/pdf' })
     const badCover = new Blob([Buffer.from('<svg/>')], { type: 'image/svg+xml' })

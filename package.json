@@ -12,7 +12,7 @@
     "build": "next build",
     "start": "next start",
     "db:test": "node scripts/test-db.mjs",
-    "test": "vitest run",
+    "test": "dotenv -e .env.test -- vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },

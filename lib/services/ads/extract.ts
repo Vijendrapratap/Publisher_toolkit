@@ -55,9 +55,11 @@ export async function extractBookAssets(pdfBytes: Buffer): Promise<ExtractedBook
     try {
       const firstPageText = await extractPageText(firstPage)
       const lines = firstPageText.split(/\s{2,}|\n/).filter(Boolean)
-      title = lines[0] ?? null
+      // Clamp to projectUpdateSchema's limits so a prefilled value is never
+      // one the PATCH that saves it would reject.
+      title = lines[0]?.slice(0, 200) ?? null
       const authorLine = lines.find((l) => /^by\s+/i.test(l))
-      author = authorLine ? authorLine.replace(/^by\s+/i, '') : null
+      author = authorLine ? authorLine.replace(/^by\s+/i, '').slice(0, 200) : null
     } catch {
       title = null
       author = null
@@ -88,7 +90,7 @@ export async function extractBookAssets(pdfBytes: Buffer): Promise<ExtractedBook
       }
 
       try {
-        blurb = (await extractPageText(lastPage)) || null
+        blurb = (await extractPageText(lastPage)).slice(0, 2000) || null
       } catch {
         blurb = null
       }

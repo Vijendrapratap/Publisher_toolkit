@@ -47,7 +47,7 @@ export const projectUpdateSchema = z
     title: z.string().trim().max(200),
     author: z.string().trim().max(200),
     blurb: z.string().trim().max(2000),
-    platforms: z.array(z.enum(['META', 'GOOGLE', 'AMAZON'])).min(1, 'Choose at least one platform'),
+    platforms: z.array(z.enum(['META', 'GOOGLE', 'AMAZON'])).min(1, 'Choose at least one platform').transform((a) => [...new Set(a)]),
     copyTone: z.enum(['literary', 'punchy', 'bold']),
     templateKey: z.enum(['classic', 'bold', 'minimal']),
   })

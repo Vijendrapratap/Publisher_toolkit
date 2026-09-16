@@ -23,6 +23,11 @@ describe('projectUpdateSchema', () => {
     expect(r.success).toBe(true)
   })
 
+  it('dedupes repeated platforms so a PATCH cannot create duplicate AdCopy rows', () => {
+    const r = projectUpdateSchema.safeParse({ platforms: ['META', 'META', 'GOOGLE'] })
+    expect(r.success && r.data.platforms).toEqual(['META', 'GOOGLE'])
+  })
+
   it('rejects an empty platform list, unknown tone, and an empty body', () => {
     expect(projectUpdateSchema.safeParse({ platforms: [] }).success).toBe(false)
     expect(projectUpdateSchema.safeParse({ copyTone: 'sarcastic' }).success).toBe(false)
