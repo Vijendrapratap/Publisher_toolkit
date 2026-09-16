@@ -1,13 +1,21 @@
 // One-command local run: database (if needed) → migrations → Next.js.
 // Any extra args pass through to `next dev` (e.g. `npm run dev -- --port 3100`).
 import { spawn, spawnSync } from 'node:child_process'
-import { startEmbeddedDb } from './embedded-db.mjs'
+import { startEmbeddedDb, isPortOpen } from './embedded-db.mjs'
 
 const DEV_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/publisher_toolkit_dev'
+const SUPABASE_PORT = 54322
+const SUPABASE_DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${SUPABASE_PORT}/postgres`
 const env = { ...process.env }
 let stop = async () => {}
 
-if (!env.DATABASE_URL) {
+if (env.DATABASE_URL) {
+  console.log('[db] using DATABASE_URL from the environment')
+} else if (await isPortOpen(SUPABASE_PORT)) {
+  console.log(`[db] local Supabase detected on port ${SUPABASE_PORT} — using it`)
+  env.DATABASE_URL = SUPABASE_DATABASE_URL
+} else {
+  console.log('[db] no DATABASE_URL and no local Supabase — starting embedded Postgres')
   env.DATABASE_URL = DEV_DATABASE_URL
   ;({ stop } = await startEmbeddedDb(['publisher_toolkit_dev']))
 }

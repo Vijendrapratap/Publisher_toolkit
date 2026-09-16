@@ -9,7 +9,15 @@ npm install
 npm run dev
 ```
 
-No accounts or keys needed. The dev script starts a local Postgres, applies migrations and starts Next.js. See `.env.example` for how to switch a capability to its real service.
+No accounts or keys needed. The dev script picks a database, applies migrations and starts Next.js. See `.env.example` for how to switch a capability to its real service.
+
+### Database modes
+
+`npm run dev` picks one automatically, in this order, and prints which:
+
+1. `DATABASE_URL` set → uses it as-is.
+2. `supabase start` already running → uses the local Supabase stack (Postgres on 54322, Studio on http://127.0.0.1:54323).
+3. Otherwise → zero-setup embedded Postgres, no install required.
 
 ## Tests
 
