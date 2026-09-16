@@ -11,8 +11,8 @@ import { generateAdCopy } from './copy'
 const book = { title: 'The Lazy Developer', author: 'Jane Coder', blurb: 'A story about shipping less code.' }
 
 describe('generateAdCopy', () => {
-  beforeEach(() => { process.env.AI_GATEWAY_API_KEY = 'test-key' })
-  afterEach(() => { delete process.env.AI_GATEWAY_API_KEY; vi.mocked(generateText).mockReset() })
+  beforeEach(() => { process.env.OPENROUTER_API_KEY = 'test-key' })
+  afterEach(() => { delete process.env.OPENROUTER_API_KEY; vi.mocked(generateText).mockReset() })
 
   it('returns copy for each platform on success', async () => {
     vi.mocked(generateText).mockResolvedValue({
@@ -39,7 +39,7 @@ describe('generateAdCopy', () => {
   })
 
   it('uses local sample copy without calling the model when AI is not configured', async () => {
-    delete process.env.AI_GATEWAY_API_KEY
+    delete process.env.OPENROUTER_API_KEY
     const result = await generateAdCopy(book)
     expect(result).toHaveLength(3)
     expect(generateText).not.toHaveBeenCalled()
@@ -63,7 +63,7 @@ describe('generateAdCopy', () => {
   })
 
   it('filters local sample copy to the requested platforms too', async () => {
-    delete process.env.AI_GATEWAY_API_KEY
+    delete process.env.OPENROUTER_API_KEY
     const result = await generateAdCopy(book, { tone: 'bold', platforms: ['META', 'AMAZON'] })
     expect(result.map((r) => r.platform)).toEqual(['META', 'AMAZON'])
   })

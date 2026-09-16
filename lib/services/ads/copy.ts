@@ -1,6 +1,6 @@
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { isAiConfigured } from '@/lib/providers/ai'
+import { isAiConfigured, getAdCopyModel } from '@/lib/providers/ai'
 import { sampleAdCopy } from './sampleCopy'
 import type { CopyTone } from './options'
 
@@ -28,7 +28,7 @@ const adCopySchema = z.object({
 
 async function attemptGeneration(book: BookInput, tone: CopyTone) {
   const { output } = await generateText({
-    model: 'anthropic/claude-sonnet-5',
+    model: getAdCopyModel(),
     output: Output.object({ schema: adCopySchema }),
     prompt: `Write ad copy for a book, one variant each for Meta, Google, and Amazon ads.
 Book title: ${book.title}

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { getCapabilityStatus, isFullyLocal } from './status'
 
-const keys = ['CLERK_SECRET_KEY', 'BLOB_READ_WRITE_TOKEN', 'AI_GATEWAY_API_KEY', 'VERCEL_OIDC_TOKEN'] as const
+const keys = ['CLERK_SECRET_KEY', 'BLOB_READ_WRITE_TOKEN', 'OPENROUTER_API_KEY'] as const
 const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]))
 afterEach(() => {
   for (const k of keys) {
