@@ -24,9 +24,9 @@ export function Stepper({ steps }: { steps: StepItem[] }) {
             <span
               className={cn(
                 'grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold transition-colors',
-                current && 'bg-accent text-on-accent ring-4 ring-accent/20',
-                !current && step.complete && 'bg-success text-white',
-                !current && !step.complete && 'border border-line bg-surface text-ink-muted'
+                current && 'bg-accent text-on-accent shadow-subtle ring-4 ring-accent/20',
+                !current && step.complete && 'bg-success text-on-accent',
+                !current && !step.complete && 'bg-surface-2 text-ink-muted shadow-inset'
               )}
             >
               {step.complete && !current ? <Check className="size-3.5" aria-hidden /> : index + 1}

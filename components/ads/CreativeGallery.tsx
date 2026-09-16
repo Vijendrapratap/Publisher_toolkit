@@ -19,7 +19,7 @@ export function CreativeGallery({ images, platformLabel }: { images: GalleryImag
     <>
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {images.map((img) => (
-          <li key={img.id} className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-surface">
+          <li key={img.id} className="group flex flex-col overflow-hidden rounded-2xl bg-surface shadow-card">
             <button
               type="button"
               onClick={() => setActive(img)}
@@ -31,9 +31,9 @@ export function CreativeGallery({ images, platformLabel }: { images: GalleryImag
                 src={img.imageUrl}
                 alt={alt(img)}
                 style={{ aspectRatio: `${img.width} / ${img.height}` }}
-                className="max-h-full max-w-full rounded-md object-contain shadow-lift"
+                className="max-h-full max-w-full rounded-md object-contain shadow-card"
               />
-              <span className="absolute right-3 top-3 grid size-8 place-items-center rounded-full bg-canvas/90 text-ink opacity-0 shadow-card transition-opacity group-hover:opacity-100">
+              <span className="absolute right-3 top-3 grid size-8 place-items-center rounded-full bg-canvas/90 text-ink opacity-0 shadow-subtle transition-opacity group-hover:opacity-100">
                 <Expand className="size-4" aria-hidden />
               </span>
             </button>
@@ -54,7 +54,7 @@ export function CreativeGallery({ images, platformLabel }: { images: GalleryImag
         ref={dialogRef}
         onClose={() => setActive(null)}
         onClick={(e) => e.target === dialogRef.current && dialogRef.current?.close()}
-        className="m-auto max-h-[90dvh] max-w-[90vw] rounded-card bg-surface p-0 text-ink shadow-lift backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+        className="m-auto max-h-[90dvh] max-w-[90vw] rounded-card bg-surface p-0 text-ink shadow-lift ring-1 ring-line backdrop:bg-black/70 backdrop:backdrop-blur-sm"
       >
         {active && (
           <div className="flex flex-col">
@@ -74,7 +74,7 @@ export function CreativeGallery({ images, platformLabel }: { images: GalleryImag
                 </button>
               </div>
             </div>
-            <div className="grid place-items-center bg-surface-2 p-6">
+            <div className="grid place-items-center bg-surface-2 p-6 shadow-inset">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={active.imageUrl} alt={alt(active)} className="max-h-[75dvh] max-w-full rounded-md object-contain" />
             </div>

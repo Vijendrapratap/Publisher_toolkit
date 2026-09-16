@@ -22,9 +22,9 @@ export default async function ProjectLayout({
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-5 rounded-card border border-line bg-surface p-5 shadow-card sm:p-6">
+      <header className="flex flex-col gap-5 rounded-card bg-surface p-5 shadow-card sm:p-6">
         <div className="flex items-center gap-4">
-          <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-surface-2 shadow-card">
+          <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-surface-2 shadow-inset">
             {book.frontCoverUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={book.frontCoverUrl} alt={`Cover of ${book.title ?? 'this book'}`} className="size-full object-cover" />

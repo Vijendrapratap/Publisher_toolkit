@@ -18,7 +18,7 @@ export default async function HubPage() {
     <div className="mx-auto w-full max-w-6xl px-6 py-12 sm:py-16">
       <header className="max-w-2xl">
         <p className="text-sm font-semibold uppercase tracking-widest text-accent">Publisher Toolkit</p>
-        <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+        <h1 className="mt-3 font-display text-4xl font-semibold tracking-tighter text-balance sm:text-5xl">
           Every tool your book needs to find its readers.
         </h1>
         <p className="mt-4 text-lg text-ink-muted">
@@ -44,9 +44,9 @@ export default async function HubPage() {
                 <li key={p.id}>
                   <Link
                     href={`/ads/${p.id}`}
-                    className="flex h-full flex-col overflow-hidden rounded-card border border-line bg-surface shadow-card transition-all hover:-translate-y-0.5 hover:shadow-lift"
+                    className="flex h-full flex-col overflow-hidden rounded-card bg-surface shadow-card transition-all hover:-translate-y-0.5 hover:shadow-lift"
                   >
-                    <span className="grid aspect-[4/3] place-items-center bg-surface-2">
+                    <span className="grid aspect-[4/3] place-items-center bg-surface-2 shadow-inset">
                       {p.frontCoverUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.frontCoverUrl} alt="" className="size-full object-cover" />

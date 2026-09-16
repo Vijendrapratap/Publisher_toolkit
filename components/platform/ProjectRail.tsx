@@ -33,7 +33,7 @@ export function ProjectRail({ projects, newHref, basePath }: { projects: RailPro
             return (
               <li key={p.id} className="min-w-56 lg:min-w-0">
                 <RailLink href={`${basePath}/${p.id}`}>
-                  <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">
+                  <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2 shadow-inset">
                     {p.frontCoverUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.frontCoverUrl} alt="" className="size-full object-cover" />

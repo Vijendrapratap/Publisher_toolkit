@@ -10,10 +10,10 @@ export function ServiceCard({ service }: { service: ServiceDefinition }) {
   return (
     <Link
       href={service.href}
-      className="group relative flex flex-col gap-5 rounded-card border border-line bg-surface p-6 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift sm:p-7"
+      className="group relative flex flex-col gap-5 rounded-card bg-surface p-6 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift sm:p-7"
     >
       <div className="flex items-start justify-between">
-        <span className={cn('grid size-12 place-items-center rounded-2xl text-ink', service.tintClass)}>
+        <span className={cn('grid size-12 place-items-center rounded-2xl text-ink shadow-subtle', service.tintClass)}>
           <ServiceIcon name={service.icon} className="size-6" />
         </span>
         {live ? <Badge tone="success">Available</Badge> : <Badge>Coming soon</Badge>}

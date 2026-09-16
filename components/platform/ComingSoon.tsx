@@ -9,7 +9,7 @@ import { ServiceIcon } from './ServiceIcon'
 export function ComingSoon({ service }: { service: ServiceDefinition }) {
   return (
     <div className="mx-auto flex max-w-2xl flex-col items-center px-6 py-16 text-center sm:py-24">
-      <span className={cn('grid size-20 place-items-center rounded-3xl text-ink shadow-card', service.tintClass)}>
+      <span className={cn('grid size-20 place-items-center rounded-3xl text-ink shadow-subtle', service.tintClass)}>
         <ServiceIcon name={service.icon} className="size-9" />
       </span>
       <Badge className="mt-6">Coming soon</Badge>
@@ -18,7 +18,7 @@ export function ComingSoon({ service }: { service: ServiceDefinition }) {
       <ul className="mt-8 flex flex-col gap-3 text-left">
         {service.highlights.map((h) => (
           <li key={h} className="flex items-center gap-3">
-            <span className="grid size-6 place-items-center rounded-full bg-accent-soft text-accent">
+            <span className="grid size-6 place-items-center rounded-full bg-accent-soft text-accent shadow-subtle">
               <Check className="size-3.5" aria-hidden />
             </span>
             {h}

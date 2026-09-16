@@ -48,9 +48,9 @@ export default async function AdsHomePage() {
         <h2 id="how-heading" className="text-xs font-semibold uppercase tracking-widest text-ink-muted">How it works</h2>
         <ol className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {HOW.map(({ icon: Icon, title, text }, i) => (
-            <li key={title} className="rounded-card border border-line bg-surface p-5">
+            <li key={title} className="rounded-card bg-surface p-5 shadow-subtle">
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <span className="grid size-8 place-items-center rounded-lg bg-accent-soft text-accent">
+                <span className="grid size-8 place-items-center rounded-lg bg-accent-soft text-accent shadow-subtle">
                   <Icon className="size-4" aria-hidden />
                 </span>
                 {i + 1}. {title}

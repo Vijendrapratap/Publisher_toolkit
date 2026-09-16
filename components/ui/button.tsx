@@ -3,10 +3,10 @@ import { Loader2 } from 'lucide-react'
 import { cn } from './cn'
 
 const VARIANTS = {
-  primary: 'bg-accent text-on-accent shadow-card hover:bg-accent-strong',
-  secondary: 'border border-line bg-surface text-ink hover:bg-surface-2',
+  primary: 'bg-accent text-on-accent shadow-subtle hover:bg-accent-strong active:shadow-inset',
+  secondary: 'bg-surface text-ink shadow-card hover:bg-surface-2 active:shadow-inset',
   ghost: 'text-ink-muted hover:bg-surface-2 hover:text-ink',
-  danger: 'bg-danger text-white hover:opacity-90',
+  danger: 'bg-danger text-white shadow-subtle hover:opacity-90 active:shadow-inset',
 } as const
 
 const SIZES = {

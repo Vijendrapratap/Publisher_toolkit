@@ -5,7 +5,7 @@ const TONES = {
   neutral: 'bg-surface-2 text-ink-muted',
   accent: 'bg-accent-soft text-accent',
   success: 'bg-success/15 text-success',
-  warning: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  warning: 'bg-warning-soft text-warning',
 } as const
 
 export function Badge({ tone = 'neutral', className, ...props }: ComponentProps<'span'> & { tone?: keyof typeof TONES }) {

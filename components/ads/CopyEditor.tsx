@@ -15,7 +15,7 @@ const LABELS: Record<Key, string> = { headline: 'Headline', primaryText: 'Primar
 
 function Counter({ length, limit }: { length: number; limit: number }) {
   return (
-    <span className={cn('text-xs tabular-nums', length > limit ? 'font-medium text-amber-700 dark:text-amber-300' : 'text-ink-muted')}>
+    <span className={cn('text-xs tabular-nums', length > limit ? 'font-medium text-warning' : 'text-ink-muted')}>
       {length}/{limit}
     </span>
   )
@@ -63,7 +63,7 @@ export function CopyEditor({ copy }: { copy: Copy }) {
   return (
     <div className="flex flex-col gap-4">
       {blank && (
-        <p className="flex items-center gap-2 rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+        <p className="flex items-center gap-2 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning">
           <PenLine className="size-4 shrink-0" aria-hidden />
           We couldn’t write copy for this platform. Add your own below.
         </p>

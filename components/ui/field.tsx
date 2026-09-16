@@ -2,7 +2,7 @@ import { cloneElement, isValidElement, type ComponentProps, type ReactNode } fro
 import { cn } from './cn'
 
 const control =
-  'w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink placeholder:text-ink-muted/70 transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 aria-[invalid=true]:border-danger'
+  'w-full rounded-xl border border-transparent bg-surface-2 px-3.5 text-sm text-ink shadow-inset placeholder:text-ink-muted/70 transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 aria-[invalid=true]:border-danger'
 
 export function Input({ className, ...props }: ComponentProps<'input'>) {
   return <input className={cn(control, 'h-10', className)} {...props} />

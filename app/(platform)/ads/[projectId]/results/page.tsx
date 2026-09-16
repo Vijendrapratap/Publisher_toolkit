@@ -55,7 +55,7 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
               </div>
               {s.images.length > 0 && <CreativeGallery images={s.images} platformLabel={s.label} />}
               {s.copy && (
-                <div className="rounded-2xl border border-line bg-canvas p-5">
+                <div className="rounded-2xl bg-surface p-5 shadow-subtle">
                   <h4 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ink-muted">Ad copy</h4>
                   <CopyEditor copy={{ ...s.copy, platform: s.copy.platform as AdPlatform }} />
                 </div>

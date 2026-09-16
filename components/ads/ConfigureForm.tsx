@@ -82,7 +82,7 @@ export function ConfigureForm({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
       {generationError && (
-        <div role="alert" className="flex flex-col gap-3 rounded-card border border-danger/30 bg-danger/10 p-4 sm:flex-row sm:items-center">
+        <div role="alert" className="flex flex-col gap-3 rounded-card bg-danger/10 p-4 shadow-subtle ring-1 ring-danger/30 sm:flex-row sm:items-center">
           <AlertCircle className="size-5 shrink-0 text-danger" aria-hidden />
           <p className="text-sm">
             <span className="font-semibold">Generation didn’t finish.</span> {generationError}
@@ -108,14 +108,16 @@ export function ConfigureForm({
                   aria-checked={selected}
                   onClick={() => togglePlatform(p.key)}
                   className={cn(
-                    'relative flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all',
-                    selected ? 'border-accent bg-accent-soft/50 ring-2 ring-accent/30' : 'border-line bg-surface hover:border-accent/40'
+                    'relative flex flex-col items-start gap-2 rounded-2xl border border-transparent p-4 text-left transition-all',
+                    selected
+                      ? 'border-accent bg-accent-soft/60 shadow-inset ring-2 ring-accent/30'
+                      : 'bg-surface shadow-subtle hover:border-accent/40'
                   )}
                 >
                   <span
                     className={cn(
                       'absolute right-3 top-3 grid size-5 place-items-center rounded-full border',
-                      selected ? 'border-accent bg-accent text-on-accent' : 'border-line'
+                      selected ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface-2'
                     )}
                   >
                     {selected && <Check className="size-3" aria-hidden />}
@@ -124,7 +126,7 @@ export function ConfigureForm({
                   <span className="text-xs text-ink-muted">{p.description}</span>
                   <span className="mt-1 flex flex-wrap gap-1">
                     {sizesFor(p.key).map((s) => (
-                      <span key={s} className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[11px] text-ink-muted">{s}</span>
+                      <span key={s} className="rounded-md bg-surface-2/80 px-1.5 py-0.5 font-mono text-[11px] text-ink-muted">{s}</span>
                     ))}
                   </span>
                 </button>
@@ -157,8 +159,10 @@ export function ConfigureForm({
                     )
                   }
                   className={cn(
-                    'flex flex-col items-start gap-1 rounded-2xl border p-4 text-left transition-all',
-                    selected ? 'border-accent bg-accent-soft/50 ring-2 ring-accent/30' : 'border-line bg-surface hover:border-accent/40'
+                    'flex flex-col items-start gap-1 rounded-2xl border border-transparent p-4 text-left transition-all',
+                    selected
+                      ? 'border-accent bg-accent-soft/60 shadow-inset ring-2 ring-accent/30'
+                      : 'bg-surface shadow-subtle hover:border-accent/40'
                   )}
                 >
                   <span className="font-semibold">{t.label}</span>
@@ -167,7 +171,7 @@ export function ConfigureForm({
               )
             })}
           </div>
-          <p className="mt-4 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-3 text-sm" aria-live="polite">
+          <p className="mt-4 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-3 text-sm shadow-inset" aria-live="polite">
             <Sparkles className="size-4 shrink-0 text-accent" aria-hidden />
             <span className="text-ink-muted">Sample headline:</span>
             <span className="font-medium">{previewHeadline}</span>
@@ -198,8 +202,8 @@ export function ConfigureForm({
                     )
                   }
                   className={cn(
-                    'flex flex-col overflow-hidden rounded-2xl border text-left transition-all',
-                    selected ? 'border-accent ring-2 ring-accent/30' : 'border-line hover:border-accent/40'
+                    'flex flex-col overflow-hidden rounded-2xl border border-transparent text-left transition-all',
+                    selected ? 'border-accent shadow-inset ring-2 ring-accent/30' : 'shadow-subtle hover:border-accent/40'
                   )}
                 >
                   <span

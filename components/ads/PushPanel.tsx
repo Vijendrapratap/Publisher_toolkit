@@ -55,7 +55,7 @@ export function PushPanel({ projectId, platforms, simulated }: { projectId: stri
         {available.map((p) => {
           const receipt = receipts[p.key]
           return (
-            <li key={p.key} className="flex flex-col gap-3 rounded-2xl border border-line p-4">
+            <li key={p.key} className="flex flex-col gap-3 rounded-2xl bg-surface-2 p-4 shadow-inset">
               <div className="flex items-center justify-between gap-3">
                 <span className="font-medium">{p.label}</span>
                 <Button size="sm" variant={receipt ? 'secondary' : 'primary'} loading={pending === p.key} onClick={() => push(p)}>
@@ -79,7 +79,7 @@ export function PushPanel({ projectId, platforms, simulated }: { projectId: stri
       </ul>
 
       {platforms.includes('AMAZON') && (
-        <p className="flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-sm text-ink-muted">
+        <p className="flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-sm text-ink-muted shadow-inset">
           <ShoppingBag className="mt-0.5 size-4 shrink-0" aria-hidden />
           Amazon doesn’t offer self-serve uploads from other tools. Download the ZIP and add the 300×250 creative in Amazon Ads.
         </p>

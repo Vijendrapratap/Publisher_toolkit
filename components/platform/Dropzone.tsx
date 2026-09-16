@@ -44,8 +44,8 @@ export function Dropzone({
     return (
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium">{label}</span>
-        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent">
+        <div className="flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-card">
+          <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent shadow-subtle">
             <Icon className="size-5" aria-hidden />
           </span>
           <span className="flex min-w-0 flex-col">
@@ -85,14 +85,14 @@ export function Dropzone({
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         className={cn(
-          'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-surface text-center transition-colors hover:border-accent/60 hover:bg-accent-soft/40',
+          'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-transparent bg-surface-2 text-center shadow-inset transition-colors hover:border-accent/50 hover:bg-accent-soft/50',
           'peer-focus-visible:border-accent peer-focus-visible:ring-4 peer-focus-visible:ring-accent/20',
           compact ? 'px-4 py-6' : 'px-6 py-12',
           dragging && 'border-accent bg-accent-soft/60',
           error && 'border-danger/60'
         )}
       >
-        <span className={cn('grid place-items-center rounded-2xl bg-accent-soft text-accent', compact ? 'size-10' : 'size-14')}>
+        <span className={cn('grid place-items-center rounded-2xl bg-accent-soft text-accent shadow-subtle', compact ? 'size-10' : 'size-14')}>
           <UploadCloud className={compact ? 'size-5' : 'size-7'} aria-hidden />
         </span>
         <span className={cn('font-medium', compact ? 'text-sm' : 'text-base')}>

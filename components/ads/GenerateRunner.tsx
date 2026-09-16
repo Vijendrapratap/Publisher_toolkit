@@ -53,7 +53,7 @@ export function GenerateRunner({
     <Card className="mx-auto flex w-full max-w-xl flex-col items-center gap-8 p-8 text-center sm:p-10">
       <div className="relative grid size-20 place-items-center">
         <span className="absolute inset-0 animate-ping rounded-full bg-accent/20" aria-hidden />
-        <span className="grid size-16 place-items-center rounded-full bg-accent text-on-accent shadow-lift">
+        <span className="grid size-16 place-items-center rounded-full bg-accent text-on-accent shadow-subtle">
           <Loader2 className="size-7 animate-spin" aria-hidden />
         </span>
       </div>
@@ -63,7 +63,7 @@ export function GenerateRunner({
           {sizeCount} sizes across {platformCount} {platformCount === 1 ? 'platform' : 'platforms'}. This usually takes under a minute.
         </p>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2 shadow-inset" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
         <div className="h-full rounded-full bg-accent transition-[width] duration-700 ease-out" style={{ width: `${percent}%` }} />
       </div>
       <ol className="flex w-full flex-col gap-3 text-left" aria-live="polite">
@@ -75,9 +75,9 @@ export function GenerateRunner({
               <span
                 className={cn(
                   'grid size-6 place-items-center rounded-full',
-                  done && 'bg-success text-white',
-                  active && 'bg-accent-soft text-accent',
-                  !done && !active && 'border border-line'
+                  done && 'bg-success text-on-accent',
+                  active && 'bg-accent-soft text-accent shadow-subtle',
+                  !done && !active && 'bg-surface-2 shadow-inset'
                 )}
               >
                 {done ? <Check className="size-3.5" aria-hidden /> : active ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}

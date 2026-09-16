@@ -16,6 +16,6 @@ describe('Button', () => {
   })
 
   it('exposes the same classes for links', () => {
-    expect(buttonClasses({ variant: 'secondary' })).toContain('border-line')
+    expect(buttonClasses({ variant: 'secondary' })).toContain('bg-surface')
   })
 })

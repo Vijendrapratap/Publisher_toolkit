@@ -13,7 +13,7 @@ export function RailLink({ href, children }: { href: string; children: ReactNode
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-surface-2',
-        active && 'bg-surface-2 ring-1 ring-line'
+        active && 'bg-surface-2 shadow-inset ring-1 ring-accent/30'
       )}
     >
       {children}

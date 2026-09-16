@@ -11,7 +11,7 @@ export default function PlatformError({ error, reset }: { error: Error & { diges
 
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-6 py-24 text-center">
-      <span className="grid size-16 place-items-center rounded-2xl bg-danger/10 text-danger">
+      <span className="grid size-16 place-items-center rounded-2xl bg-danger/10 text-danger shadow-subtle">
         <LifeBuoy className="size-7" aria-hidden />
       </span>
       <h1 className="mt-6 font-display text-3xl font-semibold tracking-tight">Something went sideways</h1>

@@ -11,8 +11,9 @@ export const metadata: Metadata = {
   description: 'Tools for book publishers: ad creatives, trailers, audiobooks and landing pages.',
 }
 
-// Runs before paint so the saved or system theme never flashes.
-const THEME_SCRIPT = `try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`
+// Runs before paint so the saved theme never flashes. Light is the default —
+// the OS preference is deliberately not consulted.
+const THEME_SCRIPT = `try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const document = (

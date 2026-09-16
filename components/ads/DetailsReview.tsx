@@ -70,7 +70,7 @@ export function DetailsReview({
         <h2 className="font-display text-lg font-semibold">Cover</h2>
         {needsCover ? (
           <>
-            <p className="flex gap-2 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+            <p className="flex gap-2 rounded-xl bg-warning-soft p-3 text-sm text-warning">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
               We couldn’t find a cover in your PDF. Add one to continue.
             </p>
@@ -81,7 +81,7 @@ export function DetailsReview({
         ) : (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={coverUrl} alt={`Cover of ${details.title || 'your book'}`} className="w-full rounded-xl shadow-lift" />
+            <img src={coverUrl} alt={`Cover of ${details.title || 'your book'}`} className="w-full rounded-xl shadow-card" />
             <Button type="button" variant="secondary" size="sm" onClick={() => setReplacing(true)}>
               Replace cover
             </Button>

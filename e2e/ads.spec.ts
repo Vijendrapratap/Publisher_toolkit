@@ -81,8 +81,11 @@ test('publisher creates ads end to end in local mode', async ({ page }) => {
   await page.getByRole('link', { name: /The Lazy Developer/ }).first().click()
   await expect(page).toHaveURL(/\/results$/)
 
-  // Dark theme and mobile screenshots of the key screens
+  // Dark theme and mobile screenshots of the key screens.
+  // Light is the app's default and the OS preference is deliberately not read,
+  // so dark comes from the saved choice the theme toggle writes.
   await page.emulateMedia({ colorScheme: 'dark' })
+  await page.evaluate(() => localStorage.setItem('theme', 'dark'))
   await page.reload()
   await expect(page.locator('html')).toHaveClass(/dark/)
   await shot(page, 'results-dark')

@@ -44,14 +44,14 @@ export function ServiceSwitcher({ services }: { services: ServiceDefinition[] })
         aria-expanded={open}
         aria-controls={popupId}
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3 text-sm font-medium transition-colors hover:bg-surface-2"
+        className="inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3 text-sm font-medium shadow-subtle transition-colors hover:bg-surface-2"
       >
         {current ? <ServiceIcon name={current.icon} className="size-4 text-accent" /> : <LayoutGrid className="size-4 text-accent" aria-hidden />}
         {current?.name ?? 'All tools'}
         <ChevronDown className={cn('size-4 text-ink-muted transition-transform', open && 'rotate-180')} aria-hidden />
       </button>
       {open && (
-        <div id={popupId} className="absolute left-0 top-11 z-50 w-72 rounded-2xl border border-line bg-surface p-2 shadow-lift">
+        <div id={popupId} className="absolute left-0 top-11 z-50 w-72 rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line">
           <nav aria-label="Tools">
             <ul>
               <li>
