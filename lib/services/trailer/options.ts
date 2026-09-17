@@ -126,6 +126,8 @@ export const trailerProjectUpdateSchema = z
       .array(z.enum(['9:16', '1:1', '16:9']))
       .min(1, 'Select at least one aspect ratio')
       .transform((a) => [...new Set(a)]),
+    hookText: z.string().trim().max(300).nullable().optional(),
+    ctaText: z.string().trim().max(200).nullable().optional(),
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, 'Nothing to update')

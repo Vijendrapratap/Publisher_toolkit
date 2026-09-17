@@ -54,6 +54,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         musicMood: (project.musicMood as TrailerMusicMood) ?? 'suspenseful',
         aspectRatio: ar as TrailerAspectRatio,
         coverPngBuffer: coverBuffer,
+        hookText: project.hookText,
+        ctaText: project.ctaText,
       })
 
       const [videoFile, posterFile] = await Promise.all([

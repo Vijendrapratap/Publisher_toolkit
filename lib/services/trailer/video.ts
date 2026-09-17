@@ -21,6 +21,8 @@ export interface GenerateTrailerInput {
   musicMood: TrailerMusicMood
   aspectRatio: TrailerAspectRatio
   coverPngBuffer?: Buffer | null
+  hookText?: string | null
+  ctaText?: string | null
 }
 
 export interface GeneratedVideoOutput {
@@ -333,7 +335,8 @@ function renderScene1(
   palette: Palette,
   style: TrailerStyle,
   title: string,
-  author: string
+  author: string,
+  hookText?: string | null
 ): Buffer {
   const canvas = createCanvas(width, height)
   const ctx = canvas.getContext('2d')
@@ -341,7 +344,14 @@ function renderScene1(
   drawBackground(ctx, width, height, palette, style, scale)
 
   // Badge at top
-  const badgeText = style === 'fantasy' ? 'ANCIENT STORYBOOK' : style === 'thriller' ? 'OFFICIAL DOSSIER' : 'OFFICIAL BOOK TRAILER'
+  const badgeText =
+    style === 'fantasy'
+      ? 'ANCIENT STORYBOOK'
+      : style === 'thriller'
+      ? 'OFFICIAL DOSSIER'
+      : style === 'scifi'
+      ? 'CLASSIFIED LOG'
+      : 'OFFICIAL BOOK TRAILER'
   drawPillBadge(ctx, badgeText, width / 2, height * 0.22, palette, scale)
 
   // Main hook title
@@ -350,7 +360,8 @@ function renderScene1(
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.font = `bold ${Math.max(28, Math.round(68 * scale))}px ${palette.fontFamily}`
-  const lines = wrapText(ctx, title || 'An Unforgettable Story', width * 0.8)
+  const mainHook = hookText?.trim() || title || 'An Unforgettable Story'
+  const lines = wrapText(ctx, mainHook, width * 0.8)
   const lineHeight = Math.max(34, Math.round(80 * scale))
   const startY = height * 0.48 - ((lines.length - 1) * lineHeight) / 2
 
@@ -538,7 +549,8 @@ function renderScene4(
   height: number,
   palette: Palette,
   style: TrailerStyle,
-  title: string
+  title: string,
+  ctaText?: string | null
 ): Buffer {
   const canvas = createCanvas(width, height)
   const ctx = canvas.getContext('2d')
@@ -547,15 +559,22 @@ function renderScene4(
 
   drawPillBadge(ctx, 'EXPERIENCE THE STORY', width / 2, height * 0.25, palette, scale)
 
+  const ctaHeadline = ctaText?.trim() || 'AVAILABLE NOW • GET YOUR COPY TODAY'
+  const parts = ctaHeadline.includes('•')
+    ? ctaHeadline.split('•').map((p) => p.trim())
+    : [ctaHeadline]
+
   ctx.save()
   ctx.fillStyle = palette.textPrimary
   ctx.textAlign = 'center'
-  ctx.font = `bold ${Math.max(32, Math.round(76 * scale))}px ${palette.fontFamily}`
-  ctx.fillText('AVAILABLE NOW', width / 2, height * 0.44)
+  ctx.font = `bold ${Math.max(30, Math.round(70 * scale))}px ${palette.fontFamily}`
+  ctx.fillText(parts[0] || 'AVAILABLE NOW', width / 2, height * 0.44)
 
-  ctx.fillStyle = palette.accent
-  ctx.font = `600 ${Math.max(20, Math.round(40 * scale))}px sans-serif`
-  ctx.fillText('GET YOUR COPY TODAY', width / 2, height * 0.54)
+  if (parts[1]) {
+    ctx.fillStyle = palette.accent
+    ctx.font = `600 ${Math.max(20, Math.round(40 * scale))}px sans-serif`
+    ctx.fillText(parts[1], width / 2, height * 0.54)
+  }
 
   // Platform badges
   const platforms = ['AMAZON', 'BARNES & NOBLE', 'APPLE BOOKS', 'AUDIBLE']
@@ -742,7 +761,15 @@ export async function renderTrailerVideoAndPoster(
   const palette = PALETTES[input.style] ?? PALETTES.cinematic
 
   // Render 4 scene images with custom visual style
-  const s1Buffer = renderScene1(spec.width, spec.height, palette, input.style, input.title, input.author)
+  const s1Buffer = renderScene1(
+    spec.width,
+    spec.height,
+    palette,
+    input.style,
+    input.title,
+    input.author,
+    input.hookText
+  )
   const s2Buffer = renderScene2(spec.width, spec.height, palette, input.style, input.blurb, input.author)
   const s3Buffer = await renderScene3(
     spec.width,
@@ -753,7 +780,14 @@ export async function renderTrailerVideoAndPoster(
     input.author,
     input.coverPngBuffer
   )
-  const s4Buffer = renderScene4(spec.width, spec.height, palette, input.style, input.title)
+  const s4Buffer = renderScene4(
+    spec.width,
+    spec.height,
+    palette,
+    input.style,
+    input.title,
+    input.ctaText
+  )
 
   // Use Scene 3 (high-res cover showcase) as the primary poster image
   const posterBuffer = s3Buffer

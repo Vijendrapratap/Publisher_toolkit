@@ -77,6 +77,8 @@ model TrailerProject {
   style         String             @default("cinematic")
   musicMood     String             @default("suspenseful")
   aspectRatios  String[]           @default(["9:16", "1:1", "16:9"])
+  hookText      String?
+  ctaText       String?            @default("AVAILABLE NOW • GET YOUR COPY TODAY")
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @default(now()) @updatedAt
   trailers      GeneratedTrailer[]

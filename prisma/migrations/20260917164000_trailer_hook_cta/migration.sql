@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "TrailerProject" ADD COLUMN "hookText" TEXT,
+ADD COLUMN "ctaText" TEXT DEFAULT 'AVAILABLE NOW • GET YOUR COPY TODAY';

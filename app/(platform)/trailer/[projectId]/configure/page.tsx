@@ -31,6 +31,8 @@ export default async function TrailerConfigureStepPage({
         length: (project.length ?? '30s') as TrailerLength,
         style: (project.style ?? 'cinematic') as TrailerStyle,
         musicMood: (project.musicMood ?? 'suspenseful') as TrailerMusicMood,
+        hookText: project.hookText,
+        ctaText: project.ctaText,
       }}
       book={{
         title: project.title ?? '',

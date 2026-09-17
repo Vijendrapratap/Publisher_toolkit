@@ -76,5 +76,15 @@ describe('trailer options', () => {
       aspectRatios: ['4:3'],
     })
     expect(invalidAspect.success).toBe(false)
+
+    const withHookAndCta = trailerProjectUpdateSchema.safeParse({
+      hookText: 'Some secrets refuse to stay buried.',
+      ctaText: 'AVAILABLE NOW • GET YOUR COPY TODAY',
+    })
+    expect(withHookAndCta.success).toBe(true)
+    if (withHookAndCta.success) {
+      expect(withHookAndCta.data.hookText).toBe('Some secrets refuse to stay buried.')
+      expect(withHookAndCta.data.ctaText).toBe('AVAILABLE NOW • GET YOUR COPY TODAY')
+    }
   })
 })
