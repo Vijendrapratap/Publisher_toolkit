@@ -10,6 +10,7 @@ import {
   Film,
   Music2,
   Smartphone,
+  Sparkles,
   Square,
   Tv,
 } from 'lucide-react'
@@ -109,6 +110,142 @@ export function TrailerConfigureForm({
         </div>
       )}
 
+      {/* Visual Style Selection */}
+      <Card className="p-6">
+        <fieldset>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <legend className="flex items-center gap-2 font-display text-lg font-semibold">
+              <Clapperboard className="size-5 text-accent" aria-hidden /> Visual Trailer Style
+            </legend>
+            <span className="text-xs text-ink-muted">
+              Choose a template matched to your book’s genre & aesthetic
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-ink-muted">
+            Shapes the motion effects, background atmosphere, borders, and scene transitions.
+          </p>
+          <div role="radiogroup" aria-label="Visual Style" className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {STYLE_OPTIONS.map((s) => {
+              const selected = style === s.key
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => setStyle(s.key)}
+                  className={cn(
+                    'group relative flex flex-col overflow-hidden rounded-2xl border text-left transition-all',
+                    selected
+                      ? 'border-accent shadow-card ring-2 ring-accent/30 bg-surface'
+                      : 'border-line/60 bg-surface hover:border-accent/40 shadow-subtle'
+                  )}
+                >
+                  {/* Style Preview Banner */}
+                  <div
+                    className="relative flex h-32 w-full flex-col items-center justify-center overflow-hidden p-4"
+                    style={{ background: s.palette.background }}
+                  >
+                    {/* Visual style decorations */}
+                    {s.key === 'fantasy' && (
+                      <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute inset-2 border border-amber-500/40 rounded" />
+                        <span className="absolute top-3 left-4 size-1.5 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]" />
+                        <span className="absolute bottom-4 right-5 size-2 rounded-full bg-yellow-300 shadow-[0_0_10px_#f59e0b]" />
+                        <span className="absolute top-6 right-8 size-1 rounded-full bg-orange-400 shadow-[0_0_6px_#ea580c]" />
+                      </div>
+                    )}
+                    {s.key === 'scifi' && (
+                      <div className="absolute inset-0 pointer-events-none opacity-40 bg-[linear-gradient(rgba(6,182,212,0.1)_1px,transparent_1px)] bg-[size:100%_8px]" />
+                    )}
+                    {s.key === 'thriller' && (
+                      <div className="absolute top-0 right-0 size-12 bg-red-600/20 blur-xl pointer-events-none" />
+                    )}
+                    {s.key === 'romance' && (
+                      <div className="absolute inset-0 pointer-events-none bg-radial from-rose-500/15 to-transparent" />
+                    )}
+
+                    {/* Book graphic preview */}
+                    <div className="relative flex items-center gap-3">
+                      {book.coverUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={book.coverUrl}
+                          alt=""
+                          className="h-16 w-11 rounded object-cover shadow-lg ring-1 ring-white/10"
+                        />
+                      ) : (
+                        <span
+                          className="grid h-16 w-11 place-items-center rounded shadow"
+                          style={{ background: s.palette.surface }}
+                        >
+                          <Clapperboard className="size-4 opacity-40" style={{ color: s.palette.accent }} />
+                        </span>
+                      )}
+                      <div className="flex flex-col gap-1 max-w-[130px]">
+                        <span
+                          className="line-clamp-1 text-xs font-bold tracking-wider uppercase"
+                          style={{ color: s.palette.ink }}
+                        >
+                          {book.title || 'Your Book'}
+                        </span>
+                        <span
+                          className="h-0.5 w-6 rounded-full"
+                          style={{ background: s.palette.accent }}
+                        />
+                        <span
+                          className="text-[10px] opacity-75 truncate"
+                          style={{ color: s.palette.ink }}
+                        >
+                          {s.tagline}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Selected badge in banner */}
+                    <span
+                      className={cn(
+                        'absolute right-2.5 top-2.5 grid size-5 place-items-center rounded-full border transition-all',
+                        selected
+                          ? 'border-accent bg-accent text-on-accent'
+                          : 'border-white/20 bg-black/40 text-transparent'
+                      )}
+                    >
+                      <Check className="size-3" aria-hidden />
+                    </span>
+                  </div>
+
+                  {/* Style Info Card Content */}
+                  <div className="flex flex-1 flex-col justify-between p-4">
+                    <div>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-semibold text-sm">{s.label}</span>
+                        <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
+                          {s.tagline}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-xs text-ink-muted leading-relaxed">{s.description}</p>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-1 pt-2 border-t border-line/40">
+                      {s.bestFor.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-surface-2/80 px-2 py-0.5 text-[10px] text-ink-muted"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
+      </Card>
+
       {/* Aspect Ratios */}
       <Card className="p-6">
         <fieldset>
@@ -186,40 +323,6 @@ export function TrailerConfigureForm({
                 >
                   <span className="font-semibold">{l.label}</span>
                   <span className="text-xs text-ink-muted">{l.description}</span>
-                </button>
-              )
-            })}
-          </div>
-        </fieldset>
-      </Card>
-
-      {/* Visual Style */}
-      <Card className="p-6">
-        <fieldset>
-          <legend className="flex items-center gap-2 font-display text-lg font-semibold">
-            <Clapperboard className="size-5 text-accent" aria-hidden /> Visual Style
-          </legend>
-          <p className="text-sm text-ink-muted">Color grading, scene typography, and transitions.</p>
-          <div role="radiogroup" aria-label="Visual Style" className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {STYLE_OPTIONS.map((s) => {
-              const selected = style === s.key
-              return (
-                <button
-                  key={s.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => setStyle(s.key)}
-                  className={cn(
-                    'flex flex-col items-start gap-1 rounded-2xl border border-transparent p-4 text-left transition-all',
-                    selected
-                      ? 'border-accent bg-accent-soft/60 shadow-inset ring-2 ring-accent/30'
-                      : 'bg-surface shadow-subtle hover:border-accent/40'
-                  )}
-                >
-                  <span className="font-semibold">{s.label}</span>
-                  <span className="text-xs text-ink-muted">{s.description}</span>
                 </button>
               )
             })}

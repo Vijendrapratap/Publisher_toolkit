@@ -22,4 +22,22 @@ describe('renderTrailerVideoAndPoster', () => {
     expect(result.videoBuffer).toBeInstanceOf(Buffer)
     expect(result.videoBuffer.length).toBeGreaterThan(0)
   }, 30000)
+
+  it('renders with fantasy style and custom embers/borders', async () => {
+    const result = await renderTrailerVideoAndPoster({
+      title: 'The Dragon Grimoire',
+      author: 'E. K. Valen',
+      blurb: 'Ancient magic awakens from the ashes of forgotten realms.',
+      length: '15s',
+      style: 'fantasy',
+      musicMood: 'epic',
+      aspectRatio: '16:9',
+    })
+
+    expect(result.aspectRatio).toBe('16:9')
+    expect(result.width).toBe(1920)
+    expect(result.height).toBe(1080)
+    expect(result.posterBuffer.length).toBeGreaterThan(1000)
+    expect(result.videoBuffer.length).toBeGreaterThan(0)
+  }, 30000)
 })

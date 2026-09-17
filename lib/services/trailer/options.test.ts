@@ -18,8 +18,22 @@ describe('trailer options', () => {
     expect(getDurationForLength('unknown')).toBe(30)
   })
 
-  it('defines 4 visual styles', () => {
-    expect(STYLE_OPTIONS.map((s) => s.key)).toEqual(['cinematic', 'dramatic', 'minimal', 'energetic'])
+  it('defines 8 visual genre styles with palettes and metadata', () => {
+    expect(STYLE_OPTIONS.map((s) => s.key)).toEqual([
+      'fantasy',
+      'thriller',
+      'scifi',
+      'romance',
+      'cinematic',
+      'minimal',
+      'dramatic',
+      'energetic',
+    ])
+    for (const s of STYLE_OPTIONS) {
+      expect(s.palette.background).toBeTruthy()
+      expect(s.palette.accent).toBeTruthy()
+      expect(s.bestFor.length).toBeGreaterThan(0)
+    }
   })
 
   it('defines 5 music moods', () => {

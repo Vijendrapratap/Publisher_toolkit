@@ -41,6 +41,34 @@ interface Palette {
 }
 
 const PALETTES: Record<TrailerStyle, Palette> = {
+  fantasy: {
+    bgGradient: ['#28150a', '#170b05', '#080301'],
+    accent: '#f59e0b',
+    textPrimary: '#fef08a',
+    textSecondary: '#fed7aa',
+    fontFamily: 'serif',
+  },
+  thriller: {
+    bgGradient: ['#0d0407', '#1c060d', '#080204'],
+    accent: '#ef4444',
+    textPrimary: '#ffffff',
+    textSecondary: '#fca5a5',
+    fontFamily: 'sans-serif',
+  },
+  scifi: {
+    bgGradient: ['#050a18', '#0b1633', '#03060f'],
+    accent: '#06b6d4',
+    textPrimary: '#e0f2fe',
+    textSecondary: '#93c5fd',
+    fontFamily: 'sans-serif',
+  },
+  romance: {
+    bgGradient: ['#1c0a14', '#2c1020', '#0f050b'],
+    accent: '#fb7185',
+    textPrimary: '#ffe4e6',
+    textSecondary: '#fbcfe8',
+    fontFamily: 'serif',
+  },
   cinematic: {
     bgGradient: ['#07070a', '#181420', '#0a080d'],
     accent: '#d97706',
@@ -94,7 +122,151 @@ function wrapText(
   return lines
 }
 
-function drawBackground(ctx: any, width: number, height: number, palette: Palette) {
+// Draw visual styling embellishments tailored to each style
+function drawStyleDecorations(
+  ctx: any,
+  width: number,
+  height: number,
+  style: TrailerStyle,
+  scale: number
+) {
+  ctx.save()
+
+  if (style === 'fantasy') {
+    // Floating magical fire embers and sparks
+    const emberCount = 36
+    for (let i = 0; i < emberCount; i++) {
+      // Deterministic spread based on index
+      const px = ((i * 197 + 43) % 1000) / 1000 * width
+      const py = ((i * 311 + 89) % 1000) / 1000 * height
+      const r = (((i * 71) % 10) / 10 * 3.5 + 1.2) * scale
+      ctx.shadowColor = '#f59e0b'
+      ctx.shadowBlur = 10 * scale
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(254, 240, 138, 0.85)' : 'rgba(249, 115, 22, 0.75)'
+      ctx.beginPath()
+      ctx.arc(px, py, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // Double ornate fantasy border
+    const m1 = 40 * scale
+    const m2 = 52 * scale
+    ctx.strokeStyle = 'rgba(217, 119, 6, 0.65)'
+    ctx.lineWidth = Math.max(2, 3 * scale)
+    ctx.strokeRect(m1, m1, width - m1 * 2, height - m1 * 2)
+
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)'
+    ctx.lineWidth = Math.max(1, 1.5 * scale)
+    ctx.strokeRect(m2, m2, width - m2 * 2, height - m2 * 2)
+  } else if (style === 'scifi') {
+    // Horizontal holographic scanlines
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.035)'
+    const scanStep = Math.max(6, Math.round(10 * scale))
+    for (let y = 0; y < height; y += scanStep) {
+      ctx.fillRect(0, y, width, Math.max(1, 2 * scale))
+    }
+
+    // Sci-fi corner brackets
+    const bLen = 50 * scale
+    const bPad = 36 * scale
+    ctx.strokeStyle = '#06b6d4'
+    ctx.lineWidth = Math.max(1.5, 2.5 * scale)
+
+    // Top-left
+    ctx.beginPath()
+    ctx.moveTo(bPad, bPad + bLen)
+    ctx.lineTo(bPad, bPad)
+    ctx.lineTo(bPad + bLen, bPad)
+    ctx.stroke()
+
+    // Top-right
+    ctx.beginPath()
+    ctx.moveTo(width - bPad - bLen, bPad)
+    ctx.lineTo(width - bPad, bPad)
+    ctx.lineTo(width - bPad, bPad + bLen)
+    ctx.stroke()
+
+    // Bottom-left
+    ctx.beginPath()
+    ctx.moveTo(bPad, height - bPad - bLen)
+    ctx.lineTo(bPad, height - bPad)
+    ctx.lineTo(bPad + bLen, height - bPad)
+    ctx.stroke()
+
+    // Bottom-right
+    ctx.beginPath()
+    ctx.moveTo(width - bPad - bLen, height - bPad)
+    ctx.lineTo(width - bPad, height - bPad)
+    ctx.lineTo(width - bPad, height - bPad - bLen)
+    ctx.stroke()
+  } else if (style === 'thriller') {
+    // Gritty noir accent lines
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.25)'
+    ctx.lineWidth = Math.max(1, 2 * scale)
+    const m = 35 * scale
+    ctx.strokeRect(m, m, width - m * 2, height - m * 2)
+
+    // Crimson hazard tick at top
+    ctx.fillStyle = '#ef4444'
+    ctx.fillRect(width / 2 - 40 * scale, m - 3 * scale, 80 * scale, 6 * scale)
+  } else if (style === 'romance') {
+    // Soft bokeh light motes
+    for (let i = 0; i < 18; i++) {
+      const bx = ((i * 179 + 51) % 1000) / 1000 * width
+      const by = ((i * 283 + 97) % 1000) / 1000 * height
+      const br = (((i * 43) % 25) + 12) * scale
+      const bokehGrad = ctx.createRadialGradient(bx, by, 0, bx, by, br)
+      bokehGrad.addColorStop(0, 'rgba(251, 113, 133, 0.16)')
+      bokehGrad.addColorStop(1, 'rgba(251, 113, 133, 0)')
+      ctx.fillStyle = bokehGrad
+      ctx.beginPath()
+      ctx.arc(bx, by, br, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    // Delicate thin gold-rose frame
+    const m = 44 * scale
+    ctx.strokeStyle = 'rgba(251, 113, 133, 0.35)'
+    ctx.lineWidth = Math.max(1, 1.5 * scale)
+    ctx.beginPath()
+    ctx.roundRect(m, m, width - m * 2, height - m * 2, 16 * scale)
+    ctx.stroke()
+  } else if (style === 'cinematic') {
+    // Subtle horizontal anamorphic light flare
+    const flareY = height * 0.46
+    const flareGrad = ctx.createLinearGradient(0, flareY, width, flareY)
+    flareGrad.addColorStop(0, 'rgba(217, 119, 6, 0)')
+    flareGrad.addColorStop(0.5, 'rgba(217, 119, 6, 0.18)')
+    flareGrad.addColorStop(1, 'rgba(217, 119, 6, 0)')
+    ctx.fillStyle = flareGrad
+    ctx.fillRect(0, flareY - 10 * scale, width, 20 * scale)
+  } else if (style === 'minimal') {
+    // Modern architectural frame with subtle corner dots
+    const m = 48 * scale
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
+    ctx.lineWidth = Math.max(1, 1.5 * scale)
+    ctx.strokeRect(m, m, width - m * 2, height - m * 2)
+
+    ctx.fillStyle = '#38bdf8'
+    const dotR = 2.5 * scale
+    ctx.beginPath()
+    ctx.arc(m, m, dotR, 0, Math.PI * 2)
+    ctx.arc(width - m, m, dotR, 0, Math.PI * 2)
+    ctx.arc(m, height - m, dotR, 0, Math.PI * 2)
+    ctx.arc(width - m, height - m, dotR, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  ctx.restore()
+}
+
+function drawBackground(
+  ctx: any,
+  width: number,
+  height: number,
+  palette: Palette,
+  style: TrailerStyle,
+  scale: number
+) {
   const grad = ctx.createLinearGradient(0, 0, width, height)
   grad.addColorStop(0, palette.bgGradient[0])
   grad.addColorStop(0.5, palette.bgGradient[1])
@@ -102,19 +274,22 @@ function drawBackground(ctx: any, width: number, height: number, palette: Palett
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, width, height)
 
-  // Subtle vignette / dark glow
+  // Radial vignette / dark glow
   const radial = ctx.createRadialGradient(
     width / 2,
     height / 2,
-    Math.min(width, height) * 0.2,
+    Math.min(width, height) * 0.15,
     width / 2,
     height / 2,
-    Math.max(width, height) * 0.7
+    Math.max(width, height) * 0.75
   )
-  radial.addColorStop(0, 'rgba(255,255,255,0.03)')
-  radial.addColorStop(1, 'rgba(0,0,0,0.45)')
+  radial.addColorStop(0, 'rgba(255,255,255,0.035)')
+  radial.addColorStop(1, 'rgba(0,0,0,0.55)')
   ctx.fillStyle = radial
   ctx.fillRect(0, 0, width, height)
+
+  // Draw custom style decorations
+  drawStyleDecorations(ctx, width, height, style, scale)
 }
 
 function drawPillBadge(
@@ -156,16 +331,18 @@ function renderScene1(
   width: number,
   height: number,
   palette: Palette,
+  style: TrailerStyle,
   title: string,
   author: string
 ): Buffer {
   const canvas = createCanvas(width, height)
   const ctx = canvas.getContext('2d')
   const scale = Math.min(width, height) / 1080
-  drawBackground(ctx, width, height, palette)
+  drawBackground(ctx, width, height, palette, style, scale)
 
   // Badge at top
-  drawPillBadge(ctx, 'OFFICIAL BOOK TRAILER', width / 2, height * 0.22, palette, scale)
+  const badgeText = style === 'fantasy' ? 'ANCIENT STORYBOOK' : style === 'thriller' ? 'OFFICIAL DOSSIER' : 'OFFICIAL BOOK TRAILER'
+  drawPillBadge(ctx, badgeText, width / 2, height * 0.22, palette, scale)
 
   // Main hook title
   ctx.save()
@@ -205,13 +382,14 @@ function renderScene2(
   width: number,
   height: number,
   palette: Palette,
+  style: TrailerStyle,
   blurb: string,
   author: string
 ): Buffer {
   const canvas = createCanvas(width, height)
   const ctx = canvas.getContext('2d')
   const scale = Math.min(width, height) / 1080
-  drawBackground(ctx, width, height, palette)
+  drawBackground(ctx, width, height, palette, style, scale)
 
   drawPillBadge(ctx, 'THE STORY', width / 2, height * 0.18, palette, scale)
 
@@ -252,6 +430,7 @@ async function renderScene3(
   width: number,
   height: number,
   palette: Palette,
+  style: TrailerStyle,
   title: string,
   author: string,
   coverPngBuffer?: Buffer | null
@@ -259,7 +438,7 @@ async function renderScene3(
   const canvas = createCanvas(width, height)
   const ctx = canvas.getContext('2d')
   const scale = Math.min(width, height) / 1080
-  drawBackground(ctx, width, height, palette)
+  drawBackground(ctx, width, height, palette, style, scale)
 
   const isWidescreen = width > height
   const isSquare = width === height
@@ -275,7 +454,7 @@ async function renderScene3(
       try {
         const img = await loadImage(coverPngBuffer)
         ctx.save()
-        ctx.shadowColor = 'rgba(0,0,0,0.6)'
+        ctx.shadowColor = 'rgba(0,0,0,0.65)'
         ctx.shadowBlur = 40 * scale
         ctx.shadowOffsetY = 20 * scale
         ctx.drawImage(img, coverX, coverY, coverW, coverH)
@@ -358,12 +537,13 @@ function renderScene4(
   width: number,
   height: number,
   palette: Palette,
+  style: TrailerStyle,
   title: string
 ): Buffer {
   const canvas = createCanvas(width, height)
   const ctx = canvas.getContext('2d')
   const scale = Math.min(width, height) / 1080
-  drawBackground(ctx, width, height, palette)
+  drawBackground(ctx, width, height, palette, style, scale)
 
   drawPillBadge(ctx, 'EXPERIENCE THE STORY', width / 2, height * 0.25, palette, scale)
 
@@ -435,7 +615,6 @@ function drawFallbackCover(
 }
 
 function buildAudioFilter(mood: TrailerMusicMood, totalDurationSec: number): { args: string[] } {
-  // Harmonic chords and audio synthesis matched to mood
   let inputs: string[] = []
   let filter = ''
 
@@ -499,7 +678,6 @@ async function runFfmpegVideoGeneration(
 
   const audioConfig = buildAudioFilter(audioMood, totalDurationSec)
 
-  // Replace filter_complex to include both video and audio
   const combinedFilter = `${vFilters};${audioConfig.args[audioConfig.args.indexOf('-filter_complex') + 1]}`
   const audioInputs = audioConfig.args.slice(0, audioConfig.args.indexOf('-filter_complex'))
 
@@ -547,9 +725,7 @@ async function runFfmpegVideoGeneration(
   })
 }
 
-// Fallback deterministic MP4 header if ffmpeg is unavailable in test environments
 function createMockMp4Buffer(): Buffer {
-  // Minimal valid ftyp + moov header representation
   return Buffer.from([
     0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
     0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00,
@@ -565,18 +741,19 @@ export async function renderTrailerVideoAndPoster(
   const durationSec = getDurationForLength(input.length)
   const palette = PALETTES[input.style] ?? PALETTES.cinematic
 
-  // Render 4 scene images
-  const s1Buffer = renderScene1(spec.width, spec.height, palette, input.title, input.author)
-  const s2Buffer = renderScene2(spec.width, spec.height, palette, input.blurb, input.author)
+  // Render 4 scene images with custom visual style
+  const s1Buffer = renderScene1(spec.width, spec.height, palette, input.style, input.title, input.author)
+  const s2Buffer = renderScene2(spec.width, spec.height, palette, input.style, input.blurb, input.author)
   const s3Buffer = await renderScene3(
     spec.width,
     spec.height,
     palette,
+    input.style,
     input.title,
     input.author,
     input.coverPngBuffer
   )
-  const s4Buffer = renderScene4(spec.width, spec.height, palette, input.title)
+  const s4Buffer = renderScene4(spec.width, spec.height, palette, input.style, input.title)
 
   // Use Scene 3 (high-res cover showcase) as the primary poster image
   const posterBuffer = s3Buffer
@@ -614,7 +791,6 @@ export async function renderTrailerVideoAndPoster(
   } catch (err) {
     console.warn('ffmpeg video execution failed, falling back:', err)
   } finally {
-    // Cleanup temporary files
     await Promise.all([
       unlink(s1Path).catch(() => {}),
       unlink(s2Path).catch(() => {}),

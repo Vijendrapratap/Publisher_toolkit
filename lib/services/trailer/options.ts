@@ -8,12 +8,76 @@ export const LENGTH_OPTIONS = [
 export type TrailerLength = (typeof LENGTH_OPTIONS)[number]['key']
 
 export const STYLE_OPTIONS = [
-  { key: 'cinematic', label: 'Cinematic', description: 'Atmospheric lighting, slow zooms, filmic grading' },
-  { key: 'dramatic', label: 'Dramatic', description: 'High contrast, bold typography, intense pacing' },
-  { key: 'minimal', label: 'Minimal', description: 'Clean layout, subtle motions, elegant breathing room' },
-  { key: 'energetic', label: 'Energetic', description: 'Fast transitions, dynamic titles, bold colors' },
+  {
+    key: 'fantasy',
+    label: 'Epic Fantasy',
+    tagline: 'Ancient Storybook',
+    description: 'Aged parchment, floating golden embers, glowing runes & mystical lore',
+    bestFor: ['Fantasy', 'Mythology', 'Historical Fiction', 'Fairy Tales'],
+    palette: { background: '#1c1008', surface: '#2e1b10', accent: '#f59e0b', ink: '#fef08a' },
+  },
+  {
+    key: 'thriller',
+    label: 'Dark Thriller',
+    tagline: 'Noir Suspense',
+    description: 'Gritty noir textures, crimson hazard accents, high tension & mystery',
+    bestFor: ['Thriller', 'Crime', 'Mystery', 'Psychological Horror'],
+    palette: { background: '#0a0507', surface: '#1c080e', accent: '#ef4444', ink: '#ffffff' },
+  },
+  {
+    key: 'scifi',
+    label: 'Sci-Fi Cyber',
+    tagline: 'Cosmic Hologram',
+    description: 'Deep space void, cyan holographic HUD, digital scanlines & neon grid',
+    bestFor: ['Science Fiction', 'Cyberpunk', 'Dystopian', 'Space Opera'],
+    palette: { background: '#050a18', surface: '#0c1630', accent: '#06b6d4', ink: '#e0f2fe' },
+  },
+  {
+    key: 'romance',
+    label: 'Romance & Poetry',
+    tagline: 'Warm Elegance',
+    description: 'Rose gold hues, soft bokeh light leaks, warm editorial charm',
+    bestFor: ['Romance', 'Poetry', 'Literary Memoir', 'Drama'],
+    palette: { background: '#190a12', surface: '#2b1220', accent: '#fb7185', ink: '#ffe4e6' },
+  },
+  {
+    key: 'cinematic',
+    label: 'Classic Film',
+    tagline: 'Bestseller Cinematic',
+    description: 'Timeless filmic grading, warm studio spotlight, luxury gold leaf',
+    bestFor: ['Bestseller Fiction', 'Biographies', 'Prestige Drama'],
+    palette: { background: '#0c0a09', surface: '#1c1917', accent: '#d97706', ink: '#f8fafc' },
+  },
+  {
+    key: 'minimal',
+    label: 'Modern Editorial',
+    tagline: 'Quiet Precision',
+    description: 'Clean architectural layout, platinum tones, quiet confident space',
+    bestFor: ['Non-Fiction', 'Philosophy', 'Business', 'Essays'],
+    palette: { background: '#0f172a', surface: '#1e293b', accent: '#38bdf8', ink: '#f8fafc' },
+  },
+  {
+    key: 'dramatic',
+    label: 'Blockbuster',
+    tagline: 'High Impact',
+    description: 'Intense contrast, bold scarlet energy, thunderous urgency',
+    bestFor: ['Action', 'War / Military', 'Dark Fantasy'],
+    palette: { background: '#120408', surface: '#240810', accent: '#f43f5e', ink: '#ffffff' },
+  },
+  {
+    key: 'energetic',
+    label: 'Vibrant Dynamic',
+    tagline: 'Pop Momentum',
+    description: 'Electric ultraviolet, fast-paced momentum, modern pop styling',
+    bestFor: ['Young Adult', 'Contemporary', 'Graphic Novels', 'Urban Fantasy'],
+    palette: { background: '#15092a', surface: '#2d1355', accent: '#c084fc', ink: '#ffffff' },
+  },
 ] as const
 export type TrailerStyle = (typeof STYLE_OPTIONS)[number]['key']
+
+export function getStyleSpec(key: string): (typeof STYLE_OPTIONS)[number] {
+  return STYLE_OPTIONS.find((s) => s.key === key) ?? STYLE_OPTIONS[0]
+}
 
 export const MUSIC_MOOD_OPTIONS = [
   { key: 'suspenseful', label: 'Suspenseful', description: 'Deep bass, tense rhythm, mysterious ambiance' },
@@ -47,7 +111,16 @@ export const trailerProjectUpdateSchema = z
     author: z.string().trim().max(200),
     blurb: z.string().trim().max(2000),
     length: z.enum(['15s', '30s', '60s']),
-    style: z.enum(['cinematic', 'dramatic', 'minimal', 'energetic']),
+    style: z.enum([
+      'fantasy',
+      'thriller',
+      'scifi',
+      'romance',
+      'cinematic',
+      'minimal',
+      'dramatic',
+      'energetic',
+    ]),
     musicMood: z.enum(['suspenseful', 'epic', 'ambient', 'upbeat', 'emotional']),
     aspectRatios: z
       .array(z.enum(['9:16', '1:1', '16:9']))
