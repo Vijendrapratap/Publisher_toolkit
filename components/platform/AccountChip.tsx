@@ -24,6 +24,8 @@ import {
   Users,
   Layers,
   Info,
+  Cpu,
+  ArrowRight,
 } from 'lucide-react'
 import type { CapabilityStatus } from '@/lib/providers/status'
 import { cn } from '@/components/ui/cn'
@@ -447,6 +449,19 @@ export function AccountChip({
                   <span>{dark ? 'Dark Mode' : 'Light Mode'}</span>
                 </button>
               </div>
+
+              {/* Studio Settings & MCP Connectors Shortcut */}
+              <Link
+                href="/settings"
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between rounded-xl bg-accent/10 p-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
+              >
+                <span className="flex items-center gap-2">
+                  <Cpu className="size-4" />
+                  <span>Meta & Google MCP Connectors</span>
+                </span>
+                <ArrowRight className="size-3.5" />
+              </Link>
             </div>
           )}
 
@@ -598,14 +613,18 @@ export function AccountChip({
 
           {/* Footer Strip */}
           <div className="mt-3.5 flex items-center justify-between border-t border-line/60 pt-2.5 text-[11px] text-ink-muted">
-            <span className="inline-flex items-center gap-1">
-              <span className="size-1.5 rounded-full bg-success" />
-              Publisher Toolkit v1.0
-            </span>
+            <Link
+              href="/settings"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-1 text-accent hover:underline"
+            >
+              <Cpu className="size-3" />
+              <span>Studio & MCP Settings</span>
+            </Link>
             <Link
               href="/"
               onClick={() => setOpen(false)}
-              className="text-accent hover:underline"
+              className="text-ink-muted hover:text-ink"
             >
               Tool Hub
             </Link>
