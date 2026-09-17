@@ -1,12 +1,17 @@
 import Link from 'next/link'
 import { BookOpen } from 'lucide-react'
 import { SERVICES } from '@/lib/services/registry'
+import { getCapabilityStatus } from '@/lib/providers/status'
+import { isClerkConfigured } from '@/lib/providers/auth'
 import { ServiceSwitcher } from './ServiceSwitcher'
 import { LocalModeBadge } from './LocalModeBadge'
 import { ThemeToggle } from './ThemeToggle'
 import { AccountChip } from './AccountChip'
 
 export function TopBar() {
+  const status = getCapabilityStatus()
+  const isClerk = isClerkConfigured()
+
   return (
     <header className="sticky top-0 z-40 bg-canvas/80 shadow-subtle backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
@@ -21,7 +26,7 @@ export function TopBar() {
         <div className="ml-auto flex items-center gap-2">
           <LocalModeBadge />
           <ThemeToggle />
-          <AccountChip />
+          <AccountChip status={status} isClerk={isClerk} />
         </div>
       </div>
     </header>
