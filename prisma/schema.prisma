@@ -100,3 +100,67 @@ model GeneratedTrailer {
 
   @@index([projectId])
 }
+
+model AudiobookProject {
+  id             String             @id @default(cuid())
+  publisherId    String
+  title          String?
+  author         String?
+  blurb          String?
+  pdfUrl         String?
+  coverUrl       String?
+  status         String             @default("uploaded")
+  ttsProvider    String             @default("fishaudio")
+  voiceModel     String             @default("warm-literary")
+  voicePacing    Float              @default(1.0)
+  audioFormat    String             @default("mp3")
+  sampleAudioUrl String?
+  totalDuration  Int                @default(0)
+  fullAudioUrl   String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @default(now()) @updatedAt
+  chapters       AudiobookChapter[]
+
+  @@index([publisherId])
+}
+
+model AudiobookChapter {
+  id            String           @id @default(cuid())
+  projectId     String
+  project       AudiobookProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  chapterNumber Int
+  title         String
+  content       String           @db.Text
+  audioUrl      String?
+  duration      Int              @default(0)
+  status        String           @default("ready")
+  createdAt     DateTime         @default(now())
+
+  @@index([projectId])
+}
+
+model LandingProject {
+  id                 String   @id @default(cuid())
+  publisherId        String
+  title              String?
+  subtitle           String?
+  author             String?
+  authorBio          String?  @db.Text
+  synopsis           String?  @db.Text
+  coverUrl           String?
+  status             String   @default("uploaded")
+  template           String   @default("bestseller")
+  theme              String   @default("matt")
+  accentColor        String   @default("#6366f1")
+  ctaText            String   @default("Order Your Copy Today")
+  retailerLinks      Json?
+  reviews            Json?
+  sampleChapterTitle String?
+  sampleChapterText  String?  @db.Text
+  publishedSlug      String?  @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+
+  @@index([publisherId])
+}
+

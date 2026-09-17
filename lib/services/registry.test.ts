@@ -11,8 +11,13 @@ describe('service registry', () => {
     }
   })
 
-  it('marks Ads Creative and Trailer Video as live', () => {
-    expect(SERVICES.filter((s) => s.availability === 'live').map((s) => s.key)).toEqual(['ads', 'trailer'])
+  it('marks all four services as live', () => {
+    expect(SERVICES.filter((s) => s.availability === 'live').map((s) => s.key)).toEqual([
+      'ads',
+      'trailer',
+      'audiobook',
+      'landing',
+    ])
   })
 
   it('looks services up by key', () => {
