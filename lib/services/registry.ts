@@ -34,7 +34,7 @@ export const SERVICES: ServiceDefinition[] = [
     href: '/trailer',
     icon: 'clapperboard',
     tintClass: 'bg-tint-trailer',
-    availability: 'coming-soon',
+    availability: 'live',
     highlights: ['15, 30 or 60 second cuts', 'Vertical, square and widescreen', 'Mood-matched music'],
   },
   {

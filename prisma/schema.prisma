@@ -62,3 +62,39 @@ model CreativeImage {
 
   @@index([creativeSetId])
 }
+
+model TrailerProject {
+  id            String             @id @default(cuid())
+  publisherId   String
+  title         String?
+  author        String?
+  blurb         String?
+  pdfUrl        String?
+  frontCoverUrl String?
+  backCoverUrl  String?
+  status        String             @default("uploaded")
+  length        String             @default("30s")
+  style         String             @default("cinematic")
+  musicMood     String             @default("suspenseful")
+  aspectRatios  String[]           @default(["9:16", "1:1", "16:9"])
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @default(now()) @updatedAt
+  trailers      GeneratedTrailer[]
+
+  @@index([publisherId])
+}
+
+model GeneratedTrailer {
+  id          String         @id @default(cuid())
+  projectId   String
+  project     TrailerProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  aspectRatio String
+  videoUrl    String
+  posterUrl   String
+  duration    Int            @default(30)
+  width       Int
+  height      Int
+  createdAt   DateTime       @default(now())
+
+  @@index([projectId])
+}
