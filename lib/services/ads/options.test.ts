@@ -4,8 +4,17 @@ import { PLATFORMS, TONES, TEMPLATES, getTemplate, projectUpdateSchema, COPY_LIM
 describe('ads options', () => {
   it('offers the three platforms, tones and templates', () => {
     expect(PLATFORMS.map((p) => p.key)).toEqual(['META', 'GOOGLE', 'AMAZON'])
-    expect(TONES.map((t) => t.key)).toEqual(['literary', 'punchy', 'bold'])
-    expect(TEMPLATES.map((t) => t.key)).toEqual(['classic', 'bold', 'minimal'])
+    expect(TONES.map((t) => t.key)).toEqual(['literary', 'punchy', 'bold', 'intriguing', 'social'])
+    expect(TEMPLATES.map((t) => t.key)).toEqual([
+      'classic',
+      'bold',
+      'minimal',
+      'cinematic',
+      'fantasy',
+      'romance',
+      'parchment',
+      'scifi',
+    ])
   })
 
   it('falls back to the classic template for unknown keys', () => {

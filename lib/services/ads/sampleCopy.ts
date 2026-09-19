@@ -8,15 +8,35 @@ const HOOKS: Record<string, (title: string) => string> = {
   literary: (t) => `Lose yourself in ${t}`,
   punchy: (t) => `${t}. Don't miss it.`,
   bold: (t) => `${t} changes everything`,
+  intriguing: (t) => `What secrets hide in ${t}?`,
+  social: (t) => `The book everyone is reading: ${t}`,
+}
+
+const OBJECTIVE_HOOKS: Record<string, (title: string) => string> = {
+  launch: (t) => `Now Available: ${t}`,
+  preorder: (t) => `Pre-Order Now: ${t}`,
+  discount: (t) => `Special 99¢ Deal: ${t}`,
+  review_quote: (t) => `★★★★★ Must-Read: ${t}`,
+  tropes: (t) => `Your Next Obsession: ${t}`,
+  evergreen: (t) => `Discover ${t}`,
 }
 
 // Local-mode stand-in for Claude: believable, length-safe copy built from the
 // book's own metadata, so the Results screen is never empty offline.
-export function sampleAdCopy(book: { title: string; author: string; blurb: string }, tone = 'literary'): AdCopyResult[] {
+export function sampleAdCopy(
+  book: { title: string; author: string; blurb: string },
+  tone = 'literary',
+  options?: { campaignObjective?: string; customHook?: string; ctaText?: string }
+): AdCopyResult[] {
   const title = book.title.trim() || 'Your next great read'
   const byline = book.author.trim() ? ` by ${book.author.trim()}` : ''
   const blurb = book.blurb.trim() || `Discover ${title}${byline}.`
-  const hook = (HOOKS[tone] ?? HOOKS.literary)(title)
+  const defaultHook = (HOOKS[tone] ?? HOOKS.literary)(title)
+  const hook = options?.customHook?.trim()
+    ? options.customHook.trim()
+    : options?.campaignObjective && OBJECTIVE_HOOKS[options.campaignObjective]
+      ? OBJECTIVE_HOOKS[options.campaignObjective](title)
+      : defaultHook
 
   return [
     {

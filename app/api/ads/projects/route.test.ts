@@ -12,7 +12,12 @@ vi.mock('@/lib/services/ads/extract', () => ({
   }),
 }))
 vi.mock('@/lib/db', () => ({
-  prisma: { book: { create: vi.fn().mockResolvedValue({ id: 'book_1' }) } },
+  prisma: {
+    book: {
+      create: vi.fn().mockResolvedValue({ id: 'book_1' }),
+      findFirst: vi.fn(),
+    },
+  },
 }))
 
 import { POST } from './route'
@@ -129,5 +134,68 @@ describe('POST /api/ads/projects', () => {
     const res = await POST(formDataRequest({ pdf: pdfBlob, frontCover: badCover }))
     expect(res.status).toBe(400)
     expect(prisma.book.create).not.toHaveBeenCalled()
+  })
+
+  it('creates a new campaign from an existing book via JSON', async () => {
+    vi.mocked(prisma.book.findFirst).mockResolvedValueOnce({
+      id: 'existing_book_1',
+      publisherId: 'pub_1',
+      title: 'Existing Book Title',
+      author: 'Author Name',
+      blurb: 'Great blurb',
+      pdfUrl: 'https://blob/existing.pdf',
+      frontCoverUrl: 'https://blob/cover.png',
+      backCoverUrl: null,
+      parentBookId: null,
+      platforms: ['META', 'GOOGLE'],
+      copyTone: 'literary',
+      templateKey: 'classic',
+    } as any)
+    vi.mocked(prisma.book.create).mockResolvedValueOnce({ id: 'campaign_project_2' } as any)
+
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          existingBookId: 'existing_book_1',
+          campaignName: 'Summer Blitz',
+          campaignObjective: 'preorder',
+          templateKey: 'fantasy',
+          copyTone: 'intriguing',
+        }),
+      })
+    )
+    const json = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(json.id).toBe('campaign_project_2')
+    expect(json.isExisting).toBe(true)
+    expect(prisma.book.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          publisherId: 'pub_1',
+          title: 'Existing Book Title',
+          campaignName: 'Summer Blitz',
+          campaignObjective: 'preorder',
+          templateKey: 'fantasy',
+          copyTone: 'intriguing',
+          parentBookId: 'existing_book_1',
+        }),
+      })
+    )
+  })
+
+  it('returns 404 when existingBookId is not found', async () => {
+    vi.mocked(prisma.book.findFirst).mockResolvedValueOnce(null)
+
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ existingBookId: 'missing_id' }),
+      })
+    )
+    expect(res.status).toBe(404)
   })
 })

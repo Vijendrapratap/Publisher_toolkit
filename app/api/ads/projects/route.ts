@@ -7,7 +7,100 @@ import { prisma } from '@/lib/db'
 
 export async function POST(request: Request) {
   const publisherId = await requireCurrentPublisherId()
+  const contentType = request.headers.get('content-type') || ''
+
+  if (contentType.includes('application/json')) {
+    const json = await request.json().catch(() => ({}))
+    const {
+      existingBookId,
+      campaignName,
+      campaignObjective,
+      templateKey,
+      copyTone,
+      targetAudience,
+      customHook,
+      ctaText,
+      platforms,
+    } = json
+
+    if (!existingBookId) {
+      return NextResponse.json({ error: 'existingBookId or PDF file is required' }, { status: 400 })
+    }
+
+    const sourceBook = await prisma.book.findFirst({
+      where: { id: existingBookId, publisherId },
+    })
+    if (!sourceBook) {
+      return NextResponse.json({ error: 'Selected book not found' }, { status: 404 })
+    }
+
+    const rootId = sourceBook.parentBookId ?? sourceBook.id
+    const newProject = await prisma.book.create({
+      data: {
+        publisherId,
+        title: sourceBook.title,
+        author: sourceBook.author,
+        blurb: sourceBook.blurb,
+        pdfUrl: sourceBook.pdfUrl,
+        frontCoverUrl: sourceBook.frontCoverUrl,
+        backCoverUrl: sourceBook.backCoverUrl,
+        status: 'configured',
+        platforms: Array.isArray(platforms) && platforms.length > 0 ? platforms : sourceBook.platforms,
+        parentBookId: rootId,
+        campaignName: campaignName?.trim() || 'New Campaign',
+        campaignObjective: campaignObjective || 'launch',
+        templateKey: templateKey || sourceBook.templateKey || 'classic',
+        copyTone: copyTone || sourceBook.copyTone || 'literary',
+        targetAudience: targetAudience?.trim() || null,
+        customHook: customHook?.trim() || null,
+        ctaText: ctaText?.trim() || 'Order Your Copy Today',
+      },
+    })
+
+    return NextResponse.json({ id: newProject.id, isExisting: true }, { status: 201 })
+  }
+
   const form = await request.formData()
+
+  const existingBookId = form.get('existingBookId')
+  if (existingBookId && typeof existingBookId === 'string') {
+    const sourceBook = await prisma.book.findFirst({
+      where: { id: existingBookId, publisherId },
+    })
+    if (!sourceBook) {
+      return NextResponse.json({ error: 'Selected book not found' }, { status: 404 })
+    }
+    const rootId = sourceBook.parentBookId ?? sourceBook.id
+    const campaignName = form.get('campaignName')
+    const campaignObjective = form.get('campaignObjective')
+    const templateKey = form.get('templateKey')
+    const copyTone = form.get('copyTone')
+    const targetAudience = form.get('targetAudience')
+    const customHook = form.get('customHook')
+    const ctaText = form.get('ctaText')
+
+    const newProject = await prisma.book.create({
+      data: {
+        publisherId,
+        title: sourceBook.title,
+        author: sourceBook.author,
+        blurb: sourceBook.blurb,
+        pdfUrl: sourceBook.pdfUrl,
+        frontCoverUrl: sourceBook.frontCoverUrl,
+        backCoverUrl: sourceBook.backCoverUrl,
+        status: 'configured',
+        parentBookId: rootId,
+        campaignName: typeof campaignName === 'string' && campaignName.trim() ? campaignName.trim() : 'New Campaign',
+        campaignObjective: typeof campaignObjective === 'string' ? campaignObjective : 'launch',
+        templateKey: typeof templateKey === 'string' ? templateKey : (sourceBook.templateKey || 'classic'),
+        copyTone: typeof copyTone === 'string' ? copyTone : (sourceBook.copyTone || 'literary'),
+        targetAudience: typeof targetAudience === 'string' && targetAudience.trim() ? targetAudience.trim() : null,
+        customHook: typeof customHook === 'string' && customHook.trim() ? customHook.trim() : null,
+        ctaText: typeof ctaText === 'string' && ctaText.trim() ? ctaText.trim() : 'Order Your Copy Today',
+      },
+    })
+    return NextResponse.json({ id: newProject.id, isExisting: true }, { status: 201 })
+  }
 
   const pdfFile = form.get('pdf')
   if (pdfFile !== null && !(pdfFile instanceof File)) {
@@ -64,6 +157,14 @@ export async function POST(request: Request) {
     backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, extracted.backCoverPng, 'image/png')).url
   }
 
+  const campaignName = form.get('campaignName')
+  const campaignObjective = form.get('campaignObjective')
+  const templateKey = form.get('templateKey')
+  const copyTone = form.get('copyTone')
+  const targetAudience = form.get('targetAudience')
+  const customHook = form.get('customHook')
+  const ctaText = form.get('ctaText')
+
   const book = await prisma.book.create({
     data: {
       publisherId,
@@ -73,6 +174,13 @@ export async function POST(request: Request) {
       pdfUrl,
       frontCoverUrl,
       backCoverUrl,
+      campaignName: typeof campaignName === 'string' && campaignName.trim() ? campaignName.trim() : 'Launch Campaign',
+      campaignObjective: typeof campaignObjective === 'string' ? campaignObjective : 'launch',
+      templateKey: typeof templateKey === 'string' ? templateKey : 'classic',
+      copyTone: typeof copyTone === 'string' ? copyTone : 'literary',
+      targetAudience: typeof targetAudience === 'string' && targetAudience.trim() ? targetAudience.trim() : null,
+      customHook: typeof customHook === 'string' && customHook.trim() ? customHook.trim() : null,
+      ctaText: typeof ctaText === 'string' && ctaText.trim() ? ctaText.trim() : 'Order Your Copy Today',
     },
   })
 

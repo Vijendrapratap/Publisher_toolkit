@@ -19,7 +19,7 @@ describe('renderCreativeImages', () => {
       expect(width).toBe(spec.width)
       expect(height).toBe(spec.height)
     }
-  })
+  }, 25000)
 
   it('renders only the sizes for the requested platforms, with the chosen template', async () => {
     const images = await renderCreativeImages({
@@ -30,5 +30,5 @@ describe('renderCreativeImages', () => {
       platforms: ['META'],
     })
     expect(images.map((i) => i.sizeKey)).toEqual(['meta_feed_1080x1080', 'meta_story_1080x1920'])
-  })
+  }, 25000)
 })

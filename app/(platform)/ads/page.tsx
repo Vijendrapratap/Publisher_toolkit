@@ -18,7 +18,7 @@ export default async function AdsHomePage() {
   const projects = await getBooksForPublisher(publisherId)
   const newButton = (
     <Link href="/ads/new" className={buttonClasses({ size: 'lg' })}>
-      <Plus className="size-4" aria-hidden /> New ad project
+      <Plus className="size-4" aria-hidden /> New campaign
     </Link>
   )
 
@@ -31,15 +31,17 @@ export default async function AdsHomePage() {
       {projects.length === 0 ? (
         <EmptyState
           icon={<Megaphone className="size-7" aria-hidden />}
-          title="Create your first ad set"
-          description="Upload a book and get ready-to-run creatives for Meta, Google and Amazon in a few minutes."
+          title="Create your first ad campaign"
+          description="Upload a book or choose an existing title to generate ready-to-run creatives for Meta, Google and Amazon in minutes."
           action={newButton}
         />
       ) : (
         <Card className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-display text-xl font-semibold">Pick a project or start a new one</h2>
-            <p className="text-sm text-ink-muted">Your projects are on the left, each resumes right where you left off.</p>
+            <h2 className="font-display text-xl font-semibold">Campaigns & book library</h2>
+            <p className="text-sm text-ink-muted">
+              Select an ongoing campaign from the left, or launch a new campaign for any previously uploaded book.
+            </p>
           </div>
           {newButton}
         </Card>

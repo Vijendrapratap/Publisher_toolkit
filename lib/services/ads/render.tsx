@@ -18,6 +18,8 @@ export async function renderCreativeImages(input: {
   author: string
   templateKey?: string
   platforms?: AdPlatform[]
+  campaignBadge?: string
+  ctaText?: string
 }): Promise<RenderedCreativeImage[]> {
   const { palette } = getTemplate(input.templateKey ?? 'classic')
   const sizes = input.platforms?.length
@@ -35,6 +37,8 @@ export async function renderCreativeImages(input: {
           width={spec.width}
           height={spec.height}
           palette={palette}
+          campaignBadge={input.campaignBadge}
+          ctaText={input.ctaText}
         />
       ),
       { width: spec.width, height: spec.height }

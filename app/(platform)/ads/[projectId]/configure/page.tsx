@@ -26,6 +26,11 @@ export default async function ConfigureStepPage({
         platforms: book.platforms as AdPlatform[],
         copyTone: book.copyTone as CopyTone,
         templateKey: book.templateKey as TemplateKey,
+        campaignName: book.campaignName,
+        campaignObjective: book.campaignObjective,
+        targetAudience: book.targetAudience,
+        customHook: book.customHook,
+        ctaText: book.ctaText,
       }}
       book={{ title: book.title ?? '', author: book.author ?? '', blurb: book.blurb ?? '', coverUrl: book.frontCoverUrl }}
     />

@@ -2,12 +2,21 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { AlertCircle, Check, Sparkles } from 'lucide-react'
+import { AlertCircle, Check, Palette, Sparkles, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
 import type { AdPlatform } from '@/lib/services/ads/copy'
-import { PLATFORMS, TEMPLATES, TONES, type CopyTone, type TemplateKey } from '@/lib/services/ads/options'
+import {
+  PLATFORMS,
+  TEMPLATES,
+  TONES,
+  CAMPAIGN_OBJECTIVES,
+  CTA_PRESETS,
+  type CopyTone,
+  type TemplateKey,
+  type CampaignObjectiveKey,
+} from '@/lib/services/ads/options'
 import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
 import { sampleAdCopy } from '@/lib/services/ads/sampleCopy'
 import { nextRadioIndex } from '@/lib/ui/radioKeys'
@@ -15,8 +24,6 @@ import { nextRadioIndex } from '@/lib/ui/radioKeys'
 const sizesFor = (platform: AdPlatform) =>
   CREATIVE_SIZES.filter((s) => s.platform === platform).map((s) => `${s.width}×${s.height}`)
 
-// Roving-tabindex arrow key contract for a role="radio" group: moves selection
-// and focus together, and leaves other keys (Tab, Enter, Space) untouched.
 function handleRadioKeyDown<K extends string>(
   e: KeyboardEvent<HTMLButtonElement>,
   keys: readonly K[],
@@ -39,7 +46,16 @@ export function ConfigureForm({
   error: generationError,
 }: {
   projectId: string
-  initial: { platforms: AdPlatform[]; copyTone: CopyTone; templateKey: TemplateKey }
+  initial: {
+    platforms: AdPlatform[]
+    copyTone: CopyTone
+    templateKey: TemplateKey
+    campaignName?: string | null
+    campaignObjective?: string | null
+    targetAudience?: string | null
+    customHook?: string | null
+    ctaText?: string | null
+  }
   book: { title: string; author: string; blurb: string; coverUrl: string | null }
   error?: string
 }) {
@@ -47,13 +63,24 @@ export function ConfigureForm({
   const [platforms, setPlatforms] = useState<AdPlatform[]>(initial.platforms)
   const [copyTone, setCopyTone] = useState<CopyTone>(initial.copyTone)
   const [templateKey, setTemplateKey] = useState<TemplateKey>(initial.templateKey)
+  const [campaignName, setCampaignName] = useState(initial.campaignName ?? 'Main Campaign')
+  const [campaignObjective, setCampaignObjective] = useState<CampaignObjectiveKey>(
+    (initial.campaignObjective as CampaignObjectiveKey) ?? 'launch'
+  )
+  const [targetAudience, setTargetAudience] = useState(initial.targetAudience ?? '')
+  const [customHook, setCustomHook] = useState(initial.customHook ?? '')
+  const [ctaText, setCtaText] = useState(initial.ctaText ?? CTA_PRESETS[0])
+
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const togglePlatform = (key: AdPlatform) =>
     setPlatforms((current) => (current.includes(key) ? current.filter((p) => p !== key) : [...current, key]))
 
-  const previewHeadline = sampleAdCopy(book, copyTone)[0].headline
+  const previewHeadline = sampleAdCopy(book, copyTone, {
+    campaignObjective,
+    customHook: customHook || undefined,
+  })[0].headline
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -66,7 +93,16 @@ export function ConfigureForm({
     const res = await fetch(`/api/ads/projects/${projectId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ platforms: PLATFORMS.map((p) => p.key).filter((k) => platforms.includes(k)), copyTone, templateKey }),
+      body: JSON.stringify({
+        platforms: PLATFORMS.map((p) => p.key).filter((k) => platforms.includes(k)),
+        copyTone,
+        templateKey,
+        campaignName: campaignName.trim() || 'Main Campaign',
+        campaignObjective,
+        targetAudience: targetAudience.trim() || undefined,
+        customHook: customHook.trim() || undefined,
+        ctaText: ctaText.trim() || undefined,
+      }),
     })
     if (!res.ok) {
       setPending(false)
@@ -93,6 +129,110 @@ export function ConfigureForm({
         </div>
       )}
 
+      {/* Campaign Details & Objective */}
+      <Card className="p-6">
+        <fieldset>
+          <div className="flex items-center gap-2">
+            <Target className="size-4 text-accent" aria-hidden />
+            <legend className="font-display text-lg font-semibold">Campaign objective & goal</legend>
+          </div>
+          <p className="mt-1 text-sm text-ink-muted">Set the strategic angle and goal for this ad campaign.</p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {CAMPAIGN_OBJECTIVES.map((obj) => {
+              const selected = campaignObjective === obj.key
+              return (
+                <button
+                  key={obj.key}
+                  type="button"
+                  onClick={() => {
+                    setCampaignObjective(obj.key)
+                    if (!ctaText || CTA_PRESETS.includes(ctaText as any)) {
+                      setCtaText(obj.defaultCta)
+                    }
+                  }}
+                  className={cn(
+                    'flex flex-col items-start gap-1 rounded-2xl border border-transparent p-4 text-left transition-all',
+                    selected
+                      ? 'border-accent bg-accent-soft/60 shadow-inset ring-2 ring-accent/30'
+                      : 'bg-surface shadow-subtle hover:border-accent/40'
+                  )}
+                >
+                  <span className="text-xs font-bold text-accent">{obj.badge}</span>
+                  <span className="font-semibold">{obj.label}</span>
+                  <span className="text-xs text-ink-muted">{obj.description}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="campaignName" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                Campaign label
+              </label>
+              <input
+                id="campaignName"
+                type="text"
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="e.g. Summer Release Push"
+                className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="ctaText" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                Primary Call to Action (CTA)
+              </label>
+              <select
+                id="ctaText"
+                value={ctaText}
+                onChange={(e) => setCtaText(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+              >
+                {CTA_PRESETS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="targetAudience" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                Target audience / Comp authors (optional)
+              </label>
+              <input
+                id="targetAudience"
+                type="text"
+                value={targetAudience}
+                onChange={(e) => setTargetAudience(e.target.value)}
+                placeholder="e.g. For fans of Brandon Sanderson & Patrick Rothfuss"
+                className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="customHook" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                Custom headline hook / Social proof (optional)
+              </label>
+              <input
+                id="customHook"
+                type="text"
+                value={customHook}
+                onChange={(e) => setCustomHook(e.target.value)}
+                placeholder="e.g. The #1 Bestselling Fantasy of 2026"
+                className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </div>
+          </div>
+        </fieldset>
+      </Card>
+
+      {/* Platforms Selection */}
       <Card className="p-6">
         <fieldset>
           <legend className="font-display text-lg font-semibold">Where will these ads run?</legend>
@@ -136,10 +276,11 @@ export function ConfigureForm({
         </fieldset>
       </Card>
 
+      {/* Copy Tone */}
       <Card className="p-6">
         <fieldset>
           <legend className="font-display text-lg font-semibold">Copy tone</legend>
-          <div role="radiogroup" aria-label="Copy tone" className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div role="radiogroup" aria-label="Copy tone" className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {TONES.map((t, i) => {
               const selected = copyTone === t.key
               return (
@@ -179,10 +320,15 @@ export function ConfigureForm({
         </fieldset>
       </Card>
 
+      {/* Design Style / Template Selection */}
       <Card className="p-6">
         <fieldset>
-          <legend className="font-display text-lg font-semibold">Design template</legend>
-          <div role="radiogroup" aria-label="Design template" className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div className="flex items-center gap-2">
+            <Palette className="size-4 text-accent" aria-hidden />
+            <legend className="font-display text-lg font-semibold">Design aesthetic & style</legend>
+          </div>
+          <p className="mt-1 text-sm text-ink-muted">Visual palette and typographic treatment for your ad images.</p>
+          <div role="radiogroup" aria-label="Design template" className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {TEMPLATES.map((t, i) => {
               const selected = templateKey === t.key
               return (
@@ -207,17 +353,17 @@ export function ConfigureForm({
                   )}
                 >
                   <span
-                    className="flex aspect-square flex-col items-center justify-center gap-2 p-4"
+                    className="flex aspect-video flex-col items-center justify-center gap-2 p-4"
                     style={{ background: t.palette.background, color: t.palette.ink }}
                     aria-hidden
                   >
                     {book.coverUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={book.coverUrl} alt="" className="h-1/2 rounded-md object-cover shadow-lg" />
+                      <img src={book.coverUrl} alt="" className="h-2/3 rounded-md object-cover shadow-lg" />
                     ) : (
-                      <span className="h-1/2 w-1/3 rounded-md bg-current opacity-20" />
+                      <span className="h-2/3 w-1/3 rounded-md bg-current opacity-20" />
                     )}
-                    <span className="line-clamp-1 font-display text-sm font-semibold">{book.title || 'Your book'}</span>
+                    <span className="line-clamp-1 font-display text-xs font-semibold">{book.title || 'Your book'}</span>
                     <span className="h-0.5 w-8" style={{ background: t.palette.accent }} />
                   </span>
                   <span className="flex flex-col gap-0.5 bg-surface p-3">

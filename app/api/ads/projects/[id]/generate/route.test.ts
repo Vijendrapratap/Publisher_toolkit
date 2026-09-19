@@ -45,7 +45,10 @@ describe('POST /api/ads/projects/:id/generate', () => {
     expect(res.status).toBe(201)
     expect(typeof json.creativeSetId).toBe('string')
     expect(json.creativeSetId.length).toBeGreaterThan(0)
-    expect(generateAdCopy).toHaveBeenCalledWith({ title: 'T', author: 'A', blurb: 'B' }, { tone: 'punchy', platforms: ['META'] })
+    expect(generateAdCopy).toHaveBeenCalledWith(
+      { title: 'T', author: 'A', blurb: 'B' },
+      expect.objectContaining({ tone: 'punchy', platforms: ['META'] })
+    )
     expect(renderCreativeImages).toHaveBeenCalledWith(
       expect.objectContaining({ coverImageUrl: 'data:image/png;base64,Y292ZXI=', templateKey: 'bold', platforms: ['META'] })
     )

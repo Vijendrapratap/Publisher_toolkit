@@ -4,7 +4,7 @@ import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { generateAdCopy, type AdPlatform } from '@/lib/services/ads/copy'
 import { renderCreativeImages } from '@/lib/services/ads/render'
 import { readStoredFile, storeFile, toDataUri } from '@/lib/providers/storage'
-import type { CopyTone } from '@/lib/services/ads/options'
+import { getCampaignObjective, type CopyTone } from '@/lib/services/ads/options'
 import { prisma } from '@/lib/db'
 
 export const maxDuration = 300
@@ -25,14 +25,24 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   try {
     const coverDataUri = toDataUri(await readStoredFile(book.frontCoverUrl))
+    const objective = getCampaignObjective(book.campaignObjective)
     const [variants, renderedImages] = await Promise.all([
-      generateAdCopy(details, { tone: book.copyTone as CopyTone, platforms }),
+      generateAdCopy(details, {
+        tone: book.copyTone as CopyTone,
+        platforms,
+        campaignObjective: book.campaignObjective ?? 'launch',
+        targetAudience: book.targetAudience ?? undefined,
+        customHook: book.customHook ?? undefined,
+        ctaText: book.ctaText ?? objective.defaultCta,
+      }),
       renderCreativeImages({
         coverImageUrl: coverDataUri,
         title: details.title,
         author: details.author,
         templateKey: book.templateKey,
         platforms,
+        campaignBadge: objective.badge,
+        ctaText: book.ctaText ?? objective.defaultCta,
       }),
     ])
 
@@ -61,6 +71,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         creativeSets: {
           create: {
             id: creativeSetId,
+            campaignName: book.campaignName,
+            campaignObjective: book.campaignObjective,
+            templateKey: book.templateKey,
             adCopies: {
               createMany: {
                 data: copyRows.map(({ platform, headline, primaryText, description }) => ({
