@@ -4,26 +4,18 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
-  Share2,
   Sliders,
   Sparkles,
   ShoppingBag,
-  ExternalLink,
   CheckCircle2,
   Save,
   Palette,
-  Layers,
-  BookOpen,
-  ArrowRight,
-  RefreshCw,
-  Cpu,
-  Radio,
-  Copy,
-  Check,
   Key,
   Eye,
   EyeOff,
   ShieldCheck,
+  Check,
+  RefreshCw,
 } from 'lucide-react'
 import type { PublisherSettings } from '@/lib/publisher/settings'
 import { Card } from '@/components/ui/card'
@@ -41,19 +33,18 @@ const AVAILABLE_GENRES = [
   'Non-Fiction & Memoir',
   'Young Adult',
   'Horror & Dark Fiction',
+  'Children’s Books',
   'Poetry',
   'Business & Self-Help',
 ]
 
 export function SettingsForm({ initial }: { initial: PublisherSettings }) {
   const [settings, setSettings] = useState<PublisherSettings>(initial)
-  const [activeTab, setActiveTab] = useState<'ai' | 'brand' | 'retail'>('ai')
+  const [activeTab, setActiveTab] = useState<'brand' | 'retail' | 'ai'>('brand')
   const [saving, setSaving] = useState(false)
-  const [copiedId, setCopiedId] = useState(false)
 
   // OpenRouter key state
   const [openRouterKey, setOpenRouterKey] = useState('')
-  const [openRouterModel, setOpenRouterModel] = useState('deepseek/deepseek-v4.1-flash')
   const [aiConfigured, setAiConfigured] = useState(false)
   const [maskedKey, setMaskedKey] = useState<string | null>(null)
   const [showKey, setShowKey] = useState(false)
@@ -66,7 +57,6 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
       .then((data) => {
         if (data) {
           setAiConfigured(Boolean(data.isConfigured))
-          if (data.model) setOpenRouterModel(data.model)
           if (data.maskedKey) setMaskedKey(data.maskedKey)
         }
       })
@@ -83,15 +73,15 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
       const res = await fetch('/api/settings/ai-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: openRouterKey, model: openRouterModel, testOnly: true }),
+        body: JSON.stringify({ apiKey: openRouterKey, testOnly: true }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Connection failed')
-      toast.success('OpenRouter Connection Successful!', {
-        description: 'API key is valid and ready to generate ad copy.',
+      toast.success('AI Connection Successful!', {
+        description: 'Your API key is valid and ready to generate book content.',
       })
     } catch (err: any) {
-      toast.error(err.message || 'Failed to verify OpenRouter key')
+      toast.error(err.message || 'Failed to verify API key')
     } finally {
       setTestingAi(false)
     }
@@ -99,7 +89,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
 
   const handleSaveAiKey = async () => {
     if (!openRouterKey.trim()) {
-      toast.error('Please enter an OpenRouter API key')
+      toast.error('Please enter an API key')
       return
     }
     setSavingAi(true)
@@ -107,30 +97,21 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
       const res = await fetch('/api/settings/ai-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: openRouterKey, model: openRouterModel }),
+        body: JSON.stringify({ apiKey: openRouterKey }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to save')
       setAiConfigured(true)
       setMaskedKey(`${openRouterKey.trim().slice(0, 7)}...${openRouterKey.trim().slice(-4)}`)
       setOpenRouterKey('')
-      toast.success('OpenRouter API Key Saved!', {
-        description: 'AI copywriting is now running live via OpenRouter.',
+      toast.success('API Key Saved!', {
+        description: 'Your custom AI account is now active.',
       })
     } catch (err: any) {
-      toast.error(err.message || 'Could not save OpenRouter key')
+      toast.error(err.message || 'Could not save API key')
     } finally {
       setSavingAi(false)
     }
-  }
-
-  const handleCopyId = () => {
-    try {
-      navigator.clipboard.writeText(settings.publisherId)
-      setCopiedId(true)
-      toast.success('Tenant ID copied to clipboard')
-      setTimeout(() => setCopiedId(false), 2000)
-    } catch {}
   }
 
   const handleSave = async () => {
@@ -144,18 +125,16 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
       if (!res.ok) throw new Error('Failed to save')
       const updated = await res.json()
       setSettings(updated)
-      // Also update local storage for instant sync in AccountChip
       try {
         localStorage.setItem('pt_studio_name', updated.brand.name)
       } catch {}
-      toast.success('Publisher profile and connector settings saved!')
+      toast.success('Publisher profile settings saved!')
     } catch {
       toast.error('Could not save settings. Please try again.')
     } finally {
       setSaving(false)
     }
   }
-
 
   const toggleGenre = (genre: string) => {
     const current = settings.brand.primaryGenres || []
@@ -169,7 +148,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-10 sm:px-6">
       {/* Header Banner */}
       <div className="flex flex-col justify-between gap-4 border-b border-line pb-6 sm:flex-row sm:items-center">
         <div>
@@ -182,7 +161,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
             </h1>
           </div>
           <p className="mt-2 text-sm text-ink-muted">
-            Configure your publisher imprint, default brand parameters, and automated publishing workflows.
+            Manage your publishing imprint, brand colors, retail links, and writing style.
           </p>
         </div>
 
@@ -193,10 +172,10 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
         </div>
       </div>
 
-      {/* Publisher Tenant Identity Summary */}
-      <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
-        <div className="flex items-center gap-3">
-          <span className="grid size-12 place-items-center rounded-2xl bg-accent-soft text-lg font-bold text-accent shadow-subtle">
+      {/* Publisher Imprint Identity Summary Card */}
+      <Card className="flex items-center justify-between gap-4 p-4">
+        <div className="flex items-center gap-3.5">
+          <span className="grid size-12 place-items-center rounded-2xl bg-accent text-lg font-bold text-on-accent shadow-subtle">
             {settings.brand.name
               .split(' ')
               .map((w) => w[0])
@@ -206,7 +185,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-display text-base font-semibold text-ink">{settings.brand.name}</span>
-              <Badge tone="success" className="gap-1">
+              <Badge tone="success" className="gap-1 text-xs">
                 <span className="size-1.5 rounded-full bg-success animate-pulse" />
                 Active Imprint
               </Badge>
@@ -214,36 +193,10 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
             <p className="text-xs text-ink-muted">{settings.brand.tagline || 'Independent Publishing Imprint'}</p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5 text-xs">
-          <span className="text-ink-muted">Tenant ID:</span>
-          <code className="font-mono text-ink">{settings.publisherId}</code>
-          <button
-            type="button"
-            onClick={handleCopyId}
-            className="rounded p-1 text-ink-muted hover:bg-surface hover:text-ink"
-            title="Copy Tenant ID"
-          >
-            {copiedId ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
-          </button>
-        </div>
       </Card>
 
-      {/* Tabs Navigation */}
+      {/* Clean Tabs Navigation */}
       <div className="flex gap-2 border-b border-line pb-px">
-        <button
-          type="button"
-          onClick={() => setActiveTab('ai')}
-          className={cn(
-            'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            activeTab === 'ai'
-              ? 'border-accent text-accent'
-              : 'border-transparent text-ink-muted hover:text-ink'
-          )}
-        >
-          <Sparkles className="size-4" />
-          AI & OpenRouter Key
-        </button>
         <button
           type="button"
           onClick={() => setActiveTab('brand')}
@@ -255,7 +208,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
           )}
         >
           <Palette className="size-4" />
-          Brand & Imprint Voice
+          Brand & Imprint
         </button>
         <button
           type="button"
@@ -268,136 +221,28 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
           )}
         >
           <ShoppingBag className="size-4" />
-          Retail & Buy Links
+          Store & Buy Links
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('ai')}
+          className={cn(
+            'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+            activeTab === 'ai'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-ink-muted hover:text-ink'
+          )}
+        >
+          <Sparkles className="size-4" />
+          AI Engine (Optional)
         </button>
       </div>
 
-      {/* TAB: AI & OPENROUTER */}
-      {activeTab === 'ai' && (
-        <div className="flex flex-col gap-6">
-          <Card className="flex flex-col gap-5 p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-5 text-accent" />
-                  <h2 className="font-display text-lg font-semibold text-ink">OpenRouter AI Configuration</h2>
-                </div>
-                <p className="mt-1 text-sm text-ink-muted">
-                  Connect your OpenRouter API key to unlock live AI ad copywriting with Claude, Gemini, or Llama models.
-                </p>
-              </div>
-              <Badge tone={aiConfigured ? 'success' : 'neutral'} className="gap-1.5">
-                <span className={cn('size-2 rounded-full', aiConfigured ? 'bg-success animate-pulse' : 'bg-ink-muted')} />
-                {aiConfigured ? 'OpenRouter Active' : 'Deterministic Sample Fallback'}
-              </Badge>
-            </div>
-
-            {maskedKey && (
-              <div className="flex items-center justify-between rounded-xl bg-surface-2 p-3 text-xs">
-                <div className="flex items-center gap-2">
-                  <Key className="size-4 text-accent" />
-                  <span className="text-ink-muted">Current configured key:</span>
-                  <code className="font-mono text-ink font-semibold">{maskedKey}</code>
-                </div>
-                <span className="text-success font-medium flex items-center gap-1">
-                  <CheckCircle2 className="size-3.5" /> Ready for generation
-                </span>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-4">
-              <div>
-                <label htmlFor="openRouterKey" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  {maskedKey ? 'Update OpenRouter API Key' : 'Enter OpenRouter API Key'}
-                </label>
-                <div className="relative mt-1.5">
-                  <Key className="absolute left-3.5 top-3 size-4 text-ink-muted" aria-hidden />
-                  <input
-                    id="openRouterKey"
-                    type={showKey ? 'text' : 'password'}
-                    value={openRouterKey}
-                    onChange={(e) => setOpenRouterKey(e.target.value)}
-                    placeholder="sk-or-v1-..."
-                    className="w-full rounded-xl border border-line bg-surface py-2.5 pl-10 pr-10 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-3 top-2.5 rounded p-1 text-ink-muted hover:text-ink"
-                  >
-                    {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-                <p className="mt-1 text-[11px] text-ink-muted">
-                  Get your API key at{' '}
-                  <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                    openrouter.ai/keys
-                  </a>
-                  . Both paid and free-tier models are supported.
-                </p>
-              </div>
-
-              <div>
-                <label htmlFor="openRouterModel" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  AI Model ID
-                </label>
-                <select
-                  id="openRouterModel"
-                  value={openRouterModel}
-                  onChange={(e) => setOpenRouterModel(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 font-mono"
-                >
-                  <option value="deepseek/deepseek-v4.1-flash">deepseek/deepseek-v4.1-flash (Recommended: Ultra-fast DeepSeek v4.1 for Ads & Landing Pages)</option>
-                  <option value="deepseek/deepseek-chat">deepseek/deepseek-chat (DeepSeek Chat General Reasoning)</option>
-                  <option value="google/gemini-2.5-flash-image">google/gemini-2.5-flash-image (Nano-Banana / Gemini Image Generation)</option>
-                  <option value="openai/gpt-5-image">openai/gpt-5-image (OpenAI GPT-5 Image Model)</option>
-                  <option value="google/veo-2">google/veo-2 (Google Veo 2 Cinematic Video Preview)</option>
-                  <option value="anthropic/claude-sonnet-5">anthropic/claude-sonnet-5 (Anthropic Claude Sonnet 5)</option>
-                  <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b-instruct:free (Free Tier Model)</option>
-                  <option value="deepseek/deepseek-r1:free">deepseek/deepseek-r1:free (Free Reasoning Model)</option>
-                  <option value="openai/gpt-4o">openai/gpt-4o (OpenAI Omni)</option>
-                </select>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={testingAi}
-                  disabled={!openRouterKey.trim() || savingAi}
-                  onClick={handleTestAiKey}
-                >
-                  <RefreshCw className="size-3.5" /> Test Key
-                </Button>
-                <Button
-                  type="button"
-                  variant="primary"
-                  loading={savingAi}
-                  disabled={!openRouterKey.trim() || testingAi}
-                  onClick={handleSaveAiKey}
-                >
-                  <Save className="size-3.5" /> Save OpenRouter Key
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-xs text-ink-muted">
-              <ShieldCheck className="size-4 shrink-0 text-success mt-0.5" />
-              <span>
-                Your API key is stored securely in your local environment file (<code className="text-ink">.env.local</code>) and runtime environment. It is used solely to generate book ad copy and creative variants.
-              </span>
-            </div>
-          </Card>
-        </div>
-      )}
-
-
-
-      {/* TAB 2: BRAND & IMPRINT */}
+      {/* TAB 1: BRAND & IMPRINT */}
       {activeTab === 'brand' && (
         <div className="flex flex-col gap-6">
           <Card className="flex flex-col gap-6 p-6">
-            <h3 className="font-display text-lg font-semibold text-ink">Imprint Identity</h3>
+            <h2 className="font-display text-lg font-semibold text-ink">Imprint Details</h2>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Publisher or Imprint Name" htmlFor="brand-name">
@@ -432,7 +277,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
             {/* Brand Colors */}
             <div>
               <label className="text-sm font-medium text-ink">Brand Palette</label>
-              <p className="text-xs text-ink-muted">Used by the compositing engine for template headers and landing pages.</p>
+              <p className="text-xs text-ink-muted">Used automatically for ad banners, cover layouts, and landing pages.</p>
               <div className="mt-3 flex flex-wrap gap-4">
                 <div className="flex items-center gap-2 rounded-xl bg-surface-2 p-2 shadow-inset">
                   <input
@@ -477,7 +322,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
             {/* Primary Genres */}
             <div>
               <label className="text-sm font-medium text-ink">Catalog Genres & Specialties</label>
-              <p className="text-xs text-ink-muted">Pre-informs ad copy angles and reader interest keywords.</p>
+              <p className="text-xs text-ink-muted">Tailors default ad copy angles and reader audience presets.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {AVAILABLE_GENRES.map((genre) => {
                   const selected = (settings.brand.primaryGenres || []).includes(genre)
@@ -501,11 +346,11 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
               </div>
             </div>
 
-            {/* AI Copy System Prompt / Voice Instructions */}
+            {/* Voice Guidelines */}
             <Field
-              label="Global Brand Voice & Editorial Guidelines"
+              label="Editorial Voice & Style Guidelines"
               htmlFor="voice-prompt"
-              hint="Injected into Claude / OpenRouter prompts when generating ad copy for all books."
+              hint="Guides tone and character descriptions across marketing copy and book generation."
             >
               <Textarea
                 id="voice-prompt"
@@ -524,14 +369,14 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
         </div>
       )}
 
-      {/* TAB 3: RETAIL & BUY LINKS */}
+      {/* TAB 2: STORE & BUY LINKS */}
       {activeTab === 'retail' && (
         <div className="flex flex-col gap-6">
           <Card className="flex flex-col gap-5 p-6">
             <div>
-              <h3 className="font-display text-lg font-semibold text-ink">Distribution Channels</h3>
+              <h2 className="font-display text-lg font-semibold text-ink">Store & Retail Links</h2>
               <p className="text-xs text-ink-muted">
-                Where should ad campaign Call-to-Actions (CTAs) and generated Landing Pages direct your readers?
+                These links are automatically attached to your promotional buttons, ads, and generated web pages.
               </p>
             </div>
 
@@ -550,7 +395,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
                 />
               </Field>
 
-              <Field label="Bookshop.org Storefront URL" htmlFor="retail-bookshop" hint="Supports independent bookstores">
+              <Field label="Bookshop.org Storefront URL" htmlFor="retail-bookshop" hint="For independent bookstore sales">
                 <Input
                   id="retail-bookshop"
                   value={settings.retail.bookshopUrl}
@@ -564,7 +409,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
                 />
               </Field>
 
-              <Field label="Direct-to-Consumer Store (Shopify/WooCommerce)" htmlFor="retail-direct">
+              <Field label="Direct Bookstore (Shopify / Web)" htmlFor="retail-direct">
                 <Input
                   id="retail-direct"
                   value={settings.retail.directStoreUrl}
@@ -578,7 +423,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
                 />
               </Field>
 
-              <Field label="Amazon Associates / Affiliate Tag" htmlFor="retail-affiliate" hint="Appended automatically to purchase links">
+              <Field label="Amazon Associates / Tag" htmlFor="retail-affiliate" hint="Appended to Amazon links for affiliate attribution">
                 <Input
                   id="retail-affiliate"
                   value={settings.retail.affiliateTag || ''}
@@ -588,9 +433,106 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
                       retail: { ...prev.retail, affiliateTag: e.target.value },
                     }))
                   }
-                  placeholder="yourstudio-20"
+                  placeholder="yourtag-20"
                 />
               </Field>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB 3: AI CONNECTION (OPTIONAL) */}
+      {activeTab === 'ai' && (
+        <div className="flex flex-col gap-6">
+          <Card className="flex flex-col gap-5 p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-5 text-accent" />
+                  <h2 className="font-display text-lg font-semibold text-ink">AI Assistant Configuration</h2>
+                </div>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Connect your OpenRouter account for custom AI copywriting, or use the built-in system out of the box.
+                </p>
+              </div>
+              <Badge tone={aiConfigured ? 'success' : 'neutral'} className="gap-1.5">
+                <span className={cn('size-2 rounded-full', aiConfigured ? 'bg-success animate-pulse' : 'bg-ink-muted')} />
+                {aiConfigured ? 'Custom Key Active' : 'Standard Engine Active'}
+              </Badge>
+            </div>
+
+            {maskedKey && (
+              <div className="flex items-center justify-between rounded-xl bg-surface-2 p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Key className="size-4 text-accent" />
+                  <span className="text-ink-muted">Saved API Key:</span>
+                  <code className="font-mono text-ink font-semibold">{maskedKey}</code>
+                </div>
+                <span className="text-success font-medium flex items-center gap-1">
+                  <CheckCircle2 className="size-3.5" /> Connected
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <label htmlFor="openRouterKey" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  {maskedKey ? 'Update API Key' : 'OpenRouter API Key'}
+                </label>
+                <div className="relative mt-1.5">
+                  <Key className="absolute left-3.5 top-3 size-4 text-ink-muted" aria-hidden />
+                  <input
+                    id="openRouterKey"
+                    type={showKey ? 'text' : 'password'}
+                    value={openRouterKey}
+                    onChange={(e) => setOpenRouterKey(e.target.value)}
+                    placeholder="sk-or-v1-..."
+                    className="w-full rounded-xl border border-line bg-surface py-2.5 pl-10 pr-10 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-3 top-2.5 rounded p-1 text-ink-muted hover:text-ink"
+                  >
+                    {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                <p className="mt-1.5 text-xs text-ink-muted">
+                  Optional. You can get an API key from{' '}
+                  <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                    openrouter.ai/keys
+                  </a>
+                  .
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={testingAi}
+                  disabled={!openRouterKey.trim() || savingAi}
+                  onClick={handleTestAiKey}
+                >
+                  <RefreshCw className="size-3.5" /> Test Connection
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  loading={savingAi}
+                  disabled={!openRouterKey.trim() || testingAi}
+                  onClick={handleSaveAiKey}
+                >
+                  <Save className="size-3.5" /> Save Key
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-xs text-ink-muted">
+              <ShieldCheck className="size-4 shrink-0 text-success mt-0.5" />
+              <span>
+                Your API key is securely stored in your workspace and used solely to generate book content and marketing copy.
+              </span>
             </div>
           </Card>
         </div>
