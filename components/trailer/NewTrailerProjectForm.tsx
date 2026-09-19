@@ -363,15 +363,7 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
           )}
         >
           <LinkIcon className="size-4 text-accent" aria-hidden />
-          URL to Video (Creatify style)
-          <span
-            className={cn(
-              'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-              tab === 'url' ? 'bg-white/20 text-white' : 'bg-accent text-on-accent'
-            )}
-          >
-            Auto-Extract
-          </span>
+          Product URL
         </button>
 
         <button
@@ -388,8 +380,7 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
           )}
         >
           <Zap className="size-4 text-amber-500" aria-hidden />
-          Upload Covers & 2–5 Interior Pages
-          <span className="text-[11px] font-normal text-ink-muted">(No PDF)</span>
+          Upload Covers & Internal Pages
         </button>
 
         <button
@@ -435,16 +426,16 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
-        {/* TAB 1: CREATIFY URL-TO-VIDEO */}
+        {/* TAB 1: PRODUCT URL */}
         {tab === 'url' && (
           <div className="flex flex-col gap-6">
             <div className="rounded-2xl border border-accent/25 bg-accent-soft/20 p-5">
               <div className="flex items-start gap-3.5">
                 <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-ink text-sm">URL-to-Video Engine</h3>
+                  <h3 className="font-semibold text-ink text-sm">Product URL</h3>
                   <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">
-                    Paste an Amazon product page or bookstore link. We pull the book cover, author, hook, and blurb to automatically build your Remotion trailer scenes.
+                    Paste an Amazon product page, bookstore, or Goodreads link. We pull the book cover, author, hook, and blurb to automatically build your Remotion trailer scenes.
                   </p>
 
                   <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -529,7 +520,7 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
                   <InteriorImagesDropzone
                     files={interiorImages}
                     onFilesChange={setInteriorImages}
-                    label="Optional: Add 2–5 Interior Page Images or Illustrations"
+                    label="Optional: Add Internal Page Images or Illustrations"
                     description="Include maps, excerpt spreads, or character art to feature in Scene 2 (Excerpt) and Scene 3 (Book Reveal)."
                   />
                 </div>
@@ -540,7 +531,7 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
               <div className="flex items-start gap-3 rounded-xl border border-line/80 bg-surface-2/40 p-4 text-xs text-ink-muted">
                 <Info className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
                 <p>
-                  Enter any book product link above to auto-extract details. If you have your cover file on your device, switch to the <strong>"Upload Covers & 2–5 Interior Pages"</strong> tab.
+                  Enter any book product link above to auto-extract details. If you have your cover file on your device, switch to the <strong>"Upload Covers & Internal Pages"</strong> tab.
                 </p>
               </div>
             )}
@@ -555,7 +546,7 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
               <div className="text-sm">
                 <p className="font-semibold text-ink">Lightweight & Fast Setup</p>
                 <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">
-                  No full book PDF upload needed. Provide your cover and 2–5 interior pages (chapter openers, maps, character art) to render cinematic trailer scenes.
+                  No full book PDF upload needed. Provide your cover and up to 5 internal pages (chapter openers, maps, character art) to render cinematic trailer scenes.
                 </p>
               </div>
             </div>
@@ -632,7 +623,7 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
                 <InteriorImagesDropzone
                   files={interiorImages}
                   onFilesChange={setInteriorImages}
-                  label="2–5 Interior Page Images & Illustrations"
+                  label="Internal Page Images & Illustrations"
                   description="Upload chapter openers, maps, character sketches, or excerpt spreads to display in the trailer scenes."
                 />
               </div>

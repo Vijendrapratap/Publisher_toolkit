@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { PLATFORMS, TONES, TEMPLATES, getTemplate, projectUpdateSchema, COPY_LIMITS, adCopyUpdateSchema } from './options'
+import {
+  PLATFORMS,
+  TONES,
+  TEMPLATES,
+  getTemplate,
+  getCampaignObjective,
+  buildCustomPaletteKey,
+  parseCustomPalette,
+  projectUpdateSchema,
+  COPY_LIMITS,
+  adCopyUpdateSchema,
+} from './options'
 
 describe('ads options', () => {
   it('offers the Amazon platform, tones and templates', () => {
@@ -19,6 +30,38 @@ describe('ads options', () => {
 
   it('falls back to the classic template for unknown keys', () => {
     expect(getTemplate('nope').key).toBe('classic')
+  })
+
+  it('parses custom palette string properly', () => {
+    const customKey = buildCustomPaletteKey({
+      background: '#064e3b',
+      ink: '#ecfdf5',
+      accent: '#f59e0b',
+      secondary: '#047857',
+    })
+    expect(customKey).toBe('custom:#064e3b:#ecfdf5:#f59e0b:#047857')
+
+    const parsed = parseCustomPalette(customKey)
+    expect(parsed.background).toBe('#064e3b')
+    expect(parsed.ink).toBe('#ecfdf5')
+    expect(parsed.accent).toBe('#f59e0b')
+    expect(parsed.secondary).toBe('#047857')
+
+    const template = getTemplate(customKey)
+    expect(template.label).toBe('Custom Palette')
+    expect(template.palette.background).toBe('#064e3b')
+  })
+
+  it('parses custom campaign objectives and custom badges', () => {
+    const objDefault = getCampaignObjective('custom')
+    expect(objDefault.label).toBe('Custom Campaign')
+    expect(objDefault.badge).toBe('SPECIAL PROMO')
+
+    const objCustomBadge = getCampaignObjective('custom:STAFF%20PICK')
+    expect(objCustomBadge.badge).toBe('STAFF PICK')
+
+    const objExclusive = getCampaignObjective('custom:EXCLUSIVE DEAL')
+    expect(objExclusive.badge).toBe('EXCLUSIVE DEAL')
   })
 })
 

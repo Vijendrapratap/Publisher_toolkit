@@ -29,11 +29,14 @@ import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
 import { Dropzone } from '@/components/platform/Dropzone'
 import { InteriorImagesDropzone } from '@/components/platform/InteriorImagesDropzone'
+import { CustomPalettePicker } from '@/components/ads/CustomPalettePicker'
+import { CustomCampaignPicker } from '@/components/ads/CustomCampaignPicker'
 import { COVER_RULE, PDF_RULE } from '@/lib/services/ads/validation'
 import {
   CAMPAIGN_OBJECTIVES,
   CTA_PRESETS,
   TEMPLATES,
+  getCampaignObjective,
   type CampaignObjectiveKey,
   type CopyTone,
   type TemplateKey,
@@ -465,7 +468,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
           <h2 className="font-display text-lg font-semibold">2. Choose your input source</h2>
         </div>
         <p className="mt-1 text-sm text-ink-muted">
-          Paste an Amazon or bookstore link for instant auto-extraction, or upload your cover and 2–5 interior images.
+          Paste a product URL for instant auto-extraction, or upload your book cover and internal pages.
         </p>
 
         {/* Tab Switcher */}
@@ -484,15 +487,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
             )}
           >
             <LinkIcon className="size-4 text-accent" aria-hidden />
-            Paste Amazon / Store Link
-            <span
-              className={cn(
-                'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                tab === 'url' ? 'bg-white/20 text-white' : 'bg-accent text-on-accent'
-              )}
-            >
-              Instant (Creatify style)
-            </span>
+            Product URL
           </button>
 
           <button
@@ -509,7 +504,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
             )}
           >
             <Zap className="size-4 text-amber-500" aria-hidden />
-            Upload Cover & 2–5 Interior Pages
+            Upload Covers & Internal Pages
             <span className="text-[11px] font-normal text-ink-muted">(No PDF required)</span>
           </button>
 
@@ -861,114 +856,53 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
           </div>
         )}
 
-        {/* CAMPAIGN SETTINGS & STYLES */}
-        <div className="flex flex-col gap-5 rounded-2xl border border-line/60 bg-surface-2/60 p-5">
+        {/* CAMPAIGN SETTINGS & CUSTOM STYLES */}
+        <div className="flex flex-col gap-6 rounded-2xl border border-line/60 bg-surface-2/60 p-5">
           <div className="flex items-center gap-2">
             <Palette className="size-4 text-accent" aria-hidden />
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-ink">Campaign customization</h3>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="campaignName" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                Campaign label
-              </label>
-              <input
-                id="campaignName"
-                type="text"
-                value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
-                placeholder={title ? `${title} - Campaign` : 'e.g. Launch Campaign'}
-                className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="ctaText" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                Primary Call To Action (CTA)
-              </label>
-              <select
-                id="ctaText"
-                value={ctaText}
-                onChange={(e) => setCtaText(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-              >
-                {CTA_PRESETS.map((preset) => (
-                  <option key={preset} value={preset}>
-                    {preset}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-ink">Campaign Customization & Visual Aesthetic</h3>
           </div>
 
           <div>
-            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-muted">
-              <Target className="size-3.5" aria-hidden /> Campaign objective
-            </span>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              {CAMPAIGN_OBJECTIVES.map((obj) => {
-                const isSelected = campaignObjective === obj.key
-                return (
-                  <button
-                    key={obj.key}
-                    type="button"
-                    onClick={() => {
-                      setCampaignObjective(obj.key)
-                      setCtaText(obj.defaultCta)
-                    }}
-                    className={cn(
-                      'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all',
-                      isSelected
-                        ? 'border-accent bg-accent-soft/80 shadow-inset ring-2 ring-accent/30'
-                        : 'border-transparent bg-surface shadow-subtle hover:border-accent/40'
-                    )}
-                  >
-                    <span className="text-xs font-bold text-accent">{obj.badge}</span>
-                    <span className="text-xs font-semibold">{obj.label}</span>
-                    <span className="text-[11px] text-ink-muted">{obj.description}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <label htmlFor="campaignName" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+              Campaign Label
+            </label>
+            <input
+              id="campaignName"
+              type="text"
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder={title ? `${title} - Campaign` : 'e.g. Launch Campaign'}
+              className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
           </div>
 
           <div>
-            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-muted">
-              <Palette className="size-3.5" aria-hidden /> Visual aesthetic & palette
+            <span className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-muted">
+              <Target className="size-3.5" aria-hidden /> Campaign Strategy & Promotional Objective
             </span>
-            <div className="mt-2 grid gap-2 sm:grid-cols-4">
-              {TEMPLATES.map((tpl) => {
-                const isSelected = templateKey === tpl.key
-                return (
-                  <button
-                    key={tpl.key}
-                    type="button"
-                    onClick={() => setTemplateKey(tpl.key)}
-                    className={cn(
-                      'flex flex-col overflow-hidden rounded-xl border text-left transition-all',
-                      isSelected
-                        ? 'border-accent shadow-inset ring-2 ring-accent/30'
-                        : 'border-transparent bg-surface shadow-subtle hover:border-accent/40'
-                    )}
-                  >
-                    <div
-                      className="flex h-10 items-center justify-between px-3"
-                      style={{ background: tpl.palette.background }}
-                    >
-                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: tpl.palette.ink }}>
-                        {tpl.key}
-                      </span>
-                      <span className="size-2.5 rounded-full" style={{ background: tpl.palette.accent }} />
-                    </div>
-                    <div className="bg-surface p-2">
-                      <p className="truncate text-xs font-semibold">{tpl.label}</p>
-                      <p className="line-clamp-1 text-[10px] text-ink-muted">{tpl.description}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+            <CustomCampaignPicker
+              campaignObjective={campaignObjective}
+              onObjectiveChange={setCampaignObjective}
+              campaignName={campaignName}
+              onCampaignNameChange={setCampaignName}
+              ctaText={ctaText}
+              onCtaTextChange={setCtaText}
+              bookTitle={title || extractedData?.title || 'Book Title'}
+            />
+          </div>
+
+          <div>
+            <span className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-muted">
+              <Palette className="size-3.5" aria-hidden /> Visual Aesthetic & Color Palette
+            </span>
+            <CustomPalettePicker
+              value={templateKey}
+              onChange={setTemplateKey}
+              bookTitle={title || extractedData?.title || 'Book Title'}
+              coverUrl={extractedData?.coverUrl || null}
+              badgeText={getCampaignObjective(campaignObjective).badge}
+            />
           </div>
         </div>
 

@@ -13,10 +13,13 @@ import {
   TONES,
   CAMPAIGN_OBJECTIVES,
   CTA_PRESETS,
+  getCampaignObjective,
   type CopyTone,
   type TemplateKey,
   type CampaignObjectiveKey,
 } from '@/lib/services/ads/options'
+import { CustomPalettePicker } from '@/components/ads/CustomPalettePicker'
+import { CustomCampaignPicker } from '@/components/ads/CustomCampaignPicker'
 import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
 import { sampleAdCopy } from '@/lib/services/ads/sampleCopy'
 import { nextRadioIndex } from '@/lib/ui/radioKeys'
@@ -208,70 +211,34 @@ export function ConfigureForm({
         <fieldset>
           <div className="flex items-center gap-2">
             <Target className="size-4 text-accent" aria-hidden />
-            <legend className="font-display text-lg font-semibold">Campaign objective & goal</legend>
+            <legend className="font-display text-lg font-semibold">Campaign Objective & Strategy</legend>
           </div>
-          <p className="mt-1 text-sm text-ink-muted">Set the strategic angle and goal for this ad campaign.</p>
+          <p className="mt-1 text-sm text-ink-muted">Set the strategic angle, custom promo badge, and goal for this ad campaign.</p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {CAMPAIGN_OBJECTIVES.map((obj) => {
-              const selected = campaignObjective === obj.key
-              return (
-                <button
-                  key={obj.key}
-                  type="button"
-                  onClick={() => {
-                    setCampaignObjective(obj.key)
-                    if (!ctaText || CTA_PRESETS.includes(ctaText as any)) {
-                      setCtaText(obj.defaultCta)
-                    }
-                  }}
-                  className={cn(
-                    'flex flex-col items-start gap-1 rounded-2xl border border-transparent p-4 text-left transition-all',
-                    selected
-                      ? 'border-accent bg-accent-soft/60 shadow-inset ring-2 ring-accent/30'
-                      : 'bg-surface shadow-subtle hover:border-accent/40'
-                  )}
-                >
-                  <span className="text-xs font-bold text-accent">{obj.badge}</span>
-                  <span className="font-semibold">{obj.label}</span>
-                  <span className="text-xs text-ink-muted">{obj.description}</span>
-                </button>
-              )
-            })}
+          <div className="mt-4">
+            <label htmlFor="campaignName" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+              Campaign label
+            </label>
+            <input
+              id="campaignName"
+              type="text"
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder="e.g. Summer Release Push"
+              className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
           </div>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="campaignName" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                Campaign label
-              </label>
-              <input
-                id="campaignName"
-                type="text"
-                value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="e.g. Summer Release Push"
-                className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="ctaText" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                Primary Call to Action (CTA)
-              </label>
-              <select
-                id="ctaText"
-                value={ctaText}
-                onChange={(e) => setCtaText(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-              >
-                {CTA_PRESETS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="mt-4">
+            <CustomCampaignPicker
+              campaignObjective={campaignObjective}
+              onObjectiveChange={setCampaignObjective}
+              campaignName={campaignName}
+              onCampaignNameChange={setCampaignName}
+              ctaText={ctaText}
+              onCtaTextChange={setCtaText}
+              bookTitle={book.title || 'Book Title'}
+            />
           </div>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -457,54 +424,17 @@ export function ConfigureForm({
         <fieldset>
           <div className="flex items-center gap-2">
             <Palette className="size-4 text-accent" aria-hidden />
-            <legend className="font-display text-lg font-semibold">Design aesthetic & style</legend>
+            <legend className="font-display text-lg font-semibold">Design Aesthetic & Color Palette</legend>
           </div>
-          <p className="mt-1 text-sm text-ink-muted">Visual palette and typographic treatment for your ad images.</p>
-          <div role="radiogroup" aria-label="Design template" className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {TEMPLATES.map((t, i) => {
-              const selected = templateKey === t.key
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => setTemplateKey(t.key)}
-                  onKeyDown={(e) =>
-                    handleRadioKeyDown(
-                      e,
-                      TEMPLATES.map((tpl) => tpl.key),
-                      i,
-                      setTemplateKey
-                    )
-                  }
-                  className={cn(
-                    'flex flex-col overflow-hidden rounded-2xl border border-transparent text-left transition-all',
-                    selected ? 'border-accent shadow-inset ring-2 ring-accent/30' : 'shadow-subtle hover:border-accent/40'
-                  )}
-                >
-                  <span
-                    className="flex aspect-video flex-col items-center justify-center gap-2 p-4"
-                    style={{ background: t.palette.background, color: t.palette.ink }}
-                    aria-hidden
-                  >
-                    {book.coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={book.coverUrl} alt="" className="h-2/3 rounded-md object-cover shadow-lg" />
-                    ) : (
-                      <span className="h-2/3 w-1/3 rounded-md bg-current opacity-20" />
-                    )}
-                    <span className="line-clamp-1 font-display text-xs font-semibold">{book.title || 'Your book'}</span>
-                    <span className="h-0.5 w-8" style={{ background: t.palette.accent }} />
-                  </span>
-                  <span className="flex flex-col gap-0.5 bg-surface p-3">
-                    <span className="text-sm font-semibold">{t.label}</span>
-                    <span className="text-xs text-ink-muted">{t.description}</span>
-                  </span>
-                </button>
-              )
-            })}
+          <p className="mt-1 text-sm text-ink-muted">Visual palette, custom colors, and typographic treatment for your ad images.</p>
+          <div className="mt-4">
+            <CustomPalettePicker
+              value={templateKey}
+              onChange={setTemplateKey}
+              bookTitle={book.title || 'Your book'}
+              coverUrl={book.coverUrl}
+              badgeText={getCampaignObjective(campaignObjective).badge}
+            />
           </div>
         </fieldset>
       </Card>

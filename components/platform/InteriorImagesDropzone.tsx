@@ -12,17 +12,15 @@ export interface InteriorImagesDropzoneProps {
   files: File[]
   onFilesChange: (files: File[]) => void
   maxFiles?: number
-  minFiles?: number
 }
 
 export function InteriorImagesDropzone({
   id: customId,
-  label = 'Interior Page Images & Illustrations',
-  description = 'Upload 2–5 interior pages, maps, character sketches, or chapter openers to feature in A+ modules and video scenes.',
+  label = 'Internal Page Images & Illustrations',
+  description = 'Upload up to 5 internal pages, maps, chapter openers, or excerpt spreads. Select multiple at once or click + to add pages one by one.',
   files,
   onFilesChange,
   maxFiles = 5,
-  minFiles = 2,
 }: InteriorImagesDropzoneProps) {
   const generatedId = useId()
   const inputId = customId || generatedId
@@ -55,7 +53,7 @@ export function InteriorImagesDropzone({
         setError(`"${file.name}" exceeds the 10MB limit.`)
         continue
       }
-      // Avoid exact duplicates by name & size
+      // Avoid duplicate uploads by file name and size
       const isDuplicate = files.some((existing) => existing.name === file.name && existing.size === file.size)
       if (!isDuplicate) {
         validNewFiles.push(file)
@@ -64,12 +62,18 @@ export function InteriorImagesDropzone({
 
     if (validNewFiles.length === 0) return
 
-    const combined = [...files, ...validNewFiles].slice(0, maxFiles)
-    if (files.length + validNewFiles.length > maxFiles) {
-      setError(`Maximum of ${maxFiles} interior images allowed. First ${maxFiles} were kept.`)
+    const slotsAvailable = maxFiles - files.length
+    if (slotsAvailable <= 0) {
+      setError(`Maximum of ${maxFiles} internal pages reached.`)
+      return
     }
 
-    onFilesChange(combined)
+    const filesToAdd = validNewFiles.slice(0, slotsAvailable)
+    if (validNewFiles.length > slotsAvailable) {
+      setError(`Only ${slotsAvailable} more internal page ${slotsAvailable === 1 ? 'image' : 'images'} could be added (max ${maxFiles}).`)
+    }
+
+    onFilesChange([...files, ...filesToAdd])
   }
 
   function removeFile(index: number) {
@@ -86,14 +90,25 @@ export function InteriorImagesDropzone({
 
   function onInputChange(e: ChangeEvent<HTMLInputElement>) {
     handleFiles(e.target.files)
-    // Reset target value so the same file can be re-selected if removed
+    // Clear value to allow selecting the same file again if removed
     e.target.value = ''
   }
 
   const reachedMax = files.length >= maxFiles
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2.5">
+      {/* Hidden file input supporting multiple selection */}
+      <input
+        id={inputId}
+        type="file"
+        multiple
+        accept={COVER_RULE.accept.join(',')}
+        className="peer sr-only"
+        onChange={onInputChange}
+      />
+
+      {/* Header with Label and Counter */}
       <div className="flex items-center justify-between">
         <div>
           <label htmlFor={inputId} className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
@@ -101,21 +116,32 @@ export function InteriorImagesDropzone({
           </label>
           {description && <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">{description}</p>}
         </div>
-        <span
-          className={cn(
-            'ml-3 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
-            files.length >= minFiles
-              ? 'bg-accent-soft text-accent'
-              : files.length > 0
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                : 'bg-surface-2 text-ink-muted'
+        <div className="flex items-center gap-2">
+          {!reachedMax && files.length > 0 && (
+            <label
+              htmlFor={inputId}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent transition hover:bg-accent hover:text-on-accent"
+            >
+              <Plus className="size-3.5" aria-hidden />
+              Add More
+            </label>
           )}
-        >
-          {files.length} / {maxFiles} images
-        </span>
+          <span
+            className={cn(
+              'shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+              files.length >= 2
+                ? 'bg-accent-soft text-accent'
+                : files.length > 0
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                  : 'bg-surface-2 text-ink-muted'
+            )}
+          >
+            {files.length} / {maxFiles} images
+          </span>
+        </div>
       </div>
 
-      {/* Grid of uploaded images */}
+      {/* Uploaded Gallery Grid + Inline "+" Tile */}
       {files.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {files.map((file, idx) => (
@@ -128,7 +154,7 @@ export function InteriorImagesDropzone({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={previewUrls[idx]}
-                    alt={`Interior page ${idx + 1}`}
+                    alt={`Internal page ${idx + 1}`}
                     className="size-full object-cover transition group-hover:scale-105"
                   />
                 ) : (
@@ -136,7 +162,8 @@ export function InteriorImagesDropzone({
                     <ImageIcon className="size-6" aria-hidden />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 flex items-center justify-center">
+                {/* Remove Overlay */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
                     onClick={() => removeFile(idx)}
@@ -154,57 +181,49 @@ export function InteriorImagesDropzone({
             </div>
           ))}
 
-          {/* Add more button tile if under maxFiles */}
+          {/* Plus (+) option tile to keep adding images up to 5 */}
           {!reachedMax && (
             <label
               htmlFor={inputId}
-              className="flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-line/70 bg-surface-2/40 p-2 text-center transition hover:border-accent hover:bg-accent-soft/30"
+              className="flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-accent/40 bg-accent-soft/20 p-3 text-center transition hover:border-accent hover:bg-accent-soft/40 hover:scale-[1.02]"
             >
-              <span className="grid size-8 place-items-center rounded-lg bg-accent-soft text-accent">
-                <Plus className="size-4" aria-hidden />
+              <span className="grid size-9 place-items-center rounded-xl bg-accent text-on-accent shadow-sm">
+                <Plus className="size-5" aria-hidden />
               </span>
-              <span className="text-xs font-medium text-ink">Add Page</span>
-              <span className="text-[10px] text-ink-muted">Up to {maxFiles}</span>
+              <span className="text-xs font-semibold text-ink">Add Page</span>
+              <span className="text-[10px] text-ink-muted">({maxFiles - files.length} remaining)</span>
             </label>
           )}
         </div>
       )}
 
-      {/* Main dropzone if no files yet */}
+      {/* Main Empty Dropzone with prominent "+" option when no files uploaded yet */}
       {files.length === 0 && (
-        <>
-          <input
-            id={inputId}
-            type="file"
-            multiple
-            accept={COVER_RULE.accept.join(',')}
-            className="peer sr-only"
-            onChange={onInputChange}
-          />
-          <label
-            htmlFor={inputId}
-            onDragOver={(e) => {
-              e.preventDefault()
-              setDragging(true)
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-            className={cn(
-              'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-surface-2/60 p-6 text-center transition-colors hover:border-accent hover:bg-accent-soft/30',
-              dragging && 'border-accent bg-accent-soft/60',
-              error && 'border-danger/60'
-            )}
-          >
-            <span className="grid size-10 place-items-center rounded-xl bg-accent-soft text-accent shadow-subtle">
-              <UploadCloud className="size-5" aria-hidden />
-            </span>
-            <div className="text-xs">
-              <span className="font-semibold text-accent">Select 2–5 interior pages</span>
-              <span className="text-ink-muted"> or drag them here</span>
-            </div>
-            <p className="text-[11px] text-ink-muted">PNG, JPG, or WebP up to 10MB each</p>
-          </label>
-        </>
+        <label
+          htmlFor={inputId}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragging(true)
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+          className={cn(
+            'flex cursor-pointer flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-line bg-surface-2/60 p-6 text-center transition-colors hover:border-accent hover:bg-accent-soft/25',
+            dragging && 'border-accent bg-accent-soft/50',
+            error && 'border-danger/60'
+          )}
+        >
+          <span className="grid size-11 place-items-center rounded-2xl bg-accent text-on-accent shadow-subtle transition-transform hover:scale-105">
+            <Plus className="size-6" aria-hidden />
+          </span>
+          <div className="text-xs">
+            <span className="font-semibold text-accent">Click + to add internal pages</span>
+            <span className="text-ink-muted"> or drag images here</span>
+          </div>
+          <p className="text-[11px] text-ink-muted leading-tight">
+            Upload multiple images at once or keep adding one by one (up to {maxFiles} images) • PNG, JPG, WebP
+          </p>
+        </label>
       )}
 
       {error && (

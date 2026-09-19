@@ -64,11 +64,7 @@ export const TEMPLATES = [
     palette: { background: '#050811', ink: '#f1f5f9', accent: '#38bdf8', secondary: '#0f172a' },
   },
 ] as const
-export type TemplateKey = (typeof TEMPLATES)[number]['key']
-
-export function getTemplate(key: string): (typeof TEMPLATES)[number] {
-  return TEMPLATES.find((t) => t.key === key) ?? TEMPLATES[0]
-}
+export type TemplateKey = (typeof TEMPLATES)[number]['key'] | (string & {})
 
 export const CAMPAIGN_OBJECTIVES = [
   {
@@ -113,11 +109,108 @@ export const CAMPAIGN_OBJECTIVES = [
     description: 'Continuous backlist acquisition and reader finding',
     defaultCta: 'Get Your Copy on Amazon',
   },
+  {
+    key: 'custom',
+    label: 'Custom Campaign',
+    badge: 'SPECIAL PROMO',
+    description: 'Create your own campaign angle, custom badge & CTA',
+    defaultCta: 'Order Your Copy Today',
+  },
 ] as const
-export type CampaignObjectiveKey = (typeof CAMPAIGN_OBJECTIVES)[number]['key']
+export type CampaignObjectiveKey = (typeof CAMPAIGN_OBJECTIVES)[number]['key'] | (string & {})
 
-export function getCampaignObjective(key?: string | null): (typeof CAMPAIGN_OBJECTIVES)[number] {
-  return CAMPAIGN_OBJECTIVES.find((o) => o.key === key) ?? CAMPAIGN_OBJECTIVES[0]
+export interface CampaignObjectiveItem {
+  key: string
+  label: string
+  badge: string
+  description: string
+  defaultCta: string
+}
+
+export function getCampaignObjective(key?: string | null): CampaignObjectiveItem {
+  if (key && key.startsWith('custom')) {
+    const parts = key.split(':')
+    const badge = parts.length > 1 && parts[1]?.trim() ? decodeURIComponent(parts[1].trim()) : 'SPECIAL PROMO'
+    return {
+      key,
+      label: 'Custom Campaign',
+      badge,
+      description: 'Create your own campaign angle, custom badge & CTA',
+      defaultCta: 'Order Your Copy Today',
+    }
+  }
+  return (CAMPAIGN_OBJECTIVES.find((o) => o.key === key) as CampaignObjectiveItem) ?? CAMPAIGN_OBJECTIVES[0]
+}
+
+export interface TemplatePalette {
+  background: string
+  ink: string
+  accent: string
+  secondary?: string
+}
+
+export interface TemplateItem {
+  key: string
+  label: string
+  description: string
+  palette: TemplatePalette
+}
+
+export const CUSTOM_PALETTE_PRESETS = [
+  { name: 'Emerald & Gold', background: '#064e3b', ink: '#ecfdf5', accent: '#f59e0b', secondary: '#047857' },
+  { name: 'Midnight Purple', background: '#2e1065', ink: '#faf5ff', accent: '#c084fc', secondary: '#581c87' },
+  { name: 'Terracotta Warmth', background: '#7c2d12', ink: '#fff7ed', accent: '#fdba74', secondary: '#9a3412' },
+  { name: 'Deep Navy & Coral', background: '#0f172a', ink: '#f8fafc', accent: '#f97316', secondary: '#1e293b' },
+  { name: 'Dark Obsidian & Mint', background: '#111827', ink: '#f0fdf4', accent: '#34d399', secondary: '#1f2937' },
+  { name: 'Crimson Velvet', background: '#4c0519', ink: '#fff1f2', accent: '#fb7185', secondary: '#881337' },
+] as const
+
+export const CUSTOM_BADGE_PRESETS = [
+  'SPECIAL PROMO',
+  'STAFF PICK',
+  'LIMITED TIME DEAL',
+  'EXCLUSIVE EDITION',
+  'EDITORS CHOICE',
+  'BOOK CLUB PICK',
+  'BESTSELLER',
+  'FREE ON KU',
+] as const
+
+export function buildCustomPaletteKey(palette: {
+  background: string
+  ink: string
+  accent: string
+  secondary?: string
+}): string {
+  return `custom:${palette.background}:${palette.ink}:${palette.accent}:${palette.secondary ?? '#27272a'}`
+}
+
+export function parseCustomPalette(key?: string | null): TemplatePalette {
+  if (key && key.startsWith('custom')) {
+    const parts = key.split(':')
+    if (parts.length >= 4) {
+      return {
+        background: parts[1] || '#18181b',
+        ink: parts[2] || '#fafafa',
+        accent: parts[3] || '#38bdf8',
+        secondary: parts[4] || '#27272a',
+      }
+    }
+  }
+  return { background: '#18181b', ink: '#fafafa', accent: '#38bdf8', secondary: '#27272a' }
+}
+
+export function getTemplate(key: string): TemplateItem {
+  if (key && key.startsWith('custom')) {
+    const palette = parseCustomPalette(key)
+    return {
+      key,
+      label: 'Custom Palette',
+      description: 'User-defined custom color aesthetic',
+      palette,
+    }
+  }
+  return (TEMPLATES.find((t) => t.key === key) as TemplateItem) ?? TEMPLATES[0]
 }
 
 export const CTA_PRESETS = [
@@ -139,9 +232,9 @@ export const projectUpdateSchema = z
     blurb: z.string().trim().max(2000),
     platforms: z.array(z.enum(['META', 'GOOGLE', 'AMAZON'])).min(1, 'Choose at least one platform').transform((a) => [...new Set(a)]),
     copyTone: z.enum(['literary', 'punchy', 'bold', 'intriguing', 'social']),
-    templateKey: z.enum(['classic', 'bold', 'minimal', 'cinematic', 'fantasy', 'romance', 'parchment', 'scifi']),
+    templateKey: z.string().trim().max(120),
     campaignName: z.string().trim().max(120),
-    campaignObjective: z.enum(['launch', 'preorder', 'discount', 'review_quote', 'tropes', 'evergreen']),
+    campaignObjective: z.string().trim().max(120),
     targetAudience: z.string().trim().max(300),
     customHook: z.string().trim().max(200),
     ctaText: z.string().trim().max(100),
