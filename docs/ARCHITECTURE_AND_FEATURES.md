@@ -1,212 +1,425 @@
-# Publisher Toolkit — Architecture & Feature Engineering Guide
+# Publisher Toolkit — Comprehensive Platform Architecture & Feature Engineering Guide
 
-This document provides a comprehensive technical overview of the **Publisher Toolkit** architecture, data flow, feature implementations, and developer extension guides.
+This document is the definitive technical manual for the **Publisher Toolkit**. It details the platform philosophy, system architecture, data flows, core feature implementations, data models, and provides step-by-step recipes for developers to maintain and extend the codebase.
 
 ---
 
-## 1. High-Level System Architecture
+## Table of Contents
+1. [Platform Overview & Philosophy](#1-platform-overview--philosophy)
+2. [Master Architecture Diagrams](#2-master-architecture-diagrams)
+   - [2.1 System Topology & Infrastructure](#21-system-topology--infrastructure)
+   - [2.2 End-to-End Asset Generation Lifecycle](#22-end-to-end-asset-generation-lifecycle)
+   - [2.3 Client-Side Component Hierarchy](#23-client-side-component-hierarchy)
+   - [2.4 Storage & Asset Delivery Architecture](#24-storage--asset-delivery-architecture)
+3. [Deep-Dive Feature Specifications](#3-deep-dive-feature-specifications)
+   - [Feature 1: Book Ingestion & Metadata Extraction](#feature-1-book-ingestion--metadata-extraction)
+   - [Feature 2: Amazon Ads & KDP A+ Content Suite](#feature-2-amazon-ads--kdp-a-content-suite)
+   - [Feature 3: Remotion & Hyperframes Video Trailer Studio](#feature-3-remotion--hyperframes-video-trailer-studio)
+   - [Feature 4: AI Audiobook Studio & Voice Synthesis](#feature-4-ai-audiobook-studio--voice-synthesis)
+   - [Feature 5: High-Converting Book Landing Page Studio](#feature-5-high-converting-book-landing-page-studio)
+   - [Feature 6: Amazon Launch Hub & 1-Click Packaging](#feature-6-amazon-launch-hub--1-click-packaging)
+   - [Feature 7: Publisher Imprint & Brand Profile Settings](#feature-7-publisher-imprint--brand-profile-settings)
+4. [Prisma Data Models & Entity Relationships](#4-prisma-data-models--entity-relationships)
+5. [API Routes & Contracts Directory](#5-api-routes--contracts-directory)
+6. [Developer Playbook: How to Extend & Make Changes](#6-developer-playbook-how-to-extend--make-changes)
+   - [How to Add a New Amazon Ad / A+ Format](#how-to-add-a-new-amazon-ad--a-format)
+   - [How to Add a New Visual Design Theme](#how-to-add-a-new-visual-design-theme)
+   - [How to Add a New Video Motion Style or Visual Transition](#how-to-add-a-new-video-motion-style-or-visual-transition)
+   - [How to Add a New TTS Voice Model or Audio Provider](#how-to-add-a-new-tts-voice-model-or-audio-provider)
+   - [Testing & Quality Assurance Gate](#testing--quality-assurance-gate)
 
-The Publisher Toolkit is built as a high-performance Next.js 15 (App Router) platform combining React 19, Prisma ORM, Satori Canvas rendering, Remotion video generation, and AI-powered copy engineering.
+---
+
+## 1. Platform Overview & Philosophy
+
+The **Publisher Toolkit** is an autonomous marketing and media production operating system for authors, independent publishers, and digital publishing imprints. 
+
+### The Problem
+Publishers and authors lose hundreds of hours manually designing Amazon A+ Content banners, producing promotional book trailers, formatting marketing copy, rendering audio chapters, and creating book landing pages. High-end video production requires costly motion designers, and graphic design tools produce static banners that fail to meet strict Amazon KDP specifications.
+
+### The Solution
+Publisher Toolkit transforms a single manuscript (PDF) or book cover into a **complete, launch-ready commercial kit** within seconds:
+- **Zero-Friction Ingestion**: Automatic heuristic extraction of title, author, blurb, and cover artwork directly from book files.
+- **Amazon KDP & AMS Native**: Pixel-perfect generation of Amazon A+ Content modules (970×600 Hero, 970×300 Feature, 300×300 Quad Module) and Amazon Sponsored Banners (300×250, 1200×628).
+- **Cinematic Motion Quality**: Real-time browser preview with Remotion and 1080p server rendering featuring 3D book depth, specular light catchlights, kinetic typography, and audio synchronization.
+- **Zero Speculative Bloat (Ponytail Senior Dev Architecture)**: Reuses native browser APIs, Satori layouts, standard node modules, and clean PostgreSQL schema models without unnecessary external SaaS dependencies.
+
+---
+
+## 2. Master Architecture Diagrams
+
+### 2.1 System Topology & Infrastructure
 
 ```mermaid
 flowchart TD
-    subgraph ClientLayer["Frontend & Client Layer (React 19 / Next.js 15)"]
-        UI_Nav["Studio Navigation & Shell"]
+    subgraph ClientBrowser["Client Web Browser (Chrome / Safari / Firefox)"]
+        UI_Shell["Next.js Layout & Studio Shell"]
         UI_Ads["Amazon Ads & A+ Studio (/ads)"]
         UI_Trailer["Video Trailer Studio (/trailer)"]
         UI_Audio["Audiobook Studio (/audiobook)"]
         UI_Landing["Landing Page Studio (/landing)"]
-        UI_Remotion["Remotion Live Player (Browser WebGL/Canvas)"]
+        UI_RemotionPlayer["Remotion Player Engine (Client-Side Canvas/WebGL)"]
     end
 
-    subgraph APILayer["API & Route Handlers (Next.js Server Runtime)"]
-        API_Ads["/api/ads/projects (CRUD, Extract, Generate, Download)"]
-        API_Trailer["/api/trailer/projects (Render, Presets, Export)"]
-        API_Audio["/api/audiobook/projects (TTS, Chapters, Audio Stream)"]
-        API_Landing["/api/landing/projects (Agent Generation, Zip)"]
-        API_Files["/api/files/[...path] (Secure File Serving)"]
+    subgraph AppRouter["Next.js 15 Server Runtime (Node.js Environment)"]
+        subgraph APIRoutes["REST API & Action Layer (/api/*)"]
+            API_Projects["/api/ads/projects (CRUD & Configure)"]
+            API_Generate["/api/ads/projects/[id]/generate (Batch Runner)"]
+            API_Download["/api/ads/projects/[id]/download (ZIP Streamer)"]
+            API_TrailerProjects["/api/trailer/projects (Video Engine)"]
+            API_AudioProjects["/api/audiobook/projects (TTS Engine)"]
+            API_Files["/api/files/[...path] (Auth Scoped File Stream)"]
+        end
+
+        subgraph CoreEngines["Specialized Production Engines"]
+            ENG_Extract["PDF Ingestion & Cover Rasterizer (unpdf / pdfjs-dist)"]
+            ENG_Copy["AI Copywriter (Vercel AI SDK + OpenRouter)"]
+            ENG_Satori["Satori Canvas Image Renderer (React JSX to PNG)"]
+            ENG_Video["Headless Video Synthesizer (@napi-rs/canvas + FFmpeg)"]
+            ENG_TTS["Audiobook Synthesizer (Fish Audio / Kokoro Models)"]
+            ENG_Packaging["JSZip Campaign Packager (Multi-Asset Bundler)"]
+        end
+
+        subgraph SecurityAuth["Security & Authentication"]
+            AUTH_Cookie["Publisher Session Cookie (UUID Scoped)"]
+            AUTH_Guard["requireCurrentPublisherId Guard"]
+        end
     end
 
-    subgraph EngineLayer["Core Processing & Generation Engines"]
-        ENG_AI["LLM Copywriting Engine (Vercel AI SDK / OpenRouter)"]
-        ENG_PDF["PDF Parsing Engine (unpdf / pdfjs-dist)"]
-        ENG_Satori["Satori Image Renderer (SVG/PNG Layouts)"]
-        ENG_Remotion["Remotion / Canvas Engine (@napi-rs/canvas + FFmpeg)"]
-        ENG_TTS["TTS Synthesis Engine (Fish Audio / Kokoro Models)"]
-        ENG_Zip["JSZip Packaging Service (Multi-Asset ZIP Bundler)"]
-    end
-
-    subgraph DataLayer["Persistence & Storage Layer"]
+    subgraph DataStorage["Data & Asset Persistence Layer"]
         DB[(PostgreSQL Database via Prisma ORM)]
-        STORAGE["Storage Abstraction (Local Filesystem / @vercel/blob)"]
+        STORAGE["Storage Provider Abstraction (Local Disk / Vercel Blob)"]
     end
 
-    ClientLayer --> APILayer
-    APILayer --> EngineLayer
-    APILayer --> DataLayer
-    EngineLayer --> STORAGE
-    EngineLayer --> DB
+    UI_Shell --> APIRoutes
+    UI_RemotionPlayer -.->|Live Canvas State| UI_Ads
+    APIRoutes --> SecurityAuth
+    APIRoutes --> CoreEngines
+    CoreEngines --> DataStorage
+    APIRoutes --> DataStorage
 ```
 
 ---
 
-## 2. End-to-End Data Flow
-
-The following sequence illustrates how a publisher uploads a manuscript/cover and generates a complete Amazon campaign kit with A+ Content and an HD video trailer:
+### 2.2 End-to-End Asset Generation Lifecycle
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Publisher as Publisher / Author
-    participant Web as Next.js Web App
-    participant API as Route Handlers
-    participant PDF as PDF Extraction Engine
-    participant LLM as Vercel AI / OpenRouter
-    participant Satori as Satori / Canvas Image Engine
-    participant Video as Remotion / FFmpeg Video Engine
+    participant Browser as Client Browser
+    participant API as Next.js API Routes
+    participant PDFEngine as PDF Extraction Service
+    participant OpenRouter as LLM Copy Engine
+    participant Satori as Satori / Canvas Engine
+    participant VideoEngine as Remotion / FFmpeg Video Engine
     participant Storage as File Storage Provider
     participant DB as PostgreSQL (Prisma)
 
-    Publisher->>Web: Uploads PDF / Book Cover
-    Web->>API: POST /api/ads/projects (Multipart Form)
-    API->>Storage: Store PDF & Cover Image
-    API->>PDF: Extract Title, Author, Blurb, Front/Back Covers
-    PDF-->>API: Extracted Book Metadata
-    API->>DB: Create Book record (status: 'uploaded')
-    API-->>Web: Redirect to /ads/[id]/configure
+    Publisher->>Browser: Selects PDF or enters book details
+    Browser->>API: POST /api/ads/projects (FormData)
+    API->>Storage: Persist uploaded PDF / Cover
+    API->>PDFEngine: Parse metadata & rasterize covers
+    PDFEngine-->>API: { title, author, blurb, frontCoverUrl, backCoverUrl }
+    API->>DB: INSERT Book (status: 'uploaded')
+    API-->>Browser: Redirect to /ads/[id]/configure
 
-    Publisher->>Web: Configures Tone, Objective, Style, & Video Parameters
-    Web->>API: PATCH /api/ads/projects/[id]
-    API->>DB: Update Book record (status: 'configured')
-    Web-->>Publisher: Displays Real-Time Remotion Live Preview
+    Publisher->>Browser: Selects Objective, Copy Tone, Template & Video Options
+    Browser->>Browser: Renders instant Remotion Live Preview
+    Publisher->>Browser: Clicks "Generate Amazon Creatives & Video"
+    Browser->>API: POST /api/ads/projects/[id]/generate
 
-    Publisher->>Web: Clicks "Generate Amazon Creatives & Video"
-    Web->>API: POST /api/ads/projects/[id]/generate
-    
-    par Parallel Generation
-        API->>LLM: Generate Amazon Ad Copy & Targeting Hooks
-        LLM-->>API: Headlines, Primary Text, Descriptions
+    par Parallel Generation Execution
+        API->>OpenRouter: Prompt LLM for Amazon Copy & Hooks
+        OpenRouter-->>API: Headline, Primary Text, Description
     and
-        API->>Satori: Render Amazon A+ Modules (970x600, 970x300, 300x300) & Banners
-        Satori-->>API: PNG Buffers
+        API->>Satori: Render Amazon A+ & Sponsored Modules (970x600, 970x300, 300x300, 300x250, 1200x628)
+        Satori-->>API: High-Resolution PNG Buffers
     and
-        API->>Video: Render Remotion Video Trailer (4 Scenes + Specular Sheen + Audio)
-        Video-->>API: MP4 Buffer & High-Res Poster Frame
+        opt If Video Enabled
+            API->>VideoEngine: Render 4-Scene Video with Specular Catchlights
+            VideoEngine-->>API: 1080p MP4 Buffer & Poster PNG Buffer
+        end
     end
 
-    API->>Storage: Store PNGs, MP4, and Poster
-    API->>DB: Create CreativeSet, AdCopies, CreativeImages
-    API->>DB: Update Book status to 'generated'
-    API-->>Web: HTTP 201 { creativeSetId }
-    Web-->>Publisher: Display Creative Gallery & Amazon Launch Hub
+    API->>Storage: Store all PNGs, MP4, and Poster
+    API->>DB: INSERT CreativeSet, AdCopies, CreativeImages
+    API->>DB: UPDATE Book (status: 'generated')
+    API-->>Browser: HTTP 201 { creativeSetId }
+    Browser-->>Publisher: Displays Interactive Gallery & Amazon Launch Hub
 
-    Publisher->>Web: Clicks "Download Complete Kit (.zip)"
-    Web->>API: GET /api/ads/projects/[id]/download
-    API->>Storage: Fetch all PNGs, MP4, Poster
-    API-->>Publisher: Streamed ZIP archive (A+ banners, MP4, copy.txt)
+    Publisher->>Browser: Clicks "Download Complete Kit (.zip)"
+    Browser->>API: GET /api/ads/projects/[id]/download
+    API->>Storage: Retrieve all generated assets
+    API-->>Browser: Streams Complete ZIP file (A+ banners, MP4 video, copy.txt)
 ```
 
 ---
 
-## 3. Detailed Feature Breakdown
+### 2.3 Client-Side Component Hierarchy
 
-### Feature 1: Amazon Ads & KDP A+ Content Suite
-* **Primary Route**: `/ads`
-* **Entry Point**: [`app/(platform)/ads/page.tsx`](file:///home/pratap/work/Publisher_toolkit/app/(platform)/ads/page.tsx)
-* **Configuration Form**: [`components/ads/ConfigureForm.tsx`](file:///home/pratap/work/Publisher_toolkit/components/ads/ConfigureForm.tsx)
-* **Image Template**: [`lib/services/ads/CreativeTemplate.tsx`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/CreativeTemplate.tsx)
-* **Results Gallery**: [`components/ads/CreativeGallery.tsx`](file:///home/pratap/work/Publisher_toolkit/components/ads/CreativeGallery.tsx)
-* **Launch Hub**: [`components/ads/AmazonPackagePanel.tsx`](file:///home/pratap/work/Publisher_toolkit/components/ads/AmazonPackagePanel.tsx)
+```mermaid
+flowchart TD
+    RootLayout["Root Layout (app/layout.tsx)"]
+    StudioLayout["Platform Studio Shell (app/(platform)/layout.tsx)"]
+    AccountChip["AccountChip & Studio Settings Quick Menu"]
 
-#### Supported Amazon Specifications
-| Format Key | Dimensions | Aspect Ratio | Target Placement |
-| :--- | :--- | :--- | :--- |
-| `amazon_aplus_banner_970x600` | 970 × 600 px | ~1.62:1 | Amazon KDP Standard Image Header / Hero Module |
-| `amazon_aplus_feature_970x300` | 970 × 300 px | 3.23:1 | Amazon KDP Standard Technical Specifications / Feature Banner |
-| `amazon_aplus_square_300x300` | 300 × 300 px | 1:1 | Amazon KDP Standard Four Image / Highlight Quad Module |
-| `amazon_300x250` | 300 × 250 px | 1.2:1 | Amazon Sponsored Display & Kindle Lockscreen Ads |
-| `amazon_1200x628` | 1200 × 628 px | 1.91:1 | Amazon Sponsored Brands Top-of-Search Headline Banner |
-| `video-trailer.mp4` | 1920 × 1080 px | 16:9 | Amazon Sponsored Brands Video & Product Detail Video |
+    RootLayout --> StudioLayout
+    StudioLayout --> AccountChip
 
-#### Key Logic & Implementation Details
-1. **Intelligent Ratio Adaptation**: `CreativeTemplate.tsx` checks if the image aspect ratio `width / height >= 1.5` (such as the 970×300 and 970×600 A+ banners) and automatically switches to a horizontal layout with cover on the left/right, title/author typography with Fraunces serif, and KDP badge tokens.
-2. **AI Copywriting**: `generateAdCopy` in [`lib/services/ads/copy.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/copy.ts) crafts concise headlines (max 80 chars) and primary text (max 150 chars) adhering to Amazon Advertising guidelines.
-3. **Unified ZIP Packaging**: In [`lib/services/ads/zip.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/zip.ts), the archive bundles `amazon/` image assets, `amazon/video-trailer.mp4`, `amazon/video-poster.png`, and a formatted `copy.txt` for immediate deployment.
+    subgraph AdsPipeline["Amazon Ads & A+ Suite (/ads)"]
+        AdsNew["New Project Page (/ads/new)"]
+        NewProjectForm["NewProjectForm (PDF Upload / Library Picker)"]
+        AdsConfig["Configure Page (/ads/[id]/configure)"]
+        ConfigureForm["ConfigureForm (Objective, Tone, Palette, Video Params)"]
+        RemotionPreview["TrailerLivePreviewPlayer (Embedded Remotion Player)"]
+        AdsGenerate["Generate Page (/ads/[id]/generate)"]
+        GenerateRunner["GenerateRunner (Progress Polling & SSE)"]
+        AdsResults["Results Page (/ads/[id]/results)"]
+        CreativeGallery["CreativeGallery (Tabs, Zoom Modal, Individual Downloads)"]
+        CopyEditor["CopyEditor (Live Inline Copy Editing)"]
+        AmazonLaunchHub["AmazonPackagePanel (Checklist, 1-Click ZIP, KDP Direct Links)"]
+    end
 
----
+    subgraph VideoPipeline["Dedicated Trailer Studio (/trailer)"]
+        TrailerNew["New Trailer Page (/trailer/new)"]
+        TrailerConfig["TrailerConfigureForm"]
+        TrailerPlayer["TrailerPlayerGallery"]
+    end
 
-### Feature 2: Cinematic Video Trailer Studio & Hyperframes Motion
-* **Primary Route**: `/trailer` and integrated into `/ads/[projectId]/configure`
-* **Live Remotion Player**: [`components/trailer/TrailerLivePreviewPlayer.tsx`](file:///home/pratap/work/Publisher_toolkit/components/trailer/TrailerLivePreviewPlayer.tsx)
-* **Remotion Composition**: [`components/trailer/remotion/BookTrailerComposition.tsx`](file:///home/pratap/work/Publisher_toolkit/components/trailer/remotion/BookTrailerComposition.tsx)
-* **Headless Server Video Engine**: [`lib/services/trailer/video.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/trailer/video.ts)
+    subgraph AudiobookPipeline["Audiobook Studio (/audiobook)"]
+        AudiobookNew["New Audiobook Page (/audiobook/new)"]
+        AudiobookConfig["AudiobookConfigureForm"]
+        AudiobookGallery["AudiobookPlayerGallery (Chapter Streaming & Player)"]
+    end
 
-#### Visual Hierarchy & Scene Progression
-The trailer engine generates a structured 4-scene cinematic teaser:
-1. **Scene 1 — Hook & Genre Atmosphere** (Frames 0–75 / 0–2.5s):
-   - Hook headline with kinetic spring typography.
-   - Dynamic atmospheric particle system (embers, dust motes, neon scanlines).
-2. **Scene 2 — The Story Excerpt** (Frames 75–150 / 2.5–5.0s):
-   - Blurb synopsis teaser text with smooth opacity fade and author attribution.
-3. **Scene 3 — 3D Book Cover Reveal** (Frames 150–225 / 5.0–7.5s):
-   - 3D physical book presentation with book thickness, page block texture, and drop shadow.
-   - **Hyperframe Specular Sheen**: Dynamic light gradient sweeping across the cover gloss.
-   - Volumetric spine depth shadow.
-4. **Scene 4 — Outro & Call to Action** (Frames 225–300 / 7.5–10.0s):
-   - Primary Call to Action ("Available on Kindle & Paperback").
-   - Publisher imprint mark and buy badges.
+    StudioLayout --> AdsNew --> NewProjectForm
+    StudioLayout --> AdsConfig --> ConfigureForm --> RemotionPreview
+    StudioLayout --> AdsGenerate --> GenerateRunner
+    StudioLayout --> AdsResults --> CreativeGallery
+    AdsResults --> CopyEditor
+    AdsResults --> AmazonLaunchHub
 
-#### Audio & Style Presets
-* **Styles**: `fantasy`, `thriller`, `scifi`, `romance`, `cinematic`, `minimal`, `dramatic`, `energetic`.
-* **Audio Moods**: `epic` (orchestral brass & drums), `suspenseful` (noir bass & clock ticks), `ambient` (warm acoustic pads), `upbeat` (modern synth pulses), `emotional` (cinematic piano).
+    StudioLayout --> TrailerNew --> TrailerConfig --> TrailerPlayer
+    StudioLayout --> AudiobookNew --> AudiobookConfig --> AudiobookGallery
+```
 
 ---
 
-### Feature 3: AI Audiobook Studio
-* **Primary Route**: `/audiobook`
-* **Entry Point**: [`app/(platform)/audiobook/page.tsx`](file:///home/pratap/work/Publisher_toolkit/app/(platform)/audiobook/page.tsx)
-* **Chapter Parsing**: [`lib/services/audiobook/chapterParser.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/audiobook/chapterParser.ts)
-* **TTS Synthesis**: [`lib/services/audiobook/tts.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/audiobook/tts.ts)
-* **Audio Player Gallery**: [`components/audiobook/AudiobookPlayerGallery.tsx`](file:///home/pratap/work/Publisher_toolkit/components/audiobook/AudiobookPlayerGallery.tsx)
+### 2.4 Storage & Asset Delivery Architecture
 
-#### Architecture
-* **Chapter Extraction**: Inspects uploaded PDF text stream, identifying chapter markers (`Chapter 1`, `Prologue`, roman numerals, or numbered titles) and parses them into individual `AudiobookChapter` entities.
-* **TTS Pipeline**: Supports pluggable TTS synthesis providers:
-  - **Fish Audio** (`fishaudio`)
-  - **Kokoro** (`kokoro`)
-  - **Local Simulated Audio** (for offline dev/test environments).
-* **Voice Profiles**: Warm Literary (`warm-literary`), Dramatic Narrator (`dramatic-deep`), Expressive Character (`expressive-story`), Crisp Non-Fiction (`clear-authoritative`).
-* **Pacing & Audio Format**: Configurable speed multiplier (`0.8x` to `1.3x`) and export formats (`mp3` / `wav`).
+All files uploaded or generated within the platform are managed by a centralized abstraction in [`lib/providers/storage.ts`](file:///home/pratap/work/Publisher_toolkit/lib/providers/storage.ts):
 
----
+```mermaid
+flowchart LR
+    Caller["API Handler / Background Engine"] -->|storeFile(path, buffer, mime)| StorageEngine{"Storage Provider Selector"}
+    StorageEngine -->|BLOB_READ_WRITE_TOKEN Set| VercelBlobProvider["Vercel Blob Storage Provider"]
+    StorageEngine -->|Token Not Set (Local Mode)| LocalDiskProvider["Local Filesystem Storage Provider"]
 
-### Feature 4: Book Landing Page Generator
-* **Primary Route**: `/landing`
-* **Entry Point**: [`app/(platform)/landing/page.tsx`](file:///home/pratap/work/Publisher_toolkit/app/(platform)/landing/page.tsx)
-* **Renderer**: [`lib/services/landing/renderer.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/landing/renderer.ts)
-* **Agent Logic**: [`lib/services/landing/agent.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/landing/agent.ts)
+    LocalDiskProvider -->|Writes to disk| LocalDisk["Local Disk (/public/uploads or os.tmpdir)"]
+    VercelBlobProvider -->|Uploads via API| VercelCDN["Vercel Global Edge CDN"]
 
-#### Capabilities
-* Generates a fully self-contained, responsive promotional landing page for the book.
-* Injects extracted synopsis, buy buttons (Amazon, Barnes & Noble, Apple Books, Kobo), author bio, chapter excerpts, and praise quotes.
-* Provides a 1-click downloadable ZIP archive containing standard HTML5, clean modern CSS, and bundled cover image assets ready to host on Vercel, Netlify, or GitHub Pages.
+    ClientReq["Client Browser Request"] -->|GET /api/files/...| AuthProxy["/api/files/[...path] Auth Proxy"]
+    AuthProxy -->|Verify Publisher Ownership| LocalDisk
+    AuthProxy -->|Stream Bytes with Content-Type| ClientReq
+    ClientReq -.->|Direct CDN Access| VercelCDN
+```
 
 ---
 
-### Feature 5: Publisher Imprint & Brand Settings
-* **Primary Route**: `/settings`
-* **Entry Point**: [`app/(platform)/settings/page.tsx`](file:///home/pratap/work/Publisher_toolkit/app/(platform)/settings/page.tsx)
-* **Form Component**: [`components/platform/SettingsForm.tsx`](file:///home/pratap/work/Publisher_toolkit/components/platform/SettingsForm.tsx)
-* **Data Layer**: [`lib/publisher/settings.ts`](file:///home/pratap/work/Publisher_toolkit/lib/publisher/settings.ts)
-
-#### Settings Parameters
-* Imprint Name, Website, Default Accent Color, and Typography preference.
-* Default Book Retailer Links (Amazon Storefront URL, Kindle Direct Publishing tag, Author website).
-* Default copy tone and campaign objectives applied automatically to newly uploaded books.
+## 3. Deep-Dive Feature Specifications
 
 ---
 
-## 4. Prisma Database Schema & Entity Relationships
+### Feature 1: Book Ingestion & Metadata Extraction
+
+#### Purpose & Business Value
+Allows publishers to upload raw manuscript files (PDF) or cover artwork without tedious manual data entry. The platform reads the document structure, identifies key bibliographic metadata, and renders cover images directly from the first and last pages.
+
+#### Key Files
+- Service Logic: [`lib/services/ads/extract.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/extract.ts)
+- API Route: [`app/api/ads/projects/route.ts`](file:///home/pratap/work/Publisher_toolkit/app/api/ads/projects/route.ts)
+- Frontend Form: [`components/ads/NewProjectForm.tsx`](file:///home/pratap/work/Publisher_toolkit/components/ads/NewProjectForm.tsx)
+
+#### Technical Workflow
+1. **File Validation**: Accepts PDF files up to 50MB and images (PNG, JPEG, WebP) up to 10MB.
+2. **Text Parsing**: Uses `unpdf` to extract textual content from the first 5 pages and the final page.
+3. **Bibliographic Heuristics**:
+   - **Title**: Looks for prominent heading typography, title case lines, and lines following "Title:".
+   - **Author**: Searches for "By [Name]" patterns or copyright block attributions.
+   - **Blurb / Synopsis**: Extracts introductory summaries from page 2/3 or the back cover blurb on the final page.
+4. **Cover Rasterization**: Uses `pdfjs-dist` to render Page 1 (Front Cover) and Page $N$ (Back Cover) at 150 DPI into clean PNG buffers stored via `storeFile`.
+5. **Fallback & Graceful Degradation**: If the PDF is scanned or text extraction fails, the system leaves fields open for manual review in [`DetailsReview.tsx`](file:///home/pratap/work/Publisher_toolkit/components/ads/DetailsReview.tsx) without throwing a fatal error.
+
+---
+
+### Feature 2: Amazon Ads & KDP A+ Content Suite
+
+#### Purpose & Business Value
+Independent authors and publishers need to look professional on Amazon to drive conversions. This feature generates the complete set of visual modules required for **Amazon KDP A+ Content** (Enhanced Brand Content) as well as **Amazon Sponsored Advertising** banners.
+
+#### Supported Specifications
+| Size Key | Width | Height | Placement Name | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| `amazon_aplus_banner_970x600` | 970 px | 600 px | Standard Image Header | Hero brand module at top of Amazon product page |
+| `amazon_aplus_feature_970x300` | 970 px | 300 px | Standard Technical / Feature | Showcase plot hooks, worldbuilding, and praise |
+| `amazon_aplus_square_300x300` | 300 px | 300 px | Standard Quad Module | Character cards, series list, or thematic icons |
+| `amazon_300x250` | 300 px | 250 px | Sponsored Display Banner | Kindle Lockscreen, product page sidebars, checkout |
+| `amazon_1200x628` | 1200 px | 628 px | Sponsored Brands Headline | Top-of-search headline banner with author logo |
+
+#### Key Files
+- Size Definitions: [`lib/services/ads/sizes.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/sizes.ts)
+- Visual Design Engine: [`lib/services/ads/CreativeTemplate.tsx`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/CreativeTemplate.tsx)
+- Image Rendering Pipeline: [`lib/services/ads/render.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/render.ts)
+- AI Copy Generator: [`lib/services/ads/copy.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/copy.ts)
+- Visual Gallery Component: [`components/ads/CreativeGallery.tsx`](file:///home/pratap/work/Publisher_toolkit/components/ads/CreativeGallery.tsx)
+
+#### Design Aesthetics & Templates
+The system supports 8 curated design aesthetics:
+1. **Classic Editorial**: Dark and elegant, warm amber serif typography.
+2. **Bold Pop & Buzz**: High-energy saturated crimson berry with gold accents.
+3. **Clean Minimalist**: Ivory white background, platinum grays, generous breathing room.
+4. **Cinematic Noir**: Obsidian black with neon cyan suspense elements.
+5. **Mythic Fantasy**: Midnight royal indigo with luminous starlight gold.
+6. **Velvet Romance**: Deep burgundy wine with emotional rose gold highlights.
+7. **Vintage Parchment**: Aged sepia paper, rich espresso ink, brass warmth.
+8. **Speculative Sci-Fi**: Deep void black with electric neon cyan HUD accents.
+
+#### Responsive Ratio Adaptation
+Wide banners (e.g. 970×300 and 970×600) automatically detect `width / height >= 1.5` in `CreativeTemplate.tsx`. Instead of stacking vertically, the layout switches to a balanced horizontal split:
+- **Left Column**: Book cover with realistic drop shadow and 3D border perspective.
+- **Right Column**: Campaign badge (e.g. `NEW RELEASE`), high-contrast title in Fraunces serif, author tagline, and primary CTA button.
+
+---
+
+### Feature 3: Remotion & Hyperframes Video Trailer Studio
+
+#### Purpose & Business Value
+Amazon Sponsored Brands Video ads have the highest click-through and purchase conversion rate of any Amazon advertising format. This feature generates studio-grade 1080p promotional video trailers with dynamic catchlights, kinetic typography, and 3D cover depth.
+
+#### Key Files
+- Browser Remotion Player: [`components/trailer/TrailerLivePreviewPlayer.tsx`](file:///home/pratap/work/Publisher_toolkit/components/trailer/TrailerLivePreviewPlayer.tsx)
+- Remotion Composition: [`components/trailer/remotion/BookTrailerComposition.tsx`](file:///home/pratap/work/Publisher_toolkit/components/trailer/remotion/BookTrailerComposition.tsx)
+- Server Headless Video Engine: [`lib/services/trailer/video.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/trailer/video.ts)
+
+#### 4-Scene Cinematic Narrative Architecture
+Each video is structured into 4 narrative beats:
+1. **Scene 1: The Hook** (0–2.5s)
+   - Atmospheric particles (golden embers for fantasy, scanlines for sci-fi, bokeh for romance).
+   - High-impact hook text animated with Remotion `spring()` physics.
+2. **Scene 2: Story Excerpt** (2.5–5.0s)
+   - Emotional synopsis blurb teaser with smooth opacity transitions.
+3. **Scene 3: 3D Book Reveal** (5.0–7.5s)
+   - **Hyperframe Specular Sheen**: Sweeping linear lighting gradient across the cover varnish.
+   - 3D physical book rendering with page block thickness and spine depth shadow.
+4. **Scene 4: Call to Action & Retail Outro** (7.5–10.0s)
+   - Book title, author name, retailer badge ("Available on Amazon & Kindle"), and call to action.
+
+#### Headless Server Pipeline
+On the server side (in `/api/ads/projects/[id]/generate` and `/api/trailer/projects/[id]/generate`), the system executes:
+1. High-resolution canvas scene generation using `@napi-rs/canvas`.
+2. Scene frames written to a secure temporary directory.
+3. High-efficiency FFmpeg stitching:
+   ```bash
+   ffmpeg -loop 1 -t 2.5 -i s1.png ... -filter_complex "[0:v]fade=...[v0]; ... concat" -c:v libx264 -pix_fmt yuv420p output.mp4
+   ```
+4. Output MP4 and poster image stored to storage provider and associated with `CreativeSet`.
+
+---
+
+### Feature 4: AI Audiobook Studio & Voice Synthesis
+
+#### Purpose & Business Value
+Empowers publishers to turn their manuscript into serialized audiobooks with automated chapter segmentation, custom narration pacing, and character-driven voice models.
+
+#### Key Files
+- Chapter Segmentation: [`lib/services/audiobook/chapterParser.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/audiobook/chapterParser.ts)
+- TTS Generation Engine: [`lib/services/audiobook/tts.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/audiobook/tts.ts)
+- Audio Player & Streaming Gallery: [`components/audiobook/AudiobookPlayerGallery.tsx`](file:///home/pratap/work/Publisher_toolkit/components/audiobook/AudiobookPlayerGallery.tsx)
+
+#### Technical Workflow
+1. **Chapter Extraction**: Parses PDF text using regex patterns detecting:
+   - `Chapter 1`, `Chapter One`, `CHAPTER I`
+   - `Prologue`, `Epilogue`, `Introduction`
+   - Custom numbered section headers.
+2. **Voice Synthesis Engines**:
+   - **Fish Audio** (`fishaudio`): Expressive neural voice model.
+   - **Kokoro** (`kokoro`): Fast, lightweight literary TTS model.
+   - **Simulated Engine**: Fallback for local testing without external API keys.
+3. **Audio Controls**: Configurable playback speed multiplier (`0.8x` to `1.3x`), audio format selection (`mp3` / `wav`), and chapter-by-chapter streaming.
+
+---
+
+### Feature 5: High-Converting Book Landing Page Studio
+
+#### Purpose & Business Value
+Provides a dedicated promotional website for book launches, pre-orders, and author branding with zero hosting setup required.
+
+#### Key Files
+- Agent Logic: [`lib/services/landing/agent.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/landing/agent.ts)
+- Standalone HTML Renderer: [`lib/services/landing/renderer.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/landing/renderer.ts)
+- ZIP Export Service: [`lib/services/landing/zip.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/landing/zip.ts)
+
+#### Output Format
+Generates a 1-click downloadable ZIP archive containing:
+- `index.html`: Modern, accessible, semantic HTML5 structure with Open Graph metadata and Schema.org Book markup.
+- `styles.css`: Self-contained, responsive modern CSS with dark/light theme support and fluid typography.
+- `cover.png`: High-resolution book cover asset.
+- `README.md`: Deployment instructions for Vercel, Netlify, Cloudflare Pages, or GitHub Pages.
+
+---
+
+### Feature 6: Amazon Launch Hub & 1-Click Packaging
+
+#### Purpose & Business Value
+Eliminates confusion on how to deploy generated assets to Amazon. Instead of downloading files piecemeal, publishers get an organized master bundle and instant launch guidance.
+
+#### Key Files
+- Panel Component: [`components/ads/AmazonPackagePanel.tsx`](file:///home/pratap/work/Publisher_toolkit/components/ads/AmazonPackagePanel.tsx)
+- ZIP Bundler: [`lib/services/ads/zip.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/zip.ts)
+- Download Route: [`app/api/ads/projects/[id]/download/route.ts`](file:///home/pratap/work/Publisher_toolkit/app/api/ads/projects/[id]/download/route.ts)
+
+#### Packaging Structure
+The downloaded `.zip` file is organized as follows:
+```
+my-book-ad-creatives.zip
+├── amazon/
+│   ├── amazon_aplus_banner_970x600.png
+│   ├── amazon_aplus_feature_970x300.png
+│   ├── amazon_aplus_square_300x300.png
+│   ├── amazon_300x250.png
+│   ├── amazon_1200x628.png
+│   ├── video-trailer.mp4
+│   └── video-poster.png
+└── copy.txt
+```
+
+#### Launch Hub Capabilities
+- **1-Click ZIP Download**: Bundles all images, video MP4, poster, and copy text into one archive.
+- **1-Click Copy to Clipboard**: Formats headline, primary text, and description ready to paste into Amazon Advertising Console.
+- **Direct Links**: Direct buttons to open **KDP A+ Content Manager** and **Amazon Advertising Console**.
+
+---
+
+### Feature 7: Publisher Imprint & Brand Profile Settings
+
+#### Purpose & Business Value
+Allows publishers and imprints to store their global brand parameters so they are automatically inherited across all newly created books and ad campaigns.
+
+#### Key Files
+- Settings Page: [`app/(platform)/settings/page.tsx`](file:///home/pratap/work/Publisher_toolkit/app/(platform)/settings/page.tsx)
+- Settings Form Component: [`components/platform/SettingsForm.tsx`](file:///home/pratap/work/Publisher_toolkit/components/platform/SettingsForm.tsx)
+- Settings Data Service: [`lib/publisher/settings.ts`](file:///home/pratap/work/Publisher_toolkit/lib/publisher/settings.ts)
+
+#### Configurable Brand Parameters
+- **Publisher Imprint**: Imprint name, logo, primary website, support email.
+- **Visual Tokens**: Primary brand accent color, serif vs. sans-serif typography preference.
+- **Retail Links**: Default Amazon Author Central link, KDP Storefront URL, and retailer tags.
+- **Defaults**: Default copy tone and campaign objectives.
+
+---
+
+## 4. Prisma Data Models & Entity Relationships
 
 The data layer is managed with Prisma ORM targeting PostgreSQL.
 
@@ -218,10 +431,10 @@ erDiagram
     Publisher ||--o{ LandingProject : "owns"
 
     Book ||--o{ CreativeSet : "has many"
-    Book ||--o{ Book : "parent/child library variants"
+    Book ||--o{ Book : "parent / child library copies"
 
-    CreativeSet ||--o{ AdCopy : "contains"
-    CreativeSet ||--o{ CreativeImage : "contains"
+    CreativeSet ||--o{ AdCopy : "has many"
+    CreativeSet ||--o{ CreativeImage : "has many"
 
     TrailerProject ||--o{ GeneratedTrailer : "renders"
     AudiobookProject ||--o{ AudiobookChapter : "contains"
@@ -232,6 +445,7 @@ erDiagram
         string email
         json settings
         datetime createdAt
+        datetime updatedAt
     }
 
     Book {
@@ -258,6 +472,8 @@ erDiagram
         string videoMood
         string videoLength
         string parentBookId FK
+        datetime createdAt
+        datetime updatedAt
     }
 
     CreativeSet {
@@ -290,126 +506,99 @@ erDiagram
         int height
         string imageUrl
     }
-
-    TrailerProject {
-        string id PK
-        string publisherId FK
-        string title
-        string author
-        string blurb
-        string status
-        string style
-        string length
-        string musicMood
-        string aspectRatio
-    }
-
-    GeneratedTrailer {
-        string id PK
-        string projectId FK
-        string aspectRatio
-        string videoUrl
-        string posterUrl
-        int duration
-        int width
-        int height
-    }
-
-    AudiobookProject {
-        string id PK
-        string publisherId FK
-        string title
-        string author
-        string ttsProvider
-        string voiceModel
-        float voicePacing
-        string fullAudioUrl
-    }
-
-    AudiobookChapter {
-        string id PK
-        string projectId FK
-        int chapterNumber
-        string title
-        string audioUrl
-        int duration
-    }
 ```
 
 ---
 
-## 5. Storage & File Serving Architecture
+## 5. API Routes & Contracts Directory
 
-All binary assets (PDFs, book covers, Satori PNG images, MP4 video trailers, poster frames, and audio MP3s) flow through the uniform storage abstraction defined in [`lib/providers/storage.ts`](file:///home/pratap/work/Publisher_toolkit/lib/providers/storage.ts).
-
-```mermaid
-flowchart LR
-    UploadClient["Client / Generation Pipeline"] -->|storeFile(path, buffer, mime)| StorageRouter{"Storage Provider"}
-    StorageRouter -->|BLOB_READ_WRITE_TOKEN exists| VercelBlob["Vercel Blob Storage"]
-    StorageRouter -->|No token (Local Dev)| LocalDisk["Local Disk (/public/uploads or tmp)"]
-
-    LocalDisk -->|Stored at /api/files/...| FileServer["Secure Route: /api/files/[...path]"]
-    VercelBlob -->|Public CDN URL| DirectCDN["Vercel Blob CDN"]
-
-    FileServer -->|Auth & Publisher Scope Check| BrowserClient["Client Browser"]
-    DirectCDN --> BrowserClient
-```
-
-### Key Rules
-* Never expose raw database file paths. Always use storage URLs generated by `storeFile`.
-* For authenticated image downloads, [`app/api/creatives/[id]/image/route.ts`](file:///home/pratap/work/Publisher_toolkit/app/api/creatives/[id]/image/route.ts) validates that the requesting session owns the book before serving bytes.
+| Endpoint | Method | Purpose | Request Payload | Response |
+| :--- | :--- | :--- | :--- | :--- |
+| `/api/ads/projects` | `GET` | List all books for authenticated publisher | None | `Book[]` |
+| `/api/ads/projects` | `POST` | Ingest manuscript/cover & extract metadata | `multipart/form-data` | `{ id: string }` |
+| `/api/ads/projects/[id]` | `PATCH` | Update campaign options & video configuration | `JSON (projectUpdateSchema)` | `{ id: string }` |
+| `/api/ads/projects/[id]/generate` | `POST` | Trigger concurrent copy, image & video generation | None | `{ creativeSetId: string }` |
+| `/api/ads/projects/[id]/download` | `GET` | Download full campaign bundle as `.zip` | None | Binary `.zip` stream |
+| `/api/creatives/[id]/image` | `GET` | Authenticated creative image stream / download | Query: `?download=1` | PNG image stream |
+| `/api/trailer/projects` | `POST` | Create standalone video trailer project | `JSON` or `FormData` | `{ id: string }` |
+| `/api/trailer/projects/[id]/generate` | `POST` | Render video trailer via headless canvas + ffmpeg | None | `{ trailerId: string }` |
+| `/api/audiobook/projects` | `POST` | Ingest book & parse audiobook chapters | `FormData` | `{ id: string }` |
+| `/api/audiobook/projects/[id]/generate` | `POST` | Generate chapter audio via TTS engine | None | `{ fullAudioUrl: string }` |
+| `/api/landing/projects/[id]/generate` | `POST` | Generate promotional landing page | None | `{ html: string }` |
+| `/api/files/[...path]` | `GET` | Securely stream stored asset for authorized session | Path params | Binary stream with mime |
 
 ---
 
-## 6. Developer Playbook: How to Make Changes
+## 6. Developer Playbook: How to Extend & Make Changes
 
-### A. Adding a New Amazon A+ Content Size or Banner Spec
+### How to Add a New Amazon Ad / A+ Format
 1. Open [`lib/services/ads/sizes.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/sizes.ts).
-2. Add your new specification to `CREATIVE_SIZES`:
+2. Add your specification to `CREATIVE_SIZES`:
    ```ts
    {
      key: 'amazon_aplus_comparison_970x150',
      platform: 'AMAZON',
      width: 970,
      height: 150,
-     label: 'Amazon A+ Comparison Header',
-     description: 'KDP technical comparison table header',
+     label: 'A+ Product Comparison Table',
+     description: 'Standard technical comparison banner for KDP',
    }
    ```
-3. Check [`lib/services/ads/CreativeTemplate.tsx`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/CreativeTemplate.tsx) to verify if the layout handles the new aspect ratio cleanly.
-4. Run `npx vitest run lib/services/ads/render.test.ts` to verify image rendering.
+3. Update [`lib/services/ads/CreativeTemplate.tsx`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/CreativeTemplate.tsx) to verify the layout adapts cleanly to the new aspect ratio.
+4. Update metadata in [`components/ads/CreativeGallery.tsx`](file:///home/pratap/work/Publisher_toolkit/components/ads/CreativeGallery.tsx) so the format displays with the proper badge.
+5. Verify with `npx vitest run lib/services/ads/render.test.ts`.
 
-### B. Adding a New Design Aesthetic / Palette
+---
+
+### How to Add a New Visual Design Theme
 1. Open [`lib/services/ads/options.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/ads/options.ts).
-2. Add an entry to `TEMPLATES`:
+2. Add a new theme definition to `TEMPLATES`:
    ```ts
    {
-     key: 'cyberpunk',
-     label: 'Cyberpunk Neon',
-     description: 'High-contrast ultraviolet with electric acid green',
-     palette: { background: '#08051a', ink: '#ffffff', accent: '#22c55e', secondary: '#a855f7' },
+     key: 'gothic',
+     label: 'Gothic Mystery',
+     description: 'Deep midnight charcoal with crimson velvet accents',
+     palette: { background: '#0a0508', ink: '#ffffff', accent: '#e11d48', secondary: '#240a15' },
    }
    ```
-3. Update `projectUpdateSchema` to include the new key in `templateKey: z.enum([...])`.
-4. Run `npx vitest run lib/services/ads/options.test.ts`.
+3. Update `projectUpdateSchema` to include the new key in the `templateKey` enum.
+4. Verify with `npx vitest run lib/services/ads/options.test.ts`.
 
-### C. Adding a New Video Trailer Style or Visual Transition
+---
+
+### How to Add a New Video Motion Style or Visual Transition
 1. Open [`lib/services/trailer/options.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/trailer/options.ts) and add the style to `STYLE_OPTIONS`.
 2. Open [`components/trailer/remotion/BookTrailerComposition.tsx`](file:///home/pratap/work/Publisher_toolkit/components/trailer/remotion/BookTrailerComposition.tsx):
-   - Customize background gradients, font weights, particle effects, or spring animations for the new style.
+   - Add the specific particle animations, color grading, or spring timing for the new style.
 3. Open [`lib/services/trailer/video.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/trailer/video.ts):
    - Add the palette definition to `PALETTES` for headless backend rendering.
-4. Run `npx vitest run lib/services/trailer/video.test.ts`.
+4. Verify with `npx vitest run lib/services/trailer/video.test.ts`.
 
-### D. Verification Gate Before Submitting Changes
-Before reporting completion, always run the standard verification gate:
+---
+
+### How to Add a New TTS Voice Model or Audio Provider
+1. Open [`lib/services/audiobook/options.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/audiobook/options.ts) and add the new model key to `VOICE_MODELS` or `TTS_PROVIDERS`.
+2. Open [`lib/services/audiobook/tts.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/audiobook/tts.ts):
+   - Implement the provider request handler calling the model's API.
+3. Verify with `npx vitest run lib/services/audiobook/tts.test.ts`.
+
+---
+
+### Testing & Quality Assurance Gate
+Before committing any changes, run the mandatory verification gate:
 ```bash
 # 1. Type check
 npx tsc --noEmit
 
-# 2. Ads & Core suite tests
+# 2. Ads test suite
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ads_creative_test" npx vitest run lib/services/ads/
 
-# 3. Verify server health
+# 3. Video engine test suite
+npx vitest run lib/services/trailer/
+
+# 4. Audiobook suite
+npx vitest run lib/services/audiobook/
+
+# 5. Check local dev server health
 curl -I http://localhost:3000/
 ```
