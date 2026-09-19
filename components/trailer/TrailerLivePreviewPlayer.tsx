@@ -33,6 +33,7 @@ export interface TrailerLivePreviewPlayerProps {
   coverUrl?: string | null
   defaultAspectRatio?: TrailerAspectRatio
   className?: string
+  interiorImageUrls?: string[]
 }
 
 interface AspectConfig {
@@ -97,6 +98,7 @@ export function TrailerLivePreviewPlayer({
   coverUrl,
   defaultAspectRatio = '9:16',
   className,
+  interiorImageUrls,
 }: TrailerLivePreviewPlayerProps) {
   const [mounted, setMounted] = useState(false)
   const [activeAspect, setActiveAspect] = useState<TrailerAspectRatio>(defaultAspectRatio)
@@ -134,6 +136,7 @@ export function TrailerLivePreviewPlayer({
     musicMood,
     coverUrl,
     aspectRatio: activeAspect,
+    interiorImageUrls,
   }
 
   return (

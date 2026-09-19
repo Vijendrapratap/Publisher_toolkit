@@ -103,7 +103,13 @@ export function TrailerConfigureForm({
     hookText?: string | null
     ctaText?: string | null
   }
-  book: { title: string; author: string; blurb: string; coverUrl: string | null }
+  book: {
+    title: string
+    author: string
+    blurb: string
+    coverUrl: string | null
+    interiorImageUrls?: string[]
+  }
   error?: string
 }) {
   const router = useRouter()
@@ -181,6 +187,7 @@ export function TrailerConfigureForm({
         musicMood={musicMood}
         coverUrl={book.coverUrl}
         defaultAspectRatio={aspectRatios[0] ?? '9:16'}
+        interiorImageUrls={book.interiorImageUrls}
       />
 
       {/* Visual Style Selection */}

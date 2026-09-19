@@ -17,6 +17,11 @@ export async function POST(request: Request) {
       author,
       blurb,
       frontCoverUrl,
+      sourceUrl,
+      contentGoal,
+      interiorImageUrls = [],
+      rating,
+      reviewCount,
       campaignName,
       campaignObjective,
       templateKey,
@@ -45,6 +50,9 @@ export async function POST(request: Request) {
           pdfUrl: sourceBook.pdfUrl,
           frontCoverUrl: sourceBook.frontCoverUrl,
           backCoverUrl: sourceBook.backCoverUrl,
+          sourceUrl: sourceBook.sourceUrl,
+          contentGoal: contentGoal || sourceBook.contentGoal || 'all',
+          interiorImageUrls: Array.isArray(interiorImageUrls) && interiorImageUrls.length > 0 ? interiorImageUrls : sourceBook.interiorImageUrls,
           status: 'configured',
           platforms: Array.isArray(platforms) && platforms.length > 0 ? platforms : sourceBook.platforms,
           parentBookId: rootId,
@@ -61,17 +69,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ id: newProject.id, isExisting: true }, { status: 201 })
     }
 
-    if (title || frontCoverUrl) {
+    if (title || frontCoverUrl || sourceUrl) {
       const newProject = await prisma.book.create({
         data: {
           publisherId,
           title: title?.trim()?.slice(0, 200) || 'Untitled Book',
           author: author?.trim()?.slice(0, 200) || '',
           blurb: blurb?.trim()?.slice(0, 2000) || '',
-          pdfUrl: '',
+          pdfUrl: null,
           frontCoverUrl: frontCoverUrl || null,
+          sourceUrl: sourceUrl || null,
+          contentGoal: contentGoal || 'all',
+          interiorImageUrls: Array.isArray(interiorImageUrls) ? interiorImageUrls : [],
+          rating: typeof rating === 'number' ? rating : null,
+          reviewCount: typeof reviewCount === 'number' ? reviewCount : null,
           status: frontCoverUrl ? 'configured' : 'uploaded',
-          platforms: Array.isArray(platforms) && platforms.length > 0 ? platforms : ['META', 'GOOGLE', 'AMAZON'],
+          platforms: Array.isArray(platforms) && platforms.length > 0 ? platforms : ['AMAZON'],
           campaignName: campaignName?.trim() || 'New Campaign',
           campaignObjective: campaignObjective || 'launch',
           templateKey: templateKey || 'classic',
@@ -275,8 +288,24 @@ export async function POST(request: Request) {
     backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, bytes, manualBackCover.type)).url
   }
 
+  // Process 2-5 interior page images / illustrations if uploaded
+  const rawInteriorFiles = form.getAll('interiorImages')
+  const interiorImageUrls: string[] = []
+  for (const item of rawInteriorFiles) {
+    if (item instanceof File && item.size > 0) {
+      if (item.size <= COVER_RULE.maxBytes && isAllowedCoverType(item.type, item.name)) {
+        const bytes = Buffer.from(await item.arrayBuffer())
+        const mime = item.type === 'image/jpg' || !item.type ? 'image/jpeg' : item.type
+        const stored = await storeFile(`ads/${publisherId}/interior/${Date.now()}-${Math.random().toString(36).slice(2)}.png`, bytes, mime)
+        interiorImageUrls.push(stored.url)
+      }
+    }
+  }
+
   const rawAuthor = form.get('author')
   const rawBlurb = form.get('blurb')
+  const rawSourceUrl = form.get('sourceUrl')
+  const rawContentGoal = form.get('contentGoal')
   const campaignName = form.get('campaignName')
   const campaignObjective = form.get('campaignObjective')
   const templateKey = form.get('templateKey')
@@ -288,6 +317,8 @@ export async function POST(request: Request) {
   const title = typeof rawTitle === 'string' && rawTitle.trim() ? rawTitle.trim().slice(0, 200) : 'Untitled Book'
   const author = typeof rawAuthor === 'string' && rawAuthor.trim() ? rawAuthor.trim().slice(0, 200) : ''
   const blurb = typeof rawBlurb === 'string' && rawBlurb.trim() ? rawBlurb.trim().slice(0, 2000) : ''
+  const sourceUrl = typeof rawSourceUrl === 'string' && rawSourceUrl.trim() ? rawSourceUrl.trim() : null
+  const contentGoal = typeof rawContentGoal === 'string' && rawContentGoal.trim() ? rawContentGoal.trim() : 'all'
 
   const book = await prisma.book.create({
     data: {
@@ -295,10 +326,14 @@ export async function POST(request: Request) {
       title,
       author,
       blurb,
-      pdfUrl: '',
+      pdfUrl: null,
       frontCoverUrl,
       backCoverUrl,
+      sourceUrl,
+      contentGoal,
+      interiorImageUrls,
       status: frontCoverUrl ? 'configured' : 'uploaded',
+      platforms: ['AMAZON'],
       campaignName: typeof campaignName === 'string' && campaignName.trim() ? campaignName.trim() : 'Launch Campaign',
       campaignObjective: typeof campaignObjective === 'string' ? campaignObjective : 'launch',
       templateKey: typeof templateKey === 'string' ? templateKey : 'classic',

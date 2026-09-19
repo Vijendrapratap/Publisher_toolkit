@@ -19,6 +19,8 @@ export async function POST(request: Request) {
       blurb,
       frontCoverUrl,
       backCoverUrl,
+      sourceUrl,
+      interiorImageUrls = [],
       style,
       length,
       musicMood,
@@ -53,6 +55,10 @@ export async function POST(request: Request) {
           pdfUrl: source.pdfUrl,
           frontCoverUrl: source.frontCoverUrl,
           backCoverUrl: source.backCoverUrl,
+          sourceUrl: 'sourceUrl' in source ? (source.sourceUrl as string | null) : null,
+          interiorImageUrls: Array.isArray(interiorImageUrls) && interiorImageUrls.length > 0
+            ? interiorImageUrls
+            : ('interiorImageUrls' in source && Array.isArray(source.interiorImageUrls) ? (source.interiorImageUrls as string[]) : []),
           status: hasCover ? 'configured' : 'uploaded',
           style: style || ('style' in source && source.style ? source.style : 'cinematic'),
           length: length || ('length' in source && source.length ? source.length : '30s'),
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
       )
     }
 
-    if (title || frontCoverUrl) {
+    if (title || frontCoverUrl || sourceUrl) {
       const hasCover = Boolean(frontCoverUrl)
       const newProject = await prisma.trailerProject.create({
         data: {
@@ -81,9 +87,11 @@ export async function POST(request: Request) {
           title: title?.trim()?.slice(0, 200) || 'Untitled Book',
           author: author?.trim()?.slice(0, 200) || '',
           blurb: blurb?.trim()?.slice(0, 2000) || '',
-          pdfUrl: '',
+          pdfUrl: null,
           frontCoverUrl: frontCoverUrl || null,
           backCoverUrl: backCoverUrl || null,
+          sourceUrl: sourceUrl || null,
+          interiorImageUrls: Array.isArray(interiorImageUrls) ? interiorImageUrls : [],
           status: hasCover ? 'configured' : 'uploaded',
           style: style || 'cinematic',
           length: length || '30s',
@@ -297,8 +305,23 @@ export async function POST(request: Request) {
     backCoverUrl = (await storeFile(`trailer/${publisherId}/${Date.now()}-back.png`, bytes, manualBackCover.type)).url
   }
 
+  // Process 2-5 interior page images / illustrations if uploaded
+  const rawInteriorFiles = form.getAll('interiorImages')
+  const interiorImageUrls: string[] = []
+  for (const item of rawInteriorFiles) {
+    if (item instanceof File && item.size > 0) {
+      if (item.size <= COVER_RULE.maxBytes && isAllowedCoverType(item.type, item.name)) {
+        const bytes = Buffer.from(await item.arrayBuffer())
+        const mime = item.type === 'image/jpg' || !item.type ? 'image/jpeg' : item.type
+        const stored = await storeFile(`trailer/${publisherId}/interior/${Date.now()}-${Math.random().toString(36).slice(2)}.png`, bytes, mime)
+        interiorImageUrls.push(stored.url)
+      }
+    }
+  }
+
   const rawAuthor = form.get('author')
   const rawBlurb = form.get('blurb')
+  const rawSourceUrl = form.get('sourceUrl')
   const style = form.get('style')
   const length = form.get('length')
   const musicMood = form.get('musicMood')
@@ -308,6 +331,7 @@ export async function POST(request: Request) {
   const titleToStore = typeof rawTitle === 'string' && rawTitle.trim() ? rawTitle.trim().slice(0, 200) : 'Untitled Book'
   const authorToStore = typeof rawAuthor === 'string' ? rawAuthor.trim().slice(0, 200) : ''
   const blurbToStore = typeof rawBlurb === 'string' ? rawBlurb.trim().slice(0, 2000) : ''
+  const sourceUrlToStore = typeof rawSourceUrl === 'string' && rawSourceUrl.trim() ? rawSourceUrl.trim() : null
 
   const project = await prisma.trailerProject.create({
     data: {
@@ -315,9 +339,11 @@ export async function POST(request: Request) {
       title: titleToStore,
       author: authorToStore,
       blurb: blurbToStore,
-      pdfUrl: '',
+      pdfUrl: null,
       frontCoverUrl,
       backCoverUrl,
+      sourceUrl: sourceUrlToStore,
+      interiorImageUrls,
       status: frontCoverUrl ? 'configured' : 'uploaded',
       style: typeof style === 'string' ? style : 'cinematic',
       length: typeof length === 'string' ? length : '30s',

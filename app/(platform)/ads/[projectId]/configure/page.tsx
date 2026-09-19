@@ -37,7 +37,14 @@ export default async function ConfigureStepPage({
         videoMood: (book.videoMood as any) ?? 'epic',
         videoLength: (book.videoLength as any) ?? '15s',
       }}
-      book={{ title: book.title ?? '', author: book.author ?? '', blurb: book.blurb ?? '', coverUrl: book.frontCoverUrl }}
+      book={{
+        title: book.title ?? '',
+        author: book.author ?? '',
+        blurb: book.blurb ?? '',
+        coverUrl: book.frontCoverUrl,
+        contentGoal: book.contentGoal ?? 'all',
+        interiorImageUrls: book.interiorImageUrls ?? [],
+      }}
     />
   )
 }

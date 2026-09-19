@@ -26,6 +26,7 @@ export interface BookTrailerCompositionProps {
   musicMood: TrailerMusicMood
   coverUrl?: string | null
   aspectRatio: TrailerAspectRatio
+  interiorImageUrls?: string[]
 }
 
 interface Palette {
@@ -447,12 +448,16 @@ function Scene2({
   palette,
   scale,
   durationInFrames,
+  isWidescreen,
+  interiorImageUrl,
 }: {
   blurb: string
   author: string
   palette: Palette
   scale: number
   durationInFrames: number
+  isWidescreen: boolean
+  interiorImageUrl?: string | null
 }) {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
@@ -473,61 +478,102 @@ function Scene2({
     <AbsoluteFill
       style={{
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: isWidescreen && interiorImageUrl ? 'row' : 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: isWidescreen && interiorImageUrl ? Math.max(24, 60 * scale) : 0,
         padding: Math.max(30, 90 * scale),
-        textAlign: 'center',
+        textAlign: isWidescreen && interiorImageUrl ? 'left' : 'center',
         opacity: exitOpacity,
       }}
     >
-      <div style={{ opacity: enterProgress }}>
-        <PillBadge text="THE STORY" accent={palette.accent} scale={scale} />
-      </div>
-
-      <div
-        style={{
-          marginTop: Math.max(16, 32 * scale),
-          fontSize: Math.max(48, Math.round(110 * scale)),
-          fontFamily: 'Georgia, serif',
-          fontWeight: 700,
-          color: palette.accent,
-          lineHeight: 0.8,
-          opacity: enterProgress,
-        }}
-      >
-        “
-      </div>
-
-      <div
-        style={{
-          marginTop: Math.max(12, 24 * scale),
-          maxWidth: '82%',
-          color: palette.textPrimary,
-          fontFamily: palette.fontFamily,
-          fontStyle: 'italic',
-          fontSize: Math.max(20, Math.round(44 * scale)),
-          lineHeight: 1.4,
-          opacity: enterProgress,
-          transform: `translateY(${interpolate(enterProgress, [0, 1], [25, 0])}px)`,
-        }}
-      >
-        {cleanBlurb}
-      </div>
-
-      {author && (
+      {interiorImageUrl && (
         <div
           style={{
-            marginTop: Math.max(18, 44 * scale),
-            fontSize: Math.max(16, Math.round(30 * scale)),
-            fontWeight: 600,
-            color: palette.accent,
-            opacity: interpolate(frame, [20, 45], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+            maxWidth: isWidescreen ? '40%' : '55%',
+            opacity: enterProgress,
+            transform: `translateY(${interpolate(enterProgress, [0, 1], [30, 0])}px) rotateZ(-2deg)`,
+            perspective: 800,
           }}
         >
-          — {author}
+          <div
+            style={{
+              overflow: 'hidden',
+              borderRadius: Math.max(8, 16 * scale),
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0,0,0,0.3)',
+              border: `1px solid ${palette.accent}30`,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={interiorImageUrl}
+              alt=""
+              style={{
+                width: '100%',
+                maxHeight: isWidescreen ? 480 * scale : 260 * scale,
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          </div>
         </div>
       )}
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: isWidescreen && interiorImageUrl ? 'flex-start' : 'center',
+          maxWidth: isWidescreen && interiorImageUrl ? '50%' : '82%',
+        }}
+      >
+        <div style={{ opacity: enterProgress }}>
+          <PillBadge text="THE STORY" accent={palette.accent} scale={scale} />
+        </div>
+
+        <div
+          style={{
+            marginTop: Math.max(12, 20 * scale),
+            fontSize: Math.max(40, Math.round(90 * scale)),
+            fontFamily: 'Georgia, serif',
+            fontWeight: 700,
+            color: palette.accent,
+            lineHeight: 0.8,
+            opacity: enterProgress,
+          }}
+        >
+          “
+        </div>
+
+        <div
+          style={{
+            marginTop: Math.max(8, 16 * scale),
+            color: palette.textPrimary,
+            fontFamily: palette.fontFamily,
+            fontStyle: 'italic',
+            fontSize: Math.max(18, Math.round(40 * scale)),
+            lineHeight: 1.4,
+            opacity: enterProgress,
+            transform: `translateY(${interpolate(enterProgress, [0, 1], [25, 0])}px)`,
+          }}
+        >
+          {cleanBlurb}
+        </div>
+
+        {author && (
+          <div
+            style={{
+              marginTop: Math.max(16, 36 * scale),
+              fontSize: Math.max(15, Math.round(28 * scale)),
+              fontWeight: 600,
+              color: palette.accent,
+              opacity: interpolate(frame, [20, 45], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+            }}
+          >
+            — {author}
+          </div>
+        )}
+      </div>
     </AbsoluteFill>
   )
 }
@@ -541,6 +587,7 @@ function Scene3({
   scale,
   durationInFrames,
   isWidescreen,
+  interiorImageUrl,
 }: {
   title: string
   author: string
@@ -549,6 +596,7 @@ function Scene3({
   scale: number
   durationInFrames: number
   isWidescreen: boolean
+  interiorImageUrl?: string | null
 }) {
   const frame = useCurrentFrame()
   const { fps } = useVideoConfig()
@@ -577,16 +625,45 @@ function Scene3({
         opacity: exitOpacity,
       }}
     >
-      {/* 3D Book Cover Presentation */}
+      {/* 3D Book Cover Presentation with optional interior spread peek */}
       <div
         style={{
           perspective: 1000,
           opacity: enterProgress,
           transform: `scale(${bookScale})`,
+          position: 'relative',
         }}
       >
+        {interiorImageUrl && (
+          <div
+            style={{
+              position: 'absolute',
+              top: -12 * scale,
+              left: isWidescreen ? -36 * scale : -24 * scale,
+              zIndex: 0,
+              transform: `rotateY(${bookRotateY - 8}deg) rotateZ(-6deg) scale(0.92)`,
+              transformStyle: 'preserve-3d',
+              boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.75)',
+              borderRadius: Math.max(6, 14 * scale),
+              overflow: 'hidden',
+              border: `1px solid ${palette.accent}40`,
+              width: isWidescreen ? 360 * scale : 420 * scale,
+              height: isWidescreen ? 540 * scale : 630 * scale,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={interiorImageUrl}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+        )}
+
         <div
           style={{
+            position: 'relative',
+            zIndex: 1,
             transform: `rotateY(${bookRotateY}deg) rotateX(2deg)`,
             transformStyle: 'preserve-3d',
             transition: 'transform 0.1s ease-out',
@@ -874,6 +951,8 @@ export function BookTrailerComposition(props: BookTrailerCompositionProps) {
           palette={palette}
           scale={scale}
           durationInFrames={sceneFrames}
+          isWidescreen={isWidescreen}
+          interiorImageUrl={props.interiorImageUrls?.[0]}
         />
       </Sequence>
 
@@ -887,6 +966,7 @@ export function BookTrailerComposition(props: BookTrailerCompositionProps) {
           scale={scale}
           durationInFrames={sceneFrames}
           isWidescreen={isWidescreen}
+          interiorImageUrl={props.interiorImageUrls?.[1] || props.interiorImageUrls?.[0]}
         />
       </Sequence>
 

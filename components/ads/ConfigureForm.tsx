@@ -72,7 +72,14 @@ export function ConfigureForm({
     videoMood?: TrailerMusicMood
     videoLength?: TrailerLength
   }
-  book: { title: string; author: string; blurb: string; coverUrl: string | null }
+  book: {
+    title: string
+    author: string
+    blurb: string
+    coverUrl: string | null
+    contentGoal?: string | null
+    interiorImageUrls?: string[]
+  }
   error?: string
 }) {
   const router = useRouter()
@@ -87,7 +94,11 @@ export function ConfigureForm({
   const [customHook, setCustomHook] = useState(initial.customHook ?? '')
   const [ctaText, setCtaText] = useState(initial.ctaText ?? CTA_PRESETS[0])
 
-  const [includeVideo, setIncludeVideo] = useState(initial.includeVideo ?? true)
+  const [includeVideo, setIncludeVideo] = useState(
+    initial.includeVideo !== undefined
+      ? initial.includeVideo
+      : book.contentGoal === 'video' || book.contentGoal === 'all'
+  )
   const [videoFormat, setVideoFormat] = useState<TrailerAspectRatio>(initial.videoFormat ?? '16:9')
   const [videoStyle, setVideoStyle] = useState<TrailerStyle>(
     (initial.videoStyle as TrailerStyle) || (initial.templateKey as TrailerStyle) || 'cinematic'
@@ -157,6 +168,40 @@ export function ConfigureForm({
           </Button>
         </div>
       )}
+
+      {/* Content Goal & Asset Summary Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/25 bg-accent-soft/20 p-4">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="size-4 text-accent" aria-hidden />
+          <div className="text-xs">
+            <span className="font-semibold text-ink">
+              {book.contentGoal === 'aplus'
+                ? 'Goal: Amazon KDP A+ Content Suite'
+                : book.contentGoal === 'video'
+                  ? 'Goal: Amazon Video Trailer'
+                  : book.contentGoal === 'sponsored'
+                    ? 'Goal: Amazon Sponsored Banners'
+                    : 'Goal: Full Amazon Launch Bundle'}
+            </span>
+            <span className="text-ink-muted ml-2">
+              {book.contentGoal === 'aplus'
+                ? 'Optimized for 970×600 hero, 970×300 feature, and 300×300 quad modules'
+                : book.contentGoal === 'video'
+                  ? 'Optimized for 16:9 product page video & 9:16 social shorts'
+                  : book.contentGoal === 'sponsored'
+                    ? 'Optimized for 300×250 display & 1200×628 headline search banners'
+                    : 'A+ Modules + Remotion Video + Sponsored Banners + Copy'}
+            </span>
+          </div>
+        </div>
+
+        {book.interiorImageUrls && book.interiorImageUrls.length > 0 && (
+          <span className="rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-ink shadow-subtle flex items-center gap-1.5 border border-line">
+            <Layers className="size-3.5 text-accent" aria-hidden />
+            {book.interiorImageUrls.length} interior {book.interiorImageUrls.length === 1 ? 'page' : 'pages'} linked
+          </span>
+        )}
+      </div>
 
       {/* Campaign Details & Objective */}
       <Card className="p-6">
@@ -602,6 +647,7 @@ export function ConfigureForm({
                     musicMood={videoMood}
                     coverUrl={book.coverUrl}
                     defaultAspectRatio={videoFormat}
+                    interiorImageUrls={book.interiorImageUrls}
                   />
                 </div>
               </div>

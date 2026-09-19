@@ -1,18 +1,26 @@
 'use client'
+
 import { useState, useEffect, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   BookOpen,
+  CheckCircle2,
   ChevronDown,
+  ExternalLink,
   FileUp,
+  Film,
   Info,
+  Layers,
   Library,
+  Link as LinkIcon,
+  Loader2,
   Megaphone,
   Palette,
   Search,
   ShieldCheck,
   Sparkles,
+  Star,
   Target,
   Zap,
 } from 'lucide-react'
@@ -20,12 +28,12 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
 import { Dropzone } from '@/components/platform/Dropzone'
+import { InteriorImagesDropzone } from '@/components/platform/InteriorImagesDropzone'
 import { COVER_RULE, PDF_RULE } from '@/lib/services/ads/validation'
 import {
   CAMPAIGN_OBJECTIVES,
   CTA_PRESETS,
   TEMPLATES,
-  TONES,
   type CampaignObjectiveKey,
   type CopyTone,
   type TemplateKey,
@@ -41,39 +49,93 @@ export interface LibraryBookItem {
   createdAt: string | Date
 }
 
+export type ContentGoalKey = 'all' | 'aplus' | 'video' | 'sponsored'
+
+export const CONTENT_GOALS = [
+  {
+    key: 'all' as ContentGoalKey,
+    title: 'Full Amazon Launch Bundle',
+    badge: 'All-In-One',
+    description: 'A+ Content Modules, Remotion HD Video Trailer, Sponsored Ads & high-converting ad copy.',
+    tags: ['A+ Content', 'Video Trailer', 'Sponsored Ads', 'Ad Copy'],
+    icon: Sparkles,
+  },
+  {
+    key: 'aplus' as ContentGoalKey,
+    title: 'Amazon A+ Content Suite',
+    badge: 'KDP Enhanced',
+    description: 'High-converting listing modules: Hero Banner (970×600), Feature Spread (970×300), and Quad Cards (300×300).',
+    tags: ['Hero 970×600', 'Feature 970×300', 'Quad 300×300'],
+    icon: Layers,
+  },
+  {
+    key: 'video' as ContentGoalKey,
+    title: 'Amazon Video Trailer',
+    badge: 'Remotion HD',
+    description: 'Cinematic video trailers for product pages (16:9) and social feeds (9:16) with dynamic motion & hyperframes.',
+    tags: ['16:9 Product Video', '9:16 Reels / Shorts', 'Remotion HD'],
+    icon: Film,
+  },
+  {
+    key: 'sponsored' as ContentGoalKey,
+    title: 'Sponsored Display & Banners',
+    badge: 'Amazon Ads',
+    description: 'High-CTR display banners (300×250) and headline search banners (1200×628) for Sponsored Products.',
+    tags: ['300×250 Display', '1200×628 Headline'],
+    icon: Target,
+  },
+]
+
 export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookItem[] }) {
   const router = useRouter()
-  const [tab, setTab] = useState<'library' | 'quick' | 'upload'>('upload')
+
+  // Goal Selector State
+  const [contentGoal, setContentGoal] = useState<ContentGoalKey>('all')
+
+  // Input Method State: 'url' (Creatify style), 'upload' (covers + 2-5 interior pages), 'library', 'pdf'
+  const [tab, setTab] = useState<'url' | 'upload' | 'library' | 'pdf'>('url')
+
   const [library, setLibrary] = useState<LibraryBookItem[]>(initialBooks ?? [])
   const [loadingLibrary, setLoadingLibrary] = useState(!initialBooks)
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Quick setup state
-  const [quickTitle, setQuickTitle] = useState('')
-  const [quickAuthor, setQuickAuthor] = useState('')
-  const [quickBlurb, setQuickBlurb] = useState('')
-  const [quickCover, setQuickCover] = useState<File | null>(null)
+  // URL Importer State (Creatify Style)
+  const [productUrl, setProductUrl] = useState('')
+  const [fetchingUrl, setFetchingUrl] = useState(false)
+  const [extractedData, setExtractedData] = useState<{
+    title: string
+    author: string
+    blurb: string
+    coverUrl: string | null
+    sourceUrl: string
+    rating?: number | null
+    reviewCount?: number | null
+  } | null>(null)
 
-  // Campaign settings for existing book or new upload
+  // Book Details & Upload State (No PDF mandatory)
+  const [title, setTitle] = useState('')
+  const [author, setAuthor] = useState('')
+  const [blurb, setBlurb] = useState('')
+  const [frontCover, setFrontCover] = useState<File | null>(null)
+  const [backCover, setBackCover] = useState<File | null>(null)
+  const [interiorImages, setInteriorImages] = useState<File[]>([])
+
+  // Optional PDF Upload State
+  const [pdf, setPdf] = useState<File | null>(null)
+
+  // Campaign settings
   const [campaignName, setCampaignName] = useState('')
   const [campaignObjective, setCampaignObjective] = useState<CampaignObjectiveKey>('launch')
   const [templateKey, setTemplateKey] = useState<TemplateKey>('classic')
   const [copyTone, setCopyTone] = useState<CopyTone>('literary')
   const [ctaText, setCtaText] = useState<string>(CTA_PRESETS[0])
 
-  // New PDF upload state
-  const [pdf, setPdf] = useState<File | null>(null)
-  const [front, setFront] = useState<File | null>(null)
-  const [back, setBack] = useState<File | null>(null)
-  const [showCovers, setShowCovers] = useState(false)
-
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (initialBooks && initialBooks.length > 0) {
-      setTab('library')
       setSelectedBookId(initialBooks[0].id)
       setCampaignName(`${initialBooks[0].title} - Campaign`)
       return
@@ -86,19 +148,58 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
           const data = await res.json()
           if (Array.isArray(data.books) && data.books.length > 0) {
             setLibrary(data.books)
-            setTab('library')
             setSelectedBookId(data.books[0].id)
             setCampaignName(`${data.books[0].title} - Campaign`)
           }
         }
       } catch {
-        // Fallback gracefully to quick mode
+        // Silent fallback
       } finally {
         setLoadingLibrary(false)
       }
     }
     load()
   }, [initialBooks])
+
+  // Handle URL Extraction (Creatify feature)
+  async function handleExtractFromUrl() {
+    if (!productUrl.trim()) {
+      setError('Please enter a valid Amazon, bookstore, or Goodreads link.')
+      return
+    }
+
+    setFetchingUrl(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/extract-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: productUrl.trim() }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to pull book info from link.')
+      }
+
+      setExtractedData(data)
+      setTitle(data.title || '')
+      setAuthor(data.author || '')
+      setBlurb(data.blurb || '')
+      if (!campaignName || campaignName.endsWith(' - Campaign') || campaignName === 'New Campaign') {
+        setCampaignName(`${data.title || 'Book'} - Campaign`)
+      }
+      toast.success('Book details extracted!', {
+        description: `Pulled "${data.title || 'book details'}" from store listing.`,
+      })
+    } catch (err: any) {
+      setError(err.message || 'Could not extract book details from URL. You can upload covers directly below.')
+      toast.error('Could not extract link', { description: err.message })
+    } finally {
+      setFetchingUrl(false)
+    }
+  }
 
   function handleSelectBook(book: LibraryBookItem) {
     setSelectedBookId(book.id)
@@ -112,10 +213,11 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
     setPending(true)
     setError(null)
 
+    // Flow 1: Library Book
     if (tab === 'library') {
       if (!selectedBookId) {
         setPending(false)
-        setError('Please select a book from your library to start a campaign.')
+        setError('Please select a book from your library.')
         return
       }
 
@@ -124,6 +226,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           existingBookId: selectedBookId,
+          contentGoal,
           campaignName: campaignName.trim() || 'New Campaign',
           campaignObjective,
           templateKey,
@@ -139,26 +242,104 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
         return
       }
 
-      toast.success('Campaign created', { description: 'Ready to configure and generate creatives.' })
+      toast.success('Project created', { description: 'Ready to configure your creatives.' })
       router.push(`/ads/${json.id}/configure`)
       router.refresh()
       return
     }
 
-    if (tab === 'quick') {
-      const titleToUse = quickTitle.trim() || campaignName.trim()
-      if (!titleToUse && !quickCover) {
+    // Flow 2: URL Importer (Creatify Style)
+    if (tab === 'url') {
+      const activeTitle = title.trim() || extractedData?.title?.trim()
+      if (!activeTitle && !extractedData?.coverUrl) {
         setPending(false)
-        setError('Please enter a book title to create your campaign.')
+        setError('Please paste a product URL and click "Pull Book Details", or switch to the manual upload tab.')
+        return
+      }
+
+      // If publisher also added interior images, submit via FormData
+      if (interiorImages.length > 0 || frontCover) {
+        const body = new FormData()
+        body.append('title', activeTitle || 'Untitled Book')
+        body.append('author', author.trim() || extractedData?.author || '')
+        body.append('blurb', blurb.trim() || extractedData?.blurb || '')
+        body.append('contentGoal', contentGoal)
+        body.append('sourceUrl', productUrl.trim() || extractedData?.sourceUrl || '')
+        if (frontCover) body.append('frontCover', frontCover)
+        if (backCover) body.append('backCover', backCover)
+        interiorImages.forEach((img) => body.append('interiorImages', img))
+        body.append('campaignName', campaignName.trim() || `${activeTitle || 'New'} - Campaign`)
+        body.append('campaignObjective', campaignObjective)
+        body.append('templateKey', templateKey)
+        body.append('copyTone', copyTone)
+        body.append('ctaText', ctaText)
+
+        const res = await fetch('/api/ads/projects', { method: 'POST', body })
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setPending(false)
+          setError(json.error ?? 'Something went wrong creating your project.')
+          return
+        }
+
+        toast.success('Project created', { description: 'Ready to configure and generate creatives.' })
+        router.push(`/ads/${json.id}/configure`)
+        router.refresh()
+        return
+      }
+
+      // Otherwise send clean JSON with scraped cover URL
+      const res = await fetch('/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: activeTitle || 'Untitled Book',
+          author: author.trim() || extractedData?.author || '',
+          blurb: blurb.trim() || extractedData?.blurb || '',
+          frontCoverUrl: extractedData?.coverUrl || null,
+          sourceUrl: productUrl.trim() || extractedData?.sourceUrl || null,
+          contentGoal,
+          rating: extractedData?.rating ?? null,
+          reviewCount: extractedData?.reviewCount ?? null,
+          campaignName: campaignName.trim() || `${activeTitle || 'New'} - Campaign`,
+          campaignObjective,
+          templateKey,
+          copyTone,
+          ctaText,
+        }),
+      })
+
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPending(false)
+        setError(json.error ?? 'Failed to create campaign from URL.')
+        return
+      }
+
+      toast.success('Project created', { description: 'Ready to configure and generate creatives.' })
+      router.push(`/ads/${json.id}/configure`)
+      router.refresh()
+      return
+    }
+
+    // Flow 3: Upload Covers + 2-5 Interior Pages (No PDF required)
+    if (tab === 'upload') {
+      const activeTitle = title.trim()
+      if (!activeTitle && !frontCover) {
+        setPending(false)
+        setError('Please enter a book title and provide a front cover image.')
         return
       }
 
       const body = new FormData()
-      body.append('title', titleToUse || 'Untitled Book')
-      body.append('author', quickAuthor.trim())
-      body.append('blurb', quickBlurb.trim())
-      if (quickCover) body.append('frontCover', quickCover)
-      body.append('campaignName', campaignName.trim() || `${titleToUse || 'New'} - Campaign`)
+      body.append('title', activeTitle || 'Untitled Book')
+      body.append('author', author.trim())
+      body.append('blurb', blurb.trim())
+      body.append('contentGoal', contentGoal)
+      if (frontCover) body.append('frontCover', frontCover)
+      if (backCover) body.append('backCover', backCover)
+      interiorImages.forEach((img) => body.append('interiorImages', img))
+      body.append('campaignName', campaignName.trim() || `${activeTitle || 'New'} - Campaign`)
       body.append('campaignObjective', campaignObjective)
       body.append('templateKey', templateKey)
       body.append('copyTone', copyTone)
@@ -168,22 +349,22 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
         setPending(false)
-        setError(json.error ?? 'Something went wrong creating your campaign. Please try again.')
+        setError(json.error ?? 'Something went wrong creating your project.')
         return
       }
 
       if (json.needsManualCover) {
-        toast.success('Book details saved', { description: 'Please add a cover image to generate your creatives.' })
+        toast.success('Book details saved', { description: 'Please add a cover image to continue.' })
         router.push(`/ads/${json.id}/upload`)
       } else {
-        toast.success('Campaign created', { description: 'Ready to configure and generate creatives.' })
+        toast.success('Project created', { description: 'Ready to configure your creatives.' })
         router.push(`/ads/${json.id}/configure`)
       }
       router.refresh()
       return
     }
 
-    // Tab is upload
+    // Flow 4: Full PDF Upload
     if (!pdf) {
       setPending(false)
       setError('Choose your book PDF to continue.')
@@ -192,8 +373,10 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
 
     const body = new FormData()
     body.append('pdf', pdf)
-    if (front) body.append('frontCover', front)
-    if (back) body.append('backCover', back)
+    body.append('contentGoal', contentGoal)
+    if (frontCover) body.append('frontCover', frontCover)
+    if (backCover) body.append('backCover', backCover)
+    interiorImages.forEach((img) => body.append('interiorImages', img))
     if (campaignName.trim()) body.append('campaignName', campaignName.trim())
     body.append('campaignObjective', campaignObjective)
     body.append('templateKey', templateKey)
@@ -204,12 +387,12 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
     const json = await res.json().catch(() => ({}))
     if (!res.ok) {
       setPending(false)
-      setError(json.error ?? 'Something went wrong uploading your book. Please try again.')
+      setError(json.error ?? 'Something went wrong uploading your book.')
       return
     }
 
-    toast.success('Book uploaded', { description: 'Check the details we found, then configure your ads.' })
-    router.push(`/ads/${json.id}/upload`)
+    toast.success('Book uploaded', { description: 'Ready to configure and preview.' })
+    router.push(`/ads/${json.id}/configure`)
     router.refresh()
   }
 
@@ -221,85 +404,378 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
 
   return (
     <Card className="p-6 sm:p-8">
-      {/* Tab Switcher */}
-      <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-line pb-4">
-        <button
-          type="button"
-          onClick={() => {
-            setTab('library')
-            setError(null)
-          }}
-          className={cn(
-            'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
-            tab === 'library'
-              ? 'bg-accent text-on-accent shadow-subtle'
-              : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
-          )}
-        >
-          <Library className="size-4" aria-hidden />
-          Choose from library
-          {library.length > 0 && (
-            <span
-              className={cn(
-                'ml-1 rounded-full px-2 py-0.5 text-xs',
-                tab === 'library' ? 'bg-white/20 text-white' : 'bg-surface-2 text-ink-muted'
-              )}
-            >
-              {library.length}
-            </span>
-          )}
-        </button>
+      {/* STEP 1: CONTENT GOAL SELECTOR */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-5 text-accent" aria-hidden />
+          <h2 className="font-display text-lg font-semibold">1. What kind of content do you want to create?</h2>
+        </div>
+        <p className="mt-1 text-sm text-ink-muted">
+          Select your creative goal to optimize formats, image dimensions, and trailer scripts.
+        </p>
 
-        <button
-          type="button"
-          onClick={() => {
-            setTab('quick')
-            setError(null)
-          }}
-          className={cn(
-            'relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
-            tab === 'quick'
-              ? 'bg-accent text-on-accent shadow-subtle'
-              : 'border border-accent/30 bg-accent-soft/30 text-ink hover:bg-accent-soft/50'
-          )}
-        >
-          <Zap className="size-4 text-amber-500" aria-hidden />
-          Quick setup (No PDF)
-          <span
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {CONTENT_GOALS.map((goal) => {
+            const isSelected = contentGoal === goal.key
+            const Icon = goal.icon
+            return (
+              <button
+                key={goal.key}
+                type="button"
+                onClick={() => setContentGoal(goal.key)}
+                className={cn(
+                  'flex flex-col items-start rounded-2xl border p-4 text-left transition-all',
+                  isSelected
+                    ? 'border-accent bg-accent-soft/70 shadow-inset ring-2 ring-accent/30'
+                    : 'border-line/70 bg-surface-2/60 hover:border-accent/40 hover:bg-surface-2'
+                )}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className={cn('grid size-9 place-items-center rounded-xl', isSelected ? 'bg-accent text-on-accent' : 'bg-surface text-ink-muted')}>
+                    <Icon className="size-4" aria-hidden />
+                  </span>
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                      isSelected ? 'bg-accent text-on-accent' : 'bg-surface text-ink-muted'
+                    )}
+                  >
+                    {goal.badge}
+                  </span>
+                </div>
+                <h3 className="mt-3 text-sm font-semibold text-ink">{goal.title}</h3>
+                <p className="mt-1 text-xs text-ink-muted leading-relaxed line-clamp-2">{goal.description}</p>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {goal.tags.slice(0, 2).map((tag) => (
+                    <span key={tag} className="rounded-md bg-surface px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* STEP 2: INPUT METHOD SELECTION */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          <BookOpen className="size-5 text-accent" aria-hidden />
+          <h2 className="font-display text-lg font-semibold">2. Choose your input source</h2>
+        </div>
+        <p className="mt-1 text-sm text-ink-muted">
+          Paste an Amazon or bookstore link for instant auto-extraction, or upload your cover and 2–5 interior images.
+        </p>
+
+        {/* Tab Switcher */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-b border-line pb-4">
+          <button
+            type="button"
+            onClick={() => {
+              setTab('url')
+              setError(null)
+            }}
             className={cn(
-              'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-              tab === 'quick' ? 'bg-white/20 text-white' : 'bg-accent text-on-accent'
+              'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
+              tab === 'url'
+                ? 'bg-accent text-on-accent shadow-subtle'
+                : 'border border-accent/30 bg-accent-soft/30 text-ink hover:bg-accent-soft/50'
             )}
           >
-            Recommended
-          </span>
-        </button>
+            <LinkIcon className="size-4 text-accent" aria-hidden />
+            Paste Amazon / Store Link
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                tab === 'url' ? 'bg-white/20 text-white' : 'bg-accent text-on-accent'
+              )}
+            >
+              Instant (Creatify style)
+            </span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setTab('upload')
-            setError(null)
-          }}
-          className={cn(
-            'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
-            tab === 'upload'
-              ? 'bg-accent text-on-accent shadow-subtle'
-              : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
-          )}
-        >
-          <FileUp className="size-4" aria-hidden />
-          Upload book PDF
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTab('upload')
+              setError(null)
+            }}
+            className={cn(
+              'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
+              tab === 'upload'
+                ? 'bg-accent text-on-accent shadow-subtle'
+                : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
+            )}
+          >
+            <Zap className="size-4 text-amber-500" aria-hidden />
+            Upload Cover & 2–5 Interior Pages
+            <span className="text-[11px] font-normal text-ink-muted">(No PDF required)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTab('library')
+              setError(null)
+            }}
+            className={cn(
+              'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
+              tab === 'library'
+                ? 'bg-accent text-on-accent shadow-subtle'
+                : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
+            )}
+          >
+            <Library className="size-4" aria-hidden />
+            Choose from library
+            {library.length > 0 && (
+              <span
+                className={cn(
+                  'ml-1 rounded-full px-2 py-0.5 text-xs',
+                  tab === 'library' ? 'bg-white/20 text-white' : 'bg-surface-2 text-ink-muted'
+                )}
+              >
+                {library.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTab('pdf')
+              setError(null)
+            }}
+            className={cn(
+              'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors text-ink-muted hover:bg-surface-2 hover:text-ink'
+            )}
+          >
+            <FileUp className="size-4" aria-hidden />
+            Upload PDF (Optional)
+          </button>
+        </div>
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
+        {/* TAB 1: CREATIFY-STYLE URL IMPORTER */}
+        {tab === 'url' && (
+          <div className="flex flex-col gap-6">
+            <div className="rounded-2xl border border-accent/25 bg-accent-soft/20 p-5">
+              <div className="flex items-start gap-3.5">
+                <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-ink text-sm">Instant Book Importer</h3>
+                  <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">
+                    Paste any Amazon KDP, bookstore, or Goodreads link. We will pull the book title, author, description, high-res cover, and star ratings automatically.
+                  </p>
+
+                  <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <div className="relative flex-1">
+                      <input
+                        type="url"
+                        value={productUrl}
+                        onChange={(e) => setProductUrl(e.target.value)}
+                        placeholder="e.g. https://www.amazon.com/dp/B09XYZ... or https://goodreads.com/book/show/..."
+                        className="w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleExtractFromUrl()
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={handleExtractFromUrl}
+                      loading={fetchingUrl}
+                      disabled={fetchingUrl || !productUrl.trim()}
+                      className="shrink-0"
+                    >
+                      {fetchingUrl ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                          Pulling details…
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="size-4" aria-hidden />
+                          Pull Book Details
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Extracted Product Preview Card */}
+            {extractedData && (
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5 transition-all">
+                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="size-4" aria-hidden />
+                  Successfully Pulled from Listing
+                </div>
+
+                <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
+                  {extractedData.coverUrl && (
+                    <div className="size-24 shrink-0 overflow-hidden rounded-xl border border-line bg-surface shadow-subtle sm:size-28">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={extractedData.coverUrl} alt="" className="size-full object-cover" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-base font-bold text-ink">{title || extractedData.title}</h4>
+                    <p className="text-xs font-medium text-ink-muted">By {author || extractedData.author || 'Author'}</p>
+
+                    {extractedData.rating && (
+                      <div className="mt-1.5 flex items-center gap-2 text-xs">
+                        <span className="flex items-center gap-1 font-semibold text-amber-500">
+                          <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden />
+                          {extractedData.rating.toFixed(1)} / 5
+                        </span>
+                        {extractedData.reviewCount && (
+                          <span className="text-ink-muted">({extractedData.reviewCount.toLocaleString()} customer reviews)</span>
+                        )}
+                      </div>
+                    )}
+
+                    <p className="mt-2 text-xs text-ink-muted/90 line-clamp-3 leading-relaxed">
+                      {blurb || extractedData.blurb || 'No blurb provided.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Interior Pages Option to enrich A+ and Video scenes */}
+                <div className="mt-6 border-t border-line/60 pt-5">
+                  <InteriorImagesDropzone
+                    files={interiorImages}
+                    onFilesChange={setInteriorImages}
+                    label="Optional: Add 2–5 Interior Page Images or Illustrations"
+                    description="Upload maps, chapter openers, or character art to display in A+ feature modules and Remotion trailer scenes."
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Editable Book Fields when URL is not yet pulled or needs manual edit */}
+            {!extractedData && (
+              <div className="flex items-start gap-3 rounded-xl border border-line/80 bg-surface-2/40 p-4 text-xs text-ink-muted">
+                <Info className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+                <p>
+                  Paste your link above to auto-populate everything. If you prefer manual entry, click the <strong>"Upload Cover & 2–5 Interior Pages"</strong> tab.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: UPLOAD COVERS & 2-5 INTERIOR IMAGES (NO PDF) */}
+        {tab === 'upload' && (
+          <div className="flex flex-col gap-6">
+            <div className="flex items-start gap-3.5 rounded-2xl border border-accent/25 bg-accent-soft/20 p-4">
+              <Zap className="mt-0.5 size-5 shrink-0 text-amber-500" aria-hidden />
+              <div className="text-sm">
+                <p className="font-semibold text-ink">Lightweight & Fast Setup</p>
+                <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">
+                  No full book PDF upload is required. Provide your front cover and 2–5 interior pages (illustrations, maps, or chapter spreads) to generate Amazon A+ modules and video trailers.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label htmlFor="manualTitle" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  Book title <span className="text-danger">*</span>
+                </label>
+                <input
+                  id="manualTitle"
+                  type="text"
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value)
+                    if (error) setError(null)
+                    if (!campaignName || campaignName.endsWith(' - Campaign') || campaignName === 'New Campaign') {
+                      setCampaignName(e.target.value.trim() ? `${e.target.value.trim()} - Campaign` : '')
+                    }
+                  }}
+                  placeholder="e.g. The Midnight Library"
+                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="manualAuthor" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  Author
+                </label>
+                <input
+                  id="manualAuthor"
+                  type="text"
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  placeholder="e.g. Matt Haig"
+                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="manualBlurb" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  Blurb / Hook / Synopsis
+                </label>
+                <textarea
+                  id="manualBlurb"
+                  rows={3}
+                  value={blurb}
+                  onChange={(e) => setBlurb(e.target.value)}
+                  placeholder="Back-cover copy, teaser excerpt, or hook to inspire ad headlines…"
+                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
+
+              <div>
+                <Dropzone
+                  id="frontCover"
+                  label="Front cover image (Required)"
+                  rule={COVER_RULE}
+                  file={frontCover}
+                  onFileChange={setFrontCover}
+                  compact
+                />
+              </div>
+
+              <div>
+                <Dropzone
+                  id="backCover"
+                  label="Back cover image (Optional)"
+                  rule={COVER_RULE}
+                  file={backCover}
+                  onFileChange={setBackCover}
+                  compact
+                />
+              </div>
+
+              {/* 2-5 Interior Page Images */}
+              <div className="sm:col-span-2 pt-2">
+                <InteriorImagesDropzone
+                  files={interiorImages}
+                  onFilesChange={setInteriorImages}
+                  label="2–5 Interior Page Images & Illustrations"
+                  description="Upload chapter openers, maps, character sketches, or excerpt spreads. These are showcased in A+ feature cards and video trailer reveals."
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: CHOOSE FROM LIBRARY */}
         {tab === 'library' && (
           <div className="flex flex-col gap-6">
             <div>
               <h2 className="font-display text-lg font-semibold">Select a book from your library</h2>
               <p className="text-sm text-ink-muted">
-                Run another campaign for a previously uploaded book without uploading the PDF again.
+                Run another campaign or generate new A+ content without re-entering details.
               </p>
             </div>
 
@@ -310,14 +786,14 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
             ) : library.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line p-8 text-center">
                 <BookOpen className="size-8 text-ink-muted" aria-hidden />
-                <p className="mt-3 font-medium">No books uploaded yet</p>
-                <p className="mt-1 text-sm text-ink-muted">Start with our quick setup or upload your first book PDF.</p>
+                <p className="mt-3 font-medium">No books in library yet</p>
+                <p className="mt-1 text-sm text-ink-muted">Paste an Amazon link or upload your covers above to start.</p>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <Button type="button" variant="primary" size="sm" onClick={() => setTab('quick')}>
-                    Quick setup (No PDF)
+                  <Button type="button" variant="primary" size="sm" onClick={() => setTab('url')}>
+                    Paste Amazon Link
                   </Button>
                   <Button type="button" variant="secondary" size="sm" onClick={() => setTab('upload')}>
-                    Upload book PDF
+                    Upload Covers & Pages
                   </Button>
                 </div>
               </div>
@@ -374,133 +850,35 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
           </div>
         )}
 
-        {tab === 'quick' && (
+        {/* TAB 4: OPTIONAL PDF UPLOAD */}
+        {tab === 'pdf' && (
           <div className="flex flex-col gap-6">
-            {/* Reassuring Banner */}
-            <div className="flex items-start gap-3.5 rounded-2xl border border-accent/25 bg-accent-soft/30 p-4">
-              <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-              <div className="text-sm">
-                <p className="font-semibold text-ink">Token-efficient & fast setup</p>
-                <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">
-                  Skip uploading large PDF files. All you need for ads is the book title, a short blurb, and your cover image.
-                </p>
-              </div>
-            </div>
-
+            <Dropzone id="pdf" label="Full Book PDF" rule={PDF_RULE} file={pdf} onFileChange={setPdf} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label htmlFor="quickTitle" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  Book title <span className="text-danger">*</span>
-                </label>
-                <input
-                  id="quickTitle"
-                  type="text"
-                  value={quickTitle}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    setQuickTitle(val)
-                    if (error) setError(null)
-                    if (!campaignName || campaignName.endsWith(' - Campaign') || campaignName === 'New Campaign') {
-                      setCampaignName(val.trim() ? `${val.trim()} - Campaign` : '')
-                    }
-                  }}
-                  placeholder="e.g. The Midnight Library"
-                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="quickAuthor" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  Author
-                </label>
-                <input
-                  id="quickAuthor"
-                  type="text"
-                  value={quickAuthor}
-                  onChange={(e) => setQuickAuthor(e.target.value)}
-                  placeholder="e.g. Matt Haig"
-                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label htmlFor="quickBlurb" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  Blurb / Description
-                </label>
-                <textarea
-                  id="quickBlurb"
-                  rows={4}
-                  value={quickBlurb}
-                  onChange={(e) => setQuickBlurb(e.target.value)}
-                  placeholder="Short synopsis, tagline, or back-cover blurb to inspire ad copy…"
-                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <Dropzone
-                  id="quickCover"
-                  label="Front cover image (optional, recommended)"
-                  rule={COVER_RULE}
-                  file={quickCover}
-                  onFileChange={setQuickCover}
-                  compact
-                />
-              </div>
+              <Dropzone id="frontCoverPdf" label="Front cover" rule={COVER_RULE} file={frontCover} onFileChange={setFrontCover} compact />
+              <Dropzone id="backCoverPdf" label="Back cover" rule={COVER_RULE} file={backCover} onFileChange={setBackCover} compact />
             </div>
           </div>
         )}
 
-        {tab === 'upload' && (
-          <div className="flex flex-col gap-6">
-            {/* Informational Tip Box */}
-            <div className="flex items-start gap-3 rounded-2xl border border-line bg-surface-2/60 p-4 text-xs text-ink-muted">
-              <Info className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-              <p className="leading-relaxed">
-                <strong className="font-semibold text-ink">Tip:</strong> Ads only use the title, blurb, and cover. Interior book pages and images are never sent to AI. If you already have your cover image and blurb, use the Quick setup tab to save time and bandwidth.
-              </p>
-            </div>
-
-            <Dropzone id="pdf" label="Book PDF" rule={PDF_RULE} file={pdf} onFileChange={setPdf} />
-
-            <div className="flex flex-col gap-4">
-              <button
-                type="button"
-                onClick={() => setShowCovers((s) => !s)}
-                aria-expanded={showCovers}
-                className="flex items-center gap-2 self-start text-sm font-medium text-accent"
-              >
-                <ChevronDown className={cn('size-4 transition-transform', showCovers && 'rotate-180')} aria-hidden />
-                Add your own cover images (optional)
-              </button>
-              {showCovers && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Dropzone id="frontCover" label="Front cover" rule={COVER_RULE} file={front} onFileChange={setFront} compact />
-                  <Dropzone id="backCover" label="Back cover" rule={COVER_RULE} file={back} onFileChange={setBack} compact />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Campaign & Style Customization Section */}
+        {/* CAMPAIGN SETTINGS & STYLES */}
         <div className="flex flex-col gap-5 rounded-2xl border border-line/60 bg-surface-2/60 p-5">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-accent" aria-hidden />
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-ink">Campaign details & style</h3>
+            <Palette className="size-4 text-accent" aria-hidden />
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-ink">Campaign customization</h3>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="campaignName" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                Campaign name
+                Campaign label
               </label>
               <input
                 id="campaignName"
                 type="text"
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
-                placeholder={quickTitle ? `${quickTitle} - Campaign` : 'e.g. Summer Pre-Order Blitz'}
+                placeholder={title ? `${title} - Campaign` : 'e.g. Launch Campaign'}
                 className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
               />
             </div>
@@ -557,7 +935,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
 
           <div>
             <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-muted">
-              <Palette className="size-3.5" aria-hidden /> Design aesthetic / style
+              <Palette className="size-3.5" aria-hidden /> Visual aesthetic & palette
             </span>
             <div className="mt-2 grid gap-2 sm:grid-cols-4">
               {TEMPLATES.map((tpl) => {
@@ -602,21 +980,27 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
 
         <div className="flex flex-col-reverse items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2 text-xs text-ink-muted">
-            <ShieldCheck className="size-4" aria-hidden /> Your files stay private to your account.
+            <ShieldCheck className="size-4" aria-hidden /> Safe and private to your publisher workspace.
           </p>
           <Button
             type="submit"
             size="lg"
             loading={pending}
-            disabled={pending}
+            disabled={
+              pending ||
+              (tab === 'pdf' && !pdf) ||
+              (tab === 'library' && (!selectedBookId || library.length === 0)) ||
+              (tab === 'upload' && !title.trim() && !frontCover) ||
+              (tab === 'url' && !extractedData && !title.trim() && !frontCover)
+            }
           >
             {pending
-              ? 'Setting up campaign…'
+              ? 'Setting up project…'
               : tab === 'library'
-                ? 'Create campaign for book'
-                : tab === 'quick'
-                  ? 'Create campaign'
-                  : 'Upload and continue'}
+                ? 'Create project for book'
+                : tab === 'url'
+                  ? 'Continue to configure'
+                  : 'Create project and continue'}
           </Button>
         </div>
       </form>

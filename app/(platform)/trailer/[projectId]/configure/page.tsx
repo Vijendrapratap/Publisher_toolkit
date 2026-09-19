@@ -39,6 +39,7 @@ export default async function TrailerConfigureStepPage({
         author: project.author ?? '',
         blurb: project.blurb ?? '',
         coverUrl: project.frontCoverUrl,
+        interiorImageUrls: project.interiorImageUrls ?? [],
       }}
     />
   )

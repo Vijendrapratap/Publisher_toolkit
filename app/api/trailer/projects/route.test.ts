@@ -1,18 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/providers/auth', () => ({
-  requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1'),
-}))
-vi.mock('@/lib/providers/storage', () => ({
-  storeFile: vi.fn().mockResolvedValue({ url: 'https://blob.example/trailer-file' }),
-}))
+vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
+vi.mock('@/lib/providers/storage', () => ({ storeFile: vi.fn().mockResolvedValue({ url: 'https://blob.example/file' }) }))
 vi.mock('@/lib/services/ads/extract', () => ({
   extractBookAssets: vi.fn().mockResolvedValue({
-    title: 'Extracted Trailer Book',
-    author: 'Extracted Author',
-    blurb: 'Extracted blurb text',
-    frontCoverPng: Buffer.from('png-front'),
-    backCoverPng: Buffer.from('png-back'),
+    title: 'Test Book',
+    author: 'Test Author',
+    blurb: 'A blurb',
+    frontCoverPng: Buffer.from('png'),
+    backCoverPng: Buffer.from('png'),
   }),
 }))
 vi.mock('@/lib/db', () => ({
@@ -21,7 +17,7 @@ vi.mock('@/lib/db', () => ({
       findFirst: vi.fn(),
     },
     trailerProject: {
-      create: vi.fn().mockResolvedValue({ id: 'trailer_proj_1' }),
+      create: vi.fn().mockResolvedValue({ id: 'trailer_1' }),
       findFirst: vi.fn(),
     },
   },
@@ -31,205 +27,135 @@ import { POST } from './route'
 import { prisma } from '@/lib/db'
 import { storeFile } from '@/lib/providers/storage'
 
-function formDataRequest(fields: Record<string, Blob | string>) {
-  const form = new FormData()
-  for (const [key, value] of Object.entries(fields)) form.append(key, value)
-  return new Request('http://localhost/api/trailer/projects', { method: 'POST', body: form })
-}
-
 describe('POST /api/trailer/projects', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('creates a trailer project from an uploaded PDF with extracted metadata', async () => {
-    const pdfBlob = new Blob([Buffer.from('%PDF-1.4 fake pdf')], { type: 'application/pdf' })
-    const res = await POST(formDataRequest({ pdf: pdfBlob }))
-    const json = await res.json()
+  it('creates a trailer project directly via JSON with sourceUrl and interiorImageUrls', async () => {
+    vi.mocked(prisma.trailerProject.create).mockResolvedValueOnce({ id: 'trailer_json_1' } as any)
 
-    expect(res.status).toBe(201)
-    expect(json.id).toBe('trailer_proj_1')
-    expect(json.needsManualCover).toBe(false)
-    expect(prisma.trailerProject.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          publisherId: 'pub_1',
-          title: 'Extracted Trailer Book',
-          author: 'Extracted Author',
-          status: 'uploaded',
-        }),
-      })
-    )
-  })
-
-  it('flags needsManualCover when extraction finds no cover', async () => {
-    const { extractBookAssets } = await import('@/lib/services/ads/extract')
-    vi.mocked(extractBookAssets).mockResolvedValueOnce({
-      title: null,
-      author: null,
-      blurb: null,
-      frontCoverPng: null,
-      backCoverPng: null,
-    })
-    const pdfBlob = new Blob([Buffer.from('%PDF-1.4 fake')], { type: 'application/pdf' })
-    const res = await POST(formDataRequest({ pdf: pdfBlob }))
-    const json = await res.json()
-
-    expect(json.needsManualCover).toBe(true)
-  })
-
-  it('uses the manually-supplied front cover when provided with PDF', async () => {
-    const pdfBlob = new Blob([Buffer.from('%PDF-1.4 fake')], { type: 'application/pdf' })
-    const manualCoverBytes = Buffer.from('manual-cover-bytes')
-    const manualCoverBlob = new Blob([manualCoverBytes], { type: 'image/jpeg' })
-
-    const res = await POST(formDataRequest({ pdf: pdfBlob, frontCover: manualCoverBlob }))
-    const json = await res.json()
-
-    expect(json.needsManualCover).toBe(false)
-    expect(storeFile).toHaveBeenCalledWith(
-      expect.stringContaining('-front.png'),
-      manualCoverBytes,
-      'image/jpeg'
-    )
-  })
-
-  it('creates a trailer project from an existing book in library (JSON)', async () => {
-    vi.mocked(prisma.book.findFirst).mockResolvedValueOnce({
-      id: 'book_123',
-      publisherId: 'pub_1',
-      title: 'Existing Library Book',
-      author: 'Jane Author',
-      blurb: 'Great synopsis',
-      pdfUrl: 'https://blob.example/existing.pdf',
-      frontCoverUrl: 'https://blob.example/front.png',
-      backCoverUrl: null,
-      status: 'configured',
-      platforms: ['META'],
-      copyTone: 'literary',
-      templateKey: 'classic',
-      campaignName: 'Test',
-      campaignObjective: 'launch',
-      targetAudience: null,
-      customHook: null,
-      ctaText: 'Buy',
-      parentBookId: null,
-      includeVideo: true,
-      videoFormat: '16:9',
-      videoStyle: 'cinematic',
-      videoMood: 'epic',
-      videoLength: '30s',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })
-
-    const res = await POST(
-      new Request('http://localhost/api/trailer/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ existingBookId: 'book_123', style: 'thriller' }),
-      })
-    )
-    const json = await res.json()
-
-    expect(res.status).toBe(201)
-    expect(json.id).toBe('trailer_proj_1')
-    expect(json.isExisting).toBe(true)
-    expect(json.needsManualCover).toBe(false)
-    expect(prisma.trailerProject.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          title: 'Existing Library Book',
-          author: 'Jane Author',
-          blurb: 'Great synopsis',
-          frontCoverUrl: 'https://blob.example/front.png',
-          style: 'thriller',
-          status: 'configured',
-        }),
-      })
-    )
-  })
-
-  it('creates a trailer project via Quick Setup (No PDF) via JSON', async () => {
     const res = await POST(
       new Request('http://localhost/api/trailer/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: 'Manual Book Title',
-          author: 'Manual Author',
-          blurb: 'Quick blurb',
-          frontCoverUrl: 'https://blob.example/manual-front.png',
-          style: 'fantasy',
+          title: 'The Great Story',
+          author: 'Author Name',
+          blurb: 'A gripping tale',
+          sourceUrl: 'https://www.amazon.com/dp/B000TEST',
+          interiorImageUrls: ['https://blob.example/page1.png', 'https://blob.example/page2.png'],
+          style: 'cinematic',
+          length: '30s',
         }),
       })
     )
     const json = await res.json()
 
     expect(res.status).toBe(201)
-    expect(json.id).toBe('trailer_proj_1')
+    expect(json.id).toBe('trailer_json_1')
     expect(json.isDirect).toBe(true)
-    expect(json.needsManualCover).toBe(false)
     expect(prisma.trailerProject.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          title: 'Manual Book Title',
-          author: 'Manual Author',
-          blurb: 'Quick blurb',
-          style: 'fantasy',
-          status: 'configured',
+          publisherId: 'pub_1',
+          title: 'The Great Story',
+          author: 'Author Name',
+          blurb: 'A gripping tale',
+          sourceUrl: 'https://www.amazon.com/dp/B000TEST',
+          interiorImageUrls: ['https://blob.example/page1.png', 'https://blob.example/page2.png'],
+          style: 'cinematic',
+          length: '30s',
         }),
       })
     )
   })
 
-  it('creates a trailer project via Quick Setup (No PDF) via FormData with cover file', async () => {
-    const manualCoverBytes = Buffer.from('cover-bytes-for-quick')
-    const manualCoverBlob = new Blob([manualCoverBytes], { type: 'image/png' })
+  it('creates a trailer project via FormData with frontCover and 2 interior page images', async () => {
+    vi.mocked(prisma.trailerProject.create).mockResolvedValueOnce({ id: 'trailer_form_1' } as any)
 
-    const res = await POST(
-      formDataRequest({
-        title: 'Quick Setup Form Book',
-        author: 'Quick Author',
-        blurb: 'Exciting blurb',
-        frontCover: manualCoverBlob,
-        style: 'scifi',
-      })
-    )
-    const json = await res.json()
+    const coverBlob = new Blob([Buffer.from('cover')], { type: 'image/jpeg' })
+    const page1Blob = new Blob([Buffer.from('page1')], { type: 'image/png' })
+    const page2Blob = new Blob([Buffer.from('page2')], { type: 'image/png' })
 
-    expect(res.status).toBe(201)
-    expect(json.id).toBe('trailer_proj_1')
-    expect(json.isDirect).toBe(true)
-    expect(json.needsManualCover).toBe(false)
-    expect(prisma.trailerProject.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          title: 'Quick Setup Form Book',
-          author: 'Quick Author',
-          style: 'scifi',
-          status: 'configured',
-        }),
-      })
-    )
-  })
-
-  it('rejects a request missing a PDF file when no manual details are provided', async () => {
     const form = new FormData()
-    form.append('pdf', 'not-a-file')
+    form.append('title', 'Direct Trailer Title')
+    form.append('author', 'Author')
+    form.append('blurb', 'Hook blurb')
+    form.append('frontCover', coverBlob, 'cover.jpg')
+    form.append('interiorImages', page1Blob, 'page1.png')
+    form.append('interiorImages', page2Blob, 'page2.png')
+    form.append('style', 'fantasy')
+
     const res = await POST(
-      new Request('http://localhost/api/trailer/projects', { method: 'POST', body: form })
+      new Request('http://localhost/api/trailer/projects', {
+        method: 'POST',
+        body: form,
+      })
     )
-    expect(res.status).toBe(400)
-    expect(prisma.trailerProject.create).not.toHaveBeenCalled()
+    const json = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(json.id).toBe('trailer_form_1')
+    expect(storeFile).toHaveBeenCalledTimes(3) // 1 cover + 2 interior images
+    expect(prisma.trailerProject.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          publisherId: 'pub_1',
+          title: 'Direct Trailer Title',
+          interiorImageUrls: expect.arrayContaining([
+            'https://blob.example/file',
+            'https://blob.example/file',
+          ]),
+          style: 'fantasy',
+        }),
+      })
+    )
   })
 
-  it('rejects a non-PDF file when pdf field is provided', async () => {
-    const notAPdf = new Blob([Buffer.from('not pdf content')], { type: 'text/plain' })
-    const res = await POST(formDataRequest({ pdf: notAPdf }))
-    expect(res.status).toBe(400)
-    expect(prisma.trailerProject.create).not.toHaveBeenCalled()
+  it('creates a trailer project from an existing book in library', async () => {
+    vi.mocked(prisma.book.findFirst).mockResolvedValueOnce({
+      id: 'existing_book_1',
+      publisherId: 'pub_1',
+      title: 'Library Book',
+      author: 'Library Author',
+      blurb: 'Library Blurb',
+      pdfUrl: 'https://blob.example/book.pdf',
+      frontCoverUrl: 'https://blob.example/cover.png',
+      backCoverUrl: null,
+      sourceUrl: 'https://amazon.com/dp/B000',
+      interiorImageUrls: ['https://blob.example/spread1.png'],
+    } as any)
+
+    vi.mocked(prisma.trailerProject.create).mockResolvedValueOnce({ id: 'trailer_from_lib' } as any)
+
+    const res = await POST(
+      new Request('http://localhost/api/trailer/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          existingBookId: 'existing_book_1',
+          style: 'thriller',
+        }),
+      })
+    )
+    const json = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(json.id).toBe('trailer_from_lib')
+    expect(json.isExisting).toBe(true)
+    expect(prisma.trailerProject.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          publisherId: 'pub_1',
+          title: 'Library Book',
+          sourceUrl: 'https://amazon.com/dp/B000',
+          interiorImageUrls: ['https://blob.example/spread1.png'],
+          style: 'thriller',
+        }),
+      })
+    )
   })
 
-  it('rejects when neither PDF nor title nor cover is given', async () => {
+  it('returns 400 when neither PDF nor manual details provided', async () => {
     const res = await POST(
       new Request('http://localhost/api/trailer/projects', {
         method: 'POST',
@@ -238,5 +164,7 @@ describe('POST /api/trailer/projects', () => {
       })
     )
     expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toBe('Please provide a book PDF or enter book details.')
   })
 })
