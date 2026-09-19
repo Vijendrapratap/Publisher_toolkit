@@ -189,3 +189,29 @@ model LandingProject {
   @@index([publisherId])
 }
 
+model BookCreatorProject {
+  id              String   @id @default(cuid())
+  publisherId     String
+  title           String?
+  subtitle        String?
+  author          String?
+  bookType        String   @default("children")
+  genre           String?
+  targetAudience  String?
+  styleTheme      String?
+  difficultyLevel String?
+  promptConcept   String?  @db.Text
+  coverPrompt     String?  @db.Text
+  coverImageUrl   String?
+  status          String   @default("draft")
+  metadata        Json?
+  content         Json?
+  wordCount       Int      @default(0)
+  pageCount       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  @@index([publisherId])
+}
+
+

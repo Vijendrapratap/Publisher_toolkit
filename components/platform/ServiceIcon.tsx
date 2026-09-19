@@ -1,7 +1,9 @@
-import { Clapperboard, Headphones, LayoutTemplate, Megaphone, type LucideIcon } from 'lucide-react'
+import { BookOpen, Clapperboard, Headphones, LayoutTemplate, Megaphone, Sparkles, type LucideIcon } from 'lucide-react'
 import type { ServiceIconName } from '@/lib/services/registry'
 
 const ICONS: Record<ServiceIconName, LucideIcon> = {
+  'book-open': BookOpen,
+  sparkles: Sparkles,
   megaphone: Megaphone,
   clapperboard: Clapperboard,
   headphones: Headphones,

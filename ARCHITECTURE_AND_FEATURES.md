@@ -19,6 +19,7 @@ This document is the definitive technical manual for the **Publisher Toolkit**. 
    - [Feature 5: High-Converting Book Landing Page Studio](#feature-5-high-converting-book-landing-page-studio)
    - [Feature 6: Amazon Launch Hub & 1-Click Packaging](#feature-6-amazon-launch-hub--1-click-packaging)
    - [Feature 7: Publisher Imprint & Brand Profile Settings](#feature-7-publisher-imprint--brand-profile-settings)
+   - [Feature 8: "Create Your Book" Multi-Format Generation Studio](#feature-8-create-your-book-multi-format-generation-studio)
 4. [Prisma Data Models & Entity Relationships](#4-prisma-data-models--entity-relationships)
 5. [API Routes & Contracts Directory](#5-api-routes--contracts-directory)
 6. [Developer Playbook: How to Extend & Make Changes](#6-developer-playbook-how-to-extend--make-changes)
@@ -26,6 +27,7 @@ This document is the definitive technical manual for the **Publisher Toolkit**. 
    - [How to Add a New Visual Design Theme](#how-to-add-a-new-visual-design-theme)
    - [How to Add a New Video Motion Style or Visual Transition](#how-to-add-a-new-video-motion-style-or-visual-transition)
    - [How to Add a New TTS Voice Model or Audio Provider](#how-to-add-a-new-tts-voice-model-or-audio-provider)
+   - [How to Add a New Book Type or Creative Style](#how-to-add-a-new-book-type-or-creative-style)
    - [Testing & Quality Assurance Gate](#testing--quality-assurance-gate)
 
 ---
@@ -54,6 +56,7 @@ Publisher Toolkit transforms a single manuscript (PDF) or book cover into a **co
 flowchart TD
     subgraph ClientBrowser["Client Web Browser (Chrome / Safari / Firefox)"]
         UI_Shell["Next.js Layout & Studio Shell"]
+        UI_Creator["Create Your Book Studio (/create-book)"]
         UI_Ads["Amazon Ads & A+ Studio (/ads)"]
         UI_Trailer["Video Trailer Studio (/trailer)"]
         UI_Audio["Audiobook Studio (/audiobook)"]
@@ -63,6 +66,7 @@ flowchart TD
 
     subgraph AppRouter["Next.js 15 Server Runtime (Node.js Environment)"]
         subgraph APIRoutes["REST API & Action Layer (/api/*)"]
+            API_Creator["/api/creator/* (Book & Chapter AI Engine)"]
             API_Projects["/api/ads/projects (CRUD & Configure)"]
             API_Generate["/api/ads/projects/[id]/generate (Batch Runner)"]
             API_Download["/api/ads/projects/[id]/download (ZIP Streamer)"]
@@ -72,6 +76,7 @@ flowchart TD
         end
 
         subgraph CoreEngines["Specialized Production Engines"]
+            ENG_Creator["Book & Puzzle Generator (AI SDK + 2D Matrix Engine)"]
             ENG_Extract["PDF Ingestion & Cover Rasterizer (unpdf / pdfjs-dist)"]
             ENG_Copy["AI Copywriter (Vercel AI SDK + OpenRouter)"]
             ENG_Satori["Satori Canvas Image Renderer (React JSX to PNG)"]
@@ -126,25 +131,27 @@ sequenceDiagram
 
     Publisher->>Browser: Selects Objective, Copy Tone, Template & Video Options
     Browser->>Browser: Renders instant Remotion Live Preview
-    Publisher->>Browser: Clicks "Generate Amazon Creatives & Video"
+    Publisher->>Browser: Clicks "Generate Campaign Creatives"
     Browser->>API: POST /api/ads/projects/[id]/generate
+    API->>DB: UPDATE Book status: 'generating'
 
-    par Parallel Generation Execution
-        API->>OpenRouter: Prompt LLM for Amazon Copy & Hooks
-        OpenRouter-->>API: Headline, Primary Text, Description
-    and
-        API->>Satori: Render Amazon A+ & Sponsored Modules (970x600, 970x300, 300x300, 300x250, 1200x628)
-        Satori-->>API: High-Resolution PNG Buffers
-    and
-        opt If Video Enabled
-            API->>VideoEngine: Render 4-Scene Video with Specular Catchlights
-            VideoEngine-->>API: 1080p MP4 Buffer & Poster PNG Buffer
-        end
+    par LLM Ad Copy Generation
+        API->>OpenRouter: Generate platform copy variants (AMAZON, FACEBOOK, INSTAGRAM)
+        OpenRouter-->>API: { headlines, primaryText, descriptions, hooks }
+        API->>DB: INSERT AdCopy rows
+    and Satori Responsive Image Generation
+        API->>Satori: Render React templates across 6 standard ad & A+ sizes
+        Satori->>Storage: Save generated PNG binaries
+        Storage-->>API: Returned Image URLs
+        API->>DB: INSERT CreativeImage rows
+    and Remotion Server Video Rendering (if enabled)
+        API->>VideoEngine: Render 30s MP4 (1080p 60fps with audio)
+        VideoEngine->>Storage: Save rendered MP4 video
+        Storage-->>API: Returned Video URL
+        API->>DB: INSERT GeneratedTrailer row
     end
 
-    API->>Storage: Store all PNGs, MP4, and Poster
-    API->>DB: INSERT CreativeSet, AdCopies, CreativeImages
-    API->>DB: UPDATE Book (status: 'generated')
+    API->>DB: UPDATE Book status: 'completed'
     API-->>Browser: HTTP 201 { creativeSetId }
     Browser-->>Publisher: Displays Interactive Gallery & Amazon Launch Hub
 
@@ -167,9 +174,22 @@ flowchart TD
     RootLayout --> StudioLayout
     StudioLayout --> AccountChip
 
+    subgraph CreatorPipeline["Create Your Book Studio (/create-book)"]
+        CreatorHome["Creator Hub Page (/create-book)"]
+        CreatorNew["New Book Wizard (/create-book/new)"]
+        NewBookForm["NewBookForm (Book Types, Style Picker, Sliders)"]
+        CreatorStudio["Studio Project Page (/create-book/[projectId])"]
+        BookProjectStudio["BookProjectStudio (Master Workspace & Manuscript Export)"]
+        ChildrenViewer["ChildrenBookViewer (Spreads & Illustration Prompts)"]
+        ColoringViewer["ColoringBookViewer (Line Art Gallery & Detail Badges)"]
+        WordGameViewer["WordGameViewer (Interactive Grid & Word Bank)"]
+        NovelViewer["NovelChapterViewer (Outline & Sequential Chapter AI Writer)"]
+        AdsBridge["1-Click Amazon Ads & A+ Bridge Button"]
+    end
+
     subgraph AdsPipeline["Amazon Ads & A+ Suite (/ads)"]
         AdsNew["New Project Page (/ads/new)"]
-        NewProjectForm["NewProjectForm (PDF Upload / Library Picker)"]
+        NewProjectForm["NewProjectForm (PDF Upload / Library Picker / Product URL)"]
         AdsConfig["Configure Page (/ads/[id]/configure)"]
         ConfigureForm["ConfigureForm (Objective, Tone, Palette, Video Params)"]
         RemotionPreview["TrailerLivePreviewPlayer (Embedded Remotion Player)"]
@@ -192,6 +212,15 @@ flowchart TD
         AudiobookConfig["AudiobookConfigureForm"]
         AudiobookGallery["AudiobookPlayerGallery (Chapter Streaming & Player)"]
     end
+
+    StudioLayout --> CreatorHome
+    StudioLayout --> CreatorNew --> NewBookForm
+    StudioLayout --> CreatorStudio --> BookProjectStudio
+    BookProjectStudio --> ChildrenViewer
+    BookProjectStudio --> ColoringViewer
+    BookProjectStudio --> WordGameViewer
+    BookProjectStudio --> NovelViewer
+    BookProjectStudio --> AdsBridge --> AdsNew
 
     StudioLayout --> AdsNew --> NewProjectForm
     StudioLayout --> AdsConfig --> ConfigureForm --> RemotionPreview
@@ -434,6 +463,47 @@ Allows publishers and imprints to store their global brand parameters so they ar
 
 ---
 
+### Feature 8: "Create Your Book" Multi-Format Generation Studio
+
+#### Purpose & Business Value
+Allows authors, publishers, and self-publishing entrepreneurs to generate end-to-end commercial book manuscripts, activities, and illustrations across 5 major high-demand publishing formats. Designed to serve both high-level book generation and granular, chapter-by-chapter sequential writing with continuity context tracking. Seamlessly integrates directly with the Amazon Ads & A+ Content Studio via a 1-click bridge.
+
+#### Supported Book Formats & Engines
+1. **Children's Picture & Story Books (`children_story`)**
+   - Generates age-targeted narrative spreads (ages 2-4, 5-7, 8-12).
+   - Each spread contains page prose, emotional/character focus, and dedicated prompt engineering directives for AI illustration tools (Midjourney, DALL-E, Flux) ensuring consistent character appearances.
+2. **Coloring & Activity Books (`coloring_book`)**
+   - High-contrast, clean vector line-art prompts with strict white-background isolation and zero grayscale shading.
+   - Configurable difficulty (toddler bold outlines to intricate adult mandala).
+   - Generates theme-specific scene prompts, composition notes, and target detail levels.
+3. **Word Games & Puzzle Books (`word_games`)**
+   - **Word Search Puzzles**: Algorithmic 2D matrix engine (`buildWordSearchGrid`) that places words horizontally, vertically, and diagonally with boundary collision detection and random noise character fill. Includes interactive letter matrix and word bank UI.
+   - **Crossword Puzzles**: Grid dimension specifications, across and down clue sets, and toggleable answer keys for easy author proofing.
+4. **Chapter-by-Chapter Novels & Non-Fiction (`novel_chapters`)**
+   - Comprehensive narrative architect: generates premise, world-building rules, core cast dossiers, and structured multi-chapter outline.
+   - **Sequential AI Chapter Writer**: Dedicated generation endpoint (`POST /api/creator/projects/[id]/chapter`) allowing authors to generate chapters one-by-one with dynamic narrative continuity (previous chapter summary, scene goals, tone tracking) and live word count updates.
+5. **Short Stories & Novellas (`short_story`)**
+   - Generates complete standalone stories with narrative arcs, scene beats, and thematic depth for instant anthology publishing.
+
+#### Key Files
+- Studio Dashboard: [`app/(platform)/create-book/page.tsx`](file:///home/pratap/work/Publisher_toolkit/app/(platform)/create-book/page.tsx)
+- Creation Wizard: [`app/(platform)/create-book/new/page.tsx`](file:///home/pratap/work/Publisher_toolkit/app/(platform)/create-book/new/page.tsx)
+- Studio Workspace: [`app/(platform)/create-book/[projectId]/page.tsx`](file:///home/pratap/work/Publisher_toolkit/app/(platform)/create-book/[projectId]/page.tsx)
+- Domain Options & Schemas: [`lib/services/creator/options.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/creator/options.ts)
+- Type Definitions: [`lib/services/creator/types.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/creator/types.ts)
+- Generator & Matrix Engine: [`lib/services/creator/generator.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/creator/generator.ts)
+- Database Queries: [`lib/services/creator/queries.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/creator/queries.ts)
+- Viewer Components: [`components/creator/ChildrenBookViewer.tsx`](file:///home/pratap/work/Publisher_toolkit/components/creator/ChildrenBookViewer.tsx), [`components/creator/ColoringBookViewer.tsx`](file:///home/pratap/work/Publisher_toolkit/components/creator/ColoringBookViewer.tsx), [`components/creator/WordGameViewer.tsx`](file:///home/pratap/work/Publisher_toolkit/components/creator/WordGameViewer.tsx), [`components/creator/NovelChapterViewer.tsx`](file:///home/pratap/work/Publisher_toolkit/components/creator/NovelChapterViewer.tsx)
+- 1-Click Amazon Ads Bridge: [`app/api/creator/projects/[id]/send-to-ads/route.ts`](file:///home/pratap/work/Publisher_toolkit/app/api/creator/projects/[id]/send-to-ads/route.ts)
+
+#### Seamless Amazon Ads & A+ Content Bridge
+With one click from the Studio header (`Create Amazon Ads & A+ Content`), the project is converted into a standard `Book` record, carrying over the title, author, blurb, and illustrations, immediately unlocking the generation of:
+- Amazon A+ Hero (970×600) and Feature (970×300) banners
+- Amazon Sponsored Display creatives
+- Full promotional ad copy and launch package
+
+---
+
 ## 4. Prisma Data Models & Entity Relationships
 
 The data layer is managed with Prisma ORM targeting PostgreSQL.
@@ -444,6 +514,7 @@ erDiagram
     Publisher ||--o{ TrailerProject : "owns"
     Publisher ||--o{ AudiobookProject : "owns"
     Publisher ||--o{ LandingProject : "owns"
+    Publisher ||--o{ BookCreatorProject : "owns"
 
     Book ||--o{ CreativeSet : "has many"
     Book ||--o{ Book : "parent / child library copies"
@@ -459,6 +530,29 @@ erDiagram
         string name
         string email
         json settings
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    BookCreatorProject {
+        string id PK
+        string publisherId FK
+        string title
+        string subtitle
+        string author
+        string bookType
+        string genre
+        string targetAudience
+        string styleTheme
+        string difficultyLevel
+        string promptConcept
+        string coverPrompt
+        string coverImageUrl
+        string status
+        json metadata
+        json content
+        int wordCount
+        int pageCount
         datetime createdAt
         datetime updatedAt
     }
@@ -540,6 +634,13 @@ erDiagram
 | `/api/audiobook/projects` | `POST` | Ingest book & parse audiobook chapters | `FormData` | `{ id: string }` |
 | `/api/audiobook/projects/[id]/generate` | `POST` | Generate chapter audio via TTS engine | None | `{ fullAudioUrl: string }` |
 | `/api/landing/projects/[id]/generate` | `POST` | Generate promotional landing page | None | `{ html: string }` |
+| `/api/creator/projects` | `GET` | List all book creator projects for authenticated publisher | None | `BookCreatorProjectData[]` |
+| `/api/creator/projects` | `POST` | Create & generate new multi-format book project | `JSON (createBookProjectSchema)` | `{ id: string, bookType: string, ... }` |
+| `/api/creator/projects/[id]` | `GET` | Fetch single book creator project by ID | None | `BookCreatorProjectData` |
+| `/api/creator/projects/[id]` | `PATCH` | Update project metadata or content | `JSON` | `{ success: boolean }` |
+| `/api/creator/projects/[id]` | `DELETE` | Delete book creator project | None | `{ success: boolean }` |
+| `/api/creator/projects/[id]/chapter` | `POST` | Generate individual novel chapter with continuity context | `JSON { chapterNumber: number }` | `{ success: boolean, chapter: ChapterItem, wordCount: number }` |
+| `/api/creator/projects/[id]/send-to-ads` | `POST` | Bridge creator project to Amazon Ads & KDP A+ studio | None | `{ success: boolean, bookId: string }` |
 | `/api/files/[...path]` | `GET` | Securely stream stored asset for authorized session | Path params | Binary stream with mime |
 
 ---
@@ -596,6 +697,22 @@ erDiagram
 2. Open [`lib/services/audiobook/tts.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/audiobook/tts.ts):
    - Implement the provider request handler calling the model's API.
 3. Verify with `npx vitest run lib/services/audiobook/tts.test.ts`.
+
+---
+
+### How to Add a New Book Type or Creative Style
+1. Open [`lib/services/creator/options.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/creator/options.ts):
+   - Add your format to `BOOK_TYPES` (with key, label, description, default pages/chapters).
+   - Add specific theme/style presets to `STYLES_BY_TYPE[your_format_key]`.
+   - Update `createBookProjectSchema` if new custom parameters are needed.
+2. Open [`lib/services/creator/types.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/creator/types.ts):
+   - Define the TypeScript interface for your generated content structure.
+   - Add the new structure to `GeneratedBookContent`.
+3. Open [`lib/services/creator/generator.ts`](file:///home/pratap/work/Publisher_toolkit/lib/services/creator/generator.ts):
+   - Add the deterministic sample builder in `sampleBookContent` for offline resilience.
+   - Add format-specific prompt engineering guidance in `generateBookProjectContent`.
+4. Create or update a viewer in `components/creator/` (e.g. `YourTypeViewer.tsx`) and register it in [`components/creator/BookProjectStudio.tsx`](file:///home/pratap/work/Publisher_toolkit/components/creator/BookProjectStudio.tsx).
+5. Verify with `npx vitest run lib/services/creator/creator.test.ts`.
 
 ---
 
