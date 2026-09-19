@@ -12,7 +12,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const set = await getLatestCreativeSetForBook(book.id, publisherId)
   if (!set) return NextResponse.json({ error: 'Nothing generated yet' }, { status: 404 })
 
-  const buffer = await buildCreativeZip({ title: book.title ?? '', images: set.images, copies: set.adCopies })
+  const buffer = await buildCreativeZip({
+    title: book.title ?? '',
+    images: set.images,
+    copies: set.adCopies,
+    videoUrl: set.videoUrl,
+    videoPosterUrl: set.videoPosterUrl,
+  })
   return new Response(new Uint8Array(buffer), {
     headers: {
       'Content-Type': 'application/zip',

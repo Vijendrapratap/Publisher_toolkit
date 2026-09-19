@@ -1,8 +1,10 @@
 'use client'
+
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Check, Clapperboard, Loader2 } from 'lucide-react'
+import { Check, Clapperboard, Loader2, ShieldCheck, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
 
@@ -25,34 +27,90 @@ export function TrailerGenerateRunner({
 }) {
   const router = useRouter()
   const started = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isCancelledRef = useRef(false)
   const [stage, setStage] = useState(0)
+  const [cancelling, setCancelling] = useState(false)
+
+  const handleCancel = () => {
+    if (cancelling || isCancelledRef.current) return
+    isCancelledRef.current = true
+    setCancelling(true)
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    toast.info('Generation cancelled')
+    router.replace(`/trailer/${projectId}/configure`)
+    router.refresh()
+  }
 
   useEffect(() => {
     if (started.current) return
     started.current = true
 
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     const timer = setInterval(() => setStage((s) => Math.min(s + 1, STAGES.length - 1)), STAGE_MS)
+    timerRef.current = timer
 
     ;(async () => {
-      const res = await fetch(`/api/trailer/projects/${projectId}/generate`, {
-        method: 'POST',
-      }).catch(() => null)
+      try {
+        const res = await fetch(`/api/trailer/projects/${projectId}/generate`, {
+          method: 'POST',
+          signal: controller.signal,
+        })
 
-      clearInterval(timer)
-      if (res?.ok) {
-        setStage(STAGES.length)
-        toast.success('Your trailers are ready')
-        router.replace(`/trailer/${projectId}/results`)
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+        }
+        if (isCancelledRef.current) return
+
+        if (res.ok) {
+          setStage(STAGES.length)
+          toast.success('Your trailers are ready')
+          router.replace(`/trailer/${projectId}/results`)
+          router.refresh()
+          return
+        }
+
+        const message =
+          (await res.json().catch(() => ({})))?.error ?? 'Something went wrong rendering your video trailer.'
+        router.replace(`/trailer/${projectId}/configure?error=${encodeURIComponent(message)}`)
         router.refresh()
-        return
+      } catch (err: unknown) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+        }
+        if (isCancelledRef.current) return
+
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return
+        }
+        if (err instanceof Error && err.name === 'AbortError') {
+          return
+        }
+
+        router.replace(
+          `/trailer/${projectId}/configure?error=${encodeURIComponent(
+            'Something went wrong rendering your video trailer. Please try again.'
+          )}`
+        )
+        router.refresh()
       }
-      const message =
-        (await res?.json().catch(() => ({})))?.error ?? 'Something went wrong rendering your video trailer.'
-      router.replace(`/trailer/${projectId}/configure?error=${encodeURIComponent(message)}`)
-      router.refresh()
     })()
 
-    return () => clearInterval(timer)
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
   }, [projectId, router])
 
   const percent = Math.round((Math.min(stage + 1, STAGES.length) / STAGES.length) * 100)
@@ -65,12 +123,14 @@ export function TrailerGenerateRunner({
           <Clapperboard className="size-7 animate-pulse" aria-hidden />
         </span>
       </div>
+
       <div>
         <h2 className="font-display text-2xl font-semibold tracking-tight">Creating your book trailer</h2>
         <p className="mt-2 text-sm text-ink-muted">
           Rendering {formatCount} video cut{formatCount === 1 ? '' : 's'} ({durationLabel}) with synced soundtrack and poster frames.
         </p>
       </div>
+
       <div
         className="h-2 w-full overflow-hidden rounded-full bg-surface-2 shadow-inset"
         role="progressbar"
@@ -83,6 +143,7 @@ export function TrailerGenerateRunner({
           style={{ width: `${percent}%` }}
         />
       </div>
+
       <ol className="flex w-full flex-col gap-3 text-left" aria-live="polite">
         {STAGES.map((label, i) => {
           const done = i < stage
@@ -111,6 +172,24 @@ export function TrailerGenerateRunner({
           )
         })}
       </ol>
+
+      <div className="flex w-full flex-col items-center gap-3 border-t border-line/60 pt-6">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={handleCancel}
+          disabled={cancelling}
+          className="text-danger hover:border-danger/30 hover:bg-danger/10 hover:text-danger"
+        >
+          <XCircle className="size-4" aria-hidden />
+          {cancelling ? 'Cancelling render…' : 'Cancel generation'}
+        </Button>
+        <p className="flex items-center gap-1.5 text-xs text-ink-muted">
+          <ShieldCheck className="size-3.5" aria-hidden />
+          You can adjust scene parameters or styles anytime.
+        </p>
+      </div>
     </Card>
   )
 }

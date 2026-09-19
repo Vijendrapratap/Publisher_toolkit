@@ -29,6 +29,25 @@ describe('buildCreativeZip', () => {
     expect(copy).toContain('META')
     expect(copy).toContain('Headline: Hook')
   })
+
+  it('includes video trailer and poster if provided', async () => {
+    const read = vi.fn(async (url: string) => ({ data: Buffer.from(`data:${url}`), contentType: 'application/octet-stream' }))
+    const buffer = await buildCreativeZip(
+      {
+        title: 'Sci-Fi Novel',
+        images: [{ platform: 'AMAZON', sizeKey: 'amazon_aplus_banner_970x600', imageUrl: '/banner.png' }],
+        copies: [{ platform: 'AMAZON', headline: 'Epic Read', primaryText: 'Best space opera', description: 'Buy now' }],
+        videoUrl: '/trailer.mp4',
+        videoPosterUrl: '/poster.png',
+      },
+      read
+    )
+
+    const zip = await JSZip.loadAsync(buffer)
+    expect(zip.file('amazon/video-trailer.mp4')).not.toBeNull()
+    expect(zip.file('amazon/video-poster.png')).not.toBeNull()
+    expect(await zip.file('amazon/video-trailer.mp4')!.async('string')).toBe('data:/trailer.mp4')
+  })
 })
 
 describe('zipFileName', () => {

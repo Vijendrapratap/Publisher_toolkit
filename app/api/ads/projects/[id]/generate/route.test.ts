@@ -9,6 +9,16 @@ vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mock
 vi.mock('@/lib/services/ads/queries', () => ({ getBookForPublisher: vi.fn() }))
 vi.mock('@/lib/services/ads/copy', () => ({ generateAdCopy: vi.fn() }))
 vi.mock('@/lib/services/ads/render', () => ({ renderCreativeImages: vi.fn() }))
+vi.mock('@/lib/services/trailer/video', () => ({
+  renderTrailerVideoAndPoster: vi.fn().mockResolvedValue({
+    videoBuffer: Buffer.from('video'),
+    posterBuffer: Buffer.from('poster'),
+    durationSec: 15,
+    width: 1920,
+    height: 1080,
+    aspectRatio: '16:9',
+  }),
+}))
 vi.mock('@/lib/providers/storage', () => ({
   storeFile: vi.fn().mockResolvedValue({ url: '/api/files/ads/pub_1/creatives/x/meta_feed_1080x1080.png' }),
   readStoredFile: vi.fn().mockResolvedValue({ data: Buffer.from('cover'), contentType: 'image/png' }),

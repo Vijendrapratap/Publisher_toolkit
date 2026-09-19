@@ -596,17 +596,41 @@ function Scene3({
           }}
         >
           {coverUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={coverUrl}
-              alt=""
-              style={{
-                width: isWidescreen ? 360 * scale : 420 * scale,
-                height: isWidescreen ? 540 * scale : 630 * scale,
-                objectFit: 'cover',
-                display: 'block',
-              }}
-            />
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={coverUrl}
+                alt=""
+                style={{
+                  width: isWidescreen ? 360 * scale : 420 * scale,
+                  height: isWidescreen ? 540 * scale : 630 * scale,
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+              />
+              {/* Dynamic hyperframe specular catchlight sweep */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: `linear-gradient(${110 + bookRotateY * 3}deg, transparent ${25 + bookRotateY * 3}%, rgba(255,255,255,0.22) ${45 + bookRotateY * 3}%, transparent ${60 + bookRotateY * 3}%)`,
+                  pointerEvents: 'none',
+                  mixBlendMode: 'overlay',
+                }}
+              />
+              {/* Spine ridge shadow */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: Math.max(8, 14 * scale),
+                  background: 'linear-gradient(90deg, rgba(0,0,0,0.5) 0%, transparent 100%)',
+                  pointerEvents: 'none',
+                }}
+              />
+            </div>
           ) : (
             <div
               style={{
@@ -784,6 +808,34 @@ function Scene4({
   )
 }
 
+function HyperframeLightingSweep({ scale }: { scale: number }) {
+  const frame = useCurrentFrame()
+
+  // Transition beats at scene changes (frames 0, 75, 150, 225)
+  const beat = frame % 75
+  const flareOpacity = interpolate(beat, [0, 4, 18], [0, 0.4, 0], {
+    extrapolateRight: 'clamp',
+  })
+  const flareX = interpolate(beat, [0, 24], [-10, 110], {
+    extrapolateRight: 'clamp',
+  })
+
+  if (flareOpacity <= 0.01) return null
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        background: `linear-gradient(115deg, transparent ${flareX - 30}%, rgba(255, 255, 255, ${flareOpacity}) ${flareX}%, rgba(254, 240, 138, ${flareOpacity * 0.6}) ${flareX + 10}%, transparent ${flareX + 35}%)`,
+        mixBlendMode: 'screen',
+        zIndex: 50,
+      }}
+    />
+  )
+}
+
 export function BookTrailerComposition(props: BookTrailerCompositionProps) {
   const { durationInFrames, width, height } = useVideoConfig()
   const palette = PALETTES[props.style] ?? PALETTES.cinematic
@@ -797,6 +849,9 @@ export function BookTrailerComposition(props: BookTrailerCompositionProps) {
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
       {/* Background layer with animations and styling */}
       <AnimatedBackground palette={palette} style={props.style} scale={scale} />
+
+      {/* Hyperframes cinematic optical sweep */}
+      <HyperframeLightingSweep scale={scale} />
 
       {/* Scene 1: The Hook */}
       <Sequence from={0} durationInFrames={sceneFrames}>

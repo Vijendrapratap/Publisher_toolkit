@@ -198,4 +198,200 @@ describe('POST /api/ads/projects', () => {
     )
     expect(res.status).toBe(404)
   })
+
+  it('creates a project directly via JSON without existingBookId', async () => {
+    vi.mocked(prisma.book.create).mockResolvedValueOnce({ id: 'direct_json_book_1' } as any)
+
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Direct Book Title',
+          author: 'Direct Author',
+          blurb: 'Direct Blurb',
+          campaignName: 'Direct Campaign',
+          campaignObjective: 'lead_gen',
+          templateKey: 'bold',
+          copyTone: 'punchy',
+        }),
+      })
+    )
+    const json = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(json.id).toBe('direct_json_book_1')
+    expect(json.isDirect).toBe(true)
+    expect(prisma.book.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          publisherId: 'pub_1',
+          title: 'Direct Book Title',
+          author: 'Direct Author',
+          blurb: 'Direct Blurb',
+          pdfUrl: '',
+          frontCoverUrl: null,
+          status: 'uploaded',
+          campaignName: 'Direct Campaign',
+          campaignObjective: 'lead_gen',
+          templateKey: 'bold',
+          copyTone: 'punchy',
+        }),
+      })
+    )
+  })
+
+  it('creates a project directly via JSON with frontCoverUrl and sets status to configured', async () => {
+    vi.mocked(prisma.book.create).mockResolvedValueOnce({ id: 'direct_json_book_2' } as any)
+
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          frontCoverUrl: 'https://blob.example/cover.png',
+        }),
+      })
+    )
+    const json = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(json.id).toBe('direct_json_book_2')
+    expect(json.isDirect).toBe(true)
+    expect(prisma.book.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          publisherId: 'pub_1',
+          title: 'Untitled Book',
+          author: '',
+          blurb: '',
+          pdfUrl: '',
+          frontCoverUrl: 'https://blob.example/cover.png',
+          status: 'configured',
+        }),
+      })
+    )
+  })
+
+  it('returns 400 via JSON when neither existingBookId nor title/frontCoverUrl is provided', async () => {
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+    )
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toBe('Please provide a book PDF or enter book details.')
+    expect(prisma.book.create).not.toHaveBeenCalled()
+  })
+
+  it('creates a project directly via FormData with frontCover and title (no pdf)', async () => {
+    vi.mocked(prisma.book.create).mockResolvedValueOnce({ id: 'direct_form_book_1' } as any)
+
+    const manualFrontCoverBytes = Buffer.from('manual-front-cover-bytes')
+    const manualFrontCoverBlob = new Blob([manualFrontCoverBytes], { type: 'image/jpeg' })
+
+    const form = new FormData()
+    form.append('title', 'Direct Form Title')
+    form.append('author', 'Direct Form Author')
+    form.append('blurb', 'Direct Form Blurb')
+    form.append('frontCover', manualFrontCoverBlob)
+    form.append('campaignName', 'Direct Form Campaign')
+
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        body: form,
+      })
+    )
+    const json = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(json.id).toBe('direct_form_book_1')
+    expect(json.needsManualCover).toBe(false)
+    expect(json.isDirect).toBe(true)
+    expect(storeFile).toHaveBeenCalledWith(
+      expect.stringContaining('-front.png'),
+      manualFrontCoverBytes,
+      'image/jpeg'
+    )
+    expect(prisma.book.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          publisherId: 'pub_1',
+          title: 'Direct Form Title',
+          author: 'Direct Form Author',
+          blurb: 'Direct Form Blurb',
+          pdfUrl: '',
+          frontCoverUrl: 'https://blob.example/file',
+          status: 'configured',
+          campaignName: 'Direct Form Campaign',
+        }),
+      })
+    )
+  })
+
+  it('creates a project directly via FormData with title only (no pdf, no cover)', async () => {
+    vi.mocked(prisma.book.create).mockResolvedValueOnce({ id: 'direct_form_book_2' } as any)
+
+    const form = new FormData()
+    form.append('title', 'Direct Form Title Only')
+
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        body: form,
+      })
+    )
+    const json = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(json.id).toBe('direct_form_book_2')
+    expect(json.needsManualCover).toBe(true)
+    expect(json.isDirect).toBe(true)
+    expect(prisma.book.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          publisherId: 'pub_1',
+          title: 'Direct Form Title Only',
+          pdfUrl: '',
+          frontCoverUrl: null,
+          status: 'uploaded',
+        }),
+      })
+    )
+  })
+
+  it('returns 400 via FormData when neither pdf nor title/manualFrontCover is provided', async () => {
+    const form = new FormData()
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        body: form,
+      })
+    )
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toBe('Please provide a book PDF or enter book details.')
+    expect(prisma.book.create).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 via FormData when pdf is an empty File (0 bytes) and no manual details', async () => {
+    const form = new FormData()
+    const emptyPdfBlob = new Blob([], { type: 'application/pdf' })
+    form.append('pdf', emptyPdfBlob)
+
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        body: form,
+      })
+    )
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toBe('Please provide a book PDF or enter book details.')
+    expect(prisma.book.create).not.toHaveBeenCalled()
+  })
 })

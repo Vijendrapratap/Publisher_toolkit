@@ -6,6 +6,7 @@ import {
   BookOpen,
   ChevronDown,
   FileUp,
+  Info,
   Library,
   Megaphone,
   Palette,
@@ -13,6 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -41,11 +43,17 @@ export interface LibraryBookItem {
 
 export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookItem[] }) {
   const router = useRouter()
-  const [tab, setTab] = useState<'library' | 'upload'>('upload')
+  const [tab, setTab] = useState<'library' | 'quick' | 'upload'>('upload')
   const [library, setLibrary] = useState<LibraryBookItem[]>(initialBooks ?? [])
   const [loadingLibrary, setLoadingLibrary] = useState(!initialBooks)
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Quick setup state
+  const [quickTitle, setQuickTitle] = useState('')
+  const [quickAuthor, setQuickAuthor] = useState('')
+  const [quickBlurb, setQuickBlurb] = useState('')
+  const [quickCover, setQuickCover] = useState<File | null>(null)
 
   // Campaign settings for existing book or new upload
   const [campaignName, setCampaignName] = useState('')
@@ -84,7 +92,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
           }
         }
       } catch {
-        // Fallback gracefully to upload mode
+        // Fallback gracefully to quick mode
       } finally {
         setLoadingLibrary(false)
       }
@@ -137,6 +145,44 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
       return
     }
 
+    if (tab === 'quick') {
+      const titleToUse = quickTitle.trim() || campaignName.trim()
+      if (!titleToUse && !quickCover) {
+        setPending(false)
+        setError('Please enter a book title to create your campaign.')
+        return
+      }
+
+      const body = new FormData()
+      body.append('title', titleToUse || 'Untitled Book')
+      body.append('author', quickAuthor.trim())
+      body.append('blurb', quickBlurb.trim())
+      if (quickCover) body.append('frontCover', quickCover)
+      body.append('campaignName', campaignName.trim() || `${titleToUse || 'New'} - Campaign`)
+      body.append('campaignObjective', campaignObjective)
+      body.append('templateKey', templateKey)
+      body.append('copyTone', copyTone)
+      body.append('ctaText', ctaText)
+
+      const res = await fetch('/api/ads/projects', { method: 'POST', body })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPending(false)
+        setError(json.error ?? 'Something went wrong creating your campaign. Please try again.')
+        return
+      }
+
+      if (json.needsManualCover) {
+        toast.success('Book details saved', { description: 'Please add a cover image to generate your creatives.' })
+        router.push(`/ads/${json.id}/upload`)
+      } else {
+        toast.success('Campaign created', { description: 'Ready to configure and generate creatives.' })
+        router.push(`/ads/${json.id}/configure`)
+      }
+      router.refresh()
+      return
+    }
+
     // Tab is upload
     if (!pdf) {
       setPending(false)
@@ -173,15 +219,16 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
       b.author.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const selectedBook = library.find((b) => b.id === selectedBookId)
-
   return (
     <Card className="p-6 sm:p-8">
       {/* Tab Switcher */}
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-line pb-4">
+      <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-line pb-4">
         <button
           type="button"
-          onClick={() => setTab('library')}
+          onClick={() => {
+            setTab('library')
+            setError(null)
+          }}
           className={cn(
             'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
             tab === 'library'
@@ -205,7 +252,35 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
 
         <button
           type="button"
-          onClick={() => setTab('upload')}
+          onClick={() => {
+            setTab('quick')
+            setError(null)
+          }}
+          className={cn(
+            'relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
+            tab === 'quick'
+              ? 'bg-accent text-on-accent shadow-subtle'
+              : 'border border-accent/30 bg-accent-soft/30 text-ink hover:bg-accent-soft/50'
+          )}
+        >
+          <Zap className="size-4 text-amber-500" aria-hidden />
+          Quick setup (No PDF)
+          <span
+            className={cn(
+              'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+              tab === 'quick' ? 'bg-white/20 text-white' : 'bg-accent text-on-accent'
+            )}
+          >
+            Recommended
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setTab('upload')
+            setError(null)
+          }}
           className={cn(
             'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors',
             tab === 'upload'
@@ -214,12 +289,12 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
           )}
         >
           <FileUp className="size-4" aria-hidden />
-          Upload new book PDF
+          Upload book PDF
         </button>
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
-        {tab === 'library' ? (
+        {tab === 'library' && (
           <div className="flex flex-col gap-6">
             <div>
               <h2 className="font-display text-lg font-semibold">Select a book from your library</h2>
@@ -236,10 +311,15 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line p-8 text-center">
                 <BookOpen className="size-8 text-ink-muted" aria-hidden />
                 <p className="mt-3 font-medium">No books uploaded yet</p>
-                <p className="mt-1 text-sm text-ink-muted">Switch to the upload tab to add your first book.</p>
-                <Button type="button" variant="secondary" size="sm" className="mt-4" onClick={() => setTab('upload')}>
-                  Upload book PDF
-                </Button>
+                <p className="mt-1 text-sm text-ink-muted">Start with our quick setup or upload your first book PDF.</p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  <Button type="button" variant="primary" size="sm" onClick={() => setTab('quick')}>
+                    Quick setup (No PDF)
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setTab('upload')}>
+                    Upload book PDF
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-4">
@@ -292,8 +372,95 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
               </div>
             )}
           </div>
-        ) : (
+        )}
+
+        {tab === 'quick' && (
           <div className="flex flex-col gap-6">
+            {/* Reassuring Banner */}
+            <div className="flex items-start gap-3.5 rounded-2xl border border-accent/25 bg-accent-soft/30 p-4">
+              <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+              <div className="text-sm">
+                <p className="font-semibold text-ink">Token-efficient & fast setup</p>
+                <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">
+                  Skip uploading large PDF files. All you need for ads is the book title, a short blurb, and your cover image.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label htmlFor="quickTitle" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  Book title <span className="text-danger">*</span>
+                </label>
+                <input
+                  id="quickTitle"
+                  type="text"
+                  value={quickTitle}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setQuickTitle(val)
+                    if (error) setError(null)
+                    if (!campaignName || campaignName.endsWith(' - Campaign') || campaignName === 'New Campaign') {
+                      setCampaignName(val.trim() ? `${val.trim()} - Campaign` : '')
+                    }
+                  }}
+                  placeholder="e.g. The Midnight Library"
+                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="quickAuthor" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  Author
+                </label>
+                <input
+                  id="quickAuthor"
+                  type="text"
+                  value={quickAuthor}
+                  onChange={(e) => setQuickAuthor(e.target.value)}
+                  placeholder="e.g. Matt Haig"
+                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="quickBlurb" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  Blurb / Description
+                </label>
+                <textarea
+                  id="quickBlurb"
+                  rows={4}
+                  value={quickBlurb}
+                  onChange={(e) => setQuickBlurb(e.target.value)}
+                  placeholder="Short synopsis, tagline, or back-cover blurb to inspire ad copy…"
+                  className="mt-1.5 w-full rounded-xl border border-line bg-surface-2 px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <Dropzone
+                  id="quickCover"
+                  label="Front cover image (optional, recommended)"
+                  rule={COVER_RULE}
+                  file={quickCover}
+                  onFileChange={setQuickCover}
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'upload' && (
+          <div className="flex flex-col gap-6">
+            {/* Informational Tip Box */}
+            <div className="flex items-start gap-3 rounded-2xl border border-line bg-surface-2/60 p-4 text-xs text-ink-muted">
+              <Info className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+              <p className="leading-relaxed">
+                <strong className="font-semibold text-ink">Tip:</strong> Ads only use the title, blurb, and cover. Interior book pages and images are never sent to AI. If you already have your cover image and blurb, use the Quick setup tab to save time and bandwidth.
+              </p>
+            </div>
+
             <Dropzone id="pdf" label="Book PDF" rule={PDF_RULE} file={pdf} onFileChange={setPdf} />
 
             <div className="flex flex-col gap-4">
@@ -333,7 +500,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
                 type="text"
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="e.g. Summer Pre-Order Blitz"
+                placeholder={quickTitle ? `${quickTitle} - Campaign` : 'e.g. Summer Pre-Order Blitz'}
                 className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
               />
             </div>
@@ -376,7 +543,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
                       'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all',
                       isSelected
                         ? 'border-accent bg-accent-soft/80 shadow-inset ring-2 ring-accent/30'
-                        : 'border-transparent bg-surface hover:border-accent/40'
+                        : 'border-transparent bg-surface shadow-subtle hover:border-accent/40'
                     )}
                   >
                     <span className="text-xs font-bold text-accent">{obj.badge}</span>
@@ -404,7 +571,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
                       'flex flex-col overflow-hidden rounded-xl border text-left transition-all',
                       isSelected
                         ? 'border-accent shadow-inset ring-2 ring-accent/30'
-                        : 'border-transparent bg-surface hover:border-accent/40'
+                        : 'border-transparent bg-surface shadow-subtle hover:border-accent/40'
                     )}
                   >
                     <div
@@ -441,13 +608,15 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
             type="submit"
             size="lg"
             loading={pending}
-            disabled={tab === 'library' ? !selectedBookId : !pdf}
+            disabled={pending}
           >
             {pending
               ? 'Setting up campaign…'
               : tab === 'library'
                 ? 'Create campaign for book'
-                : 'Upload and continue'}
+                : tab === 'quick'
+                  ? 'Create campaign'
+                  : 'Upload and continue'}
           </Button>
         </div>
       </form>

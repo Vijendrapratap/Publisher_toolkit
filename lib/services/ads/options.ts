@@ -2,9 +2,7 @@ import { z } from 'zod'
 import type { AdPlatform } from './copy'
 
 export const PLATFORMS: { key: AdPlatform; label: string; description: string }[] = [
-  { key: 'META', label: 'Meta', description: 'Facebook & Instagram feed and stories' },
-  { key: 'GOOGLE', label: 'Google', description: 'Display network banners' },
-  { key: 'AMAZON', label: 'Amazon', description: 'Sponsored display, downloaded for manual upload' },
+  { key: 'AMAZON', label: 'Amazon Ads & A+ Content', description: 'Sponsored display, KDP A+ content modules & video trailers' },
 ]
 
 export const TONES = [
@@ -76,42 +74,42 @@ export const CAMPAIGN_OBJECTIVES = [
   {
     key: 'launch',
     label: 'New Release / Launch Blitz',
-    badge: '✦ NEW RELEASE',
+    badge: 'NEW RELEASE',
     description: 'Announce arrival, build launch week momentum',
     defaultCta: 'Order Your Copy Today',
   },
   {
     key: 'preorder',
     label: 'Pre-Order & First Edition',
-    badge: '★ PRE-ORDER NOW',
+    badge: 'PRE-ORDER NOW',
     description: 'Build anticipation, exclusive first-run perks',
     defaultCta: 'Pre-Order Today',
   },
   {
     key: 'discount',
     label: 'Price Drop & 99¢ Promo',
-    badge: '★ LIMITED TIME DEAL',
+    badge: 'LIMITED TIME DEAL',
     description: 'Drive high-volume downloads with limited discount',
     defaultCta: 'Claim 99¢ Special Deal',
   },
   {
     key: 'review_quote',
     label: 'Critical Acclaim & Awards',
-    badge: '★ 5-STAR CRITICS’ CHOICE',
+    badge: "5-STAR CRITICS' CHOICE",
     description: 'Highlight praise from reviewers and fellow authors',
     defaultCta: 'Read the Acclaimed Story',
   },
   {
     key: 'tropes',
     label: 'Tropes & Reader Aesthetic',
-    badge: '✦ COMMUNITY FAVORITE',
+    badge: 'COMMUNITY FAVORITE',
     description: 'Target specific reader hooks, tropes and vibes',
     defaultCta: 'Start Reading Free Sample',
   },
   {
     key: 'evergreen',
     label: 'Evergreen Discovery',
-    badge: '✦ BESTSELLING READ',
+    badge: 'BESTSELLING READ',
     description: 'Continuous backlist acquisition and reader finding',
     defaultCta: 'Get Your Copy on Amazon',
   },
@@ -147,6 +145,11 @@ export const projectUpdateSchema = z
     targetAudience: z.string().trim().max(300),
     customHook: z.string().trim().max(200),
     ctaText: z.string().trim().max(100),
+    includeVideo: z.boolean().optional(),
+    videoFormat: z.enum(['16:9', '1:1', '9:16']).optional(),
+    videoStyle: z.enum(['cinematic', 'fantasy', 'thriller', 'scifi', 'romance', 'minimal', 'dramatic', 'energetic']).optional(),
+    videoMood: z.enum(['suspenseful', 'epic', 'ambient', 'upbeat', 'emotional']).optional(),
+    videoLength: z.enum(['15s', '30s', '60s']).optional(),
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, 'Nothing to update')

@@ -469,6 +469,20 @@ async function renderScene3(
         ctx.shadowBlur = 40 * scale
         ctx.shadowOffsetY = 20 * scale
         ctx.drawImage(img, coverX, coverY, coverW, coverH)
+        // Hyperframes specular catchlight sheen over book cover
+        const sheenGrad = ctx.createLinearGradient(coverX, coverY, coverX + coverW, coverY + coverH)
+        sheenGrad.addColorStop(0, 'rgba(255,255,255,0.22)')
+        sheenGrad.addColorStop(0.35, 'rgba(255,255,255,0.06)')
+        sheenGrad.addColorStop(1, 'rgba(0,0,0,0.25)')
+        ctx.fillStyle = sheenGrad
+        ctx.fillRect(coverX, coverY, coverW, coverH)
+
+        // Spine depth ridge shadow
+        const spineGrad = ctx.createLinearGradient(coverX, coverY, coverX + 16 * scale, coverY)
+        spineGrad.addColorStop(0, 'rgba(0,0,0,0.55)')
+        spineGrad.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = spineGrad
+        ctx.fillRect(coverX, coverY, 16 * scale, coverH)
         ctx.restore()
       } catch {
         drawFallbackCover(ctx, coverX, coverY, coverW, coverH, title, author, palette, scale)
@@ -513,6 +527,21 @@ async function renderScene3(
         ctx.shadowBlur = 45 * scale
         ctx.shadowOffsetY = 25 * scale
         ctx.drawImage(img, coverX, coverY, coverW, coverH)
+
+        // Hyperframes specular catchlight sheen over book cover
+        const sheenGrad = ctx.createLinearGradient(coverX, coverY, coverX + coverW, coverY + coverH)
+        sheenGrad.addColorStop(0, 'rgba(255,255,255,0.22)')
+        sheenGrad.addColorStop(0.35, 'rgba(255,255,255,0.06)')
+        sheenGrad.addColorStop(1, 'rgba(0,0,0,0.25)')
+        ctx.fillStyle = sheenGrad
+        ctx.fillRect(coverX, coverY, coverW, coverH)
+
+        // Spine depth ridge shadow
+        const spineGrad = ctx.createLinearGradient(coverX, coverY, coverX + 16 * scale, coverY)
+        spineGrad.addColorStop(0, 'rgba(0,0,0,0.55)')
+        spineGrad.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = spineGrad
+        ctx.fillRect(coverX, coverY, 16 * scale, coverH)
         ctx.restore()
       } catch {
         drawFallbackCover(ctx, coverX, coverY, coverW, coverH, title, author, palette, scale)

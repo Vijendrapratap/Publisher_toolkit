@@ -2,7 +2,7 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { AlertCircle, Check, Palette, Sparkles, Target } from 'lucide-react'
+import { AlertCircle, Check, Film, Layers, Palette, Sparkles, Target, Tv, Video } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
@@ -20,6 +20,17 @@ import {
 import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
 import { sampleAdCopy } from '@/lib/services/ads/sampleCopy'
 import { nextRadioIndex } from '@/lib/ui/radioKeys'
+import { TrailerLivePreviewPlayer } from '@/components/trailer/TrailerLivePreviewPlayer'
+import {
+  STYLE_OPTIONS,
+  MUSIC_MOOD_OPTIONS,
+  LENGTH_OPTIONS,
+  ASPECT_RATIO_OPTIONS,
+  type TrailerStyle,
+  type TrailerMusicMood,
+  type TrailerLength,
+  type TrailerAspectRatio,
+} from '@/lib/services/trailer/options'
 
 const sizesFor = (platform: AdPlatform) =>
   CREATIVE_SIZES.filter((s) => s.platform === platform).map((s) => `${s.width}×${s.height}`)
@@ -55,6 +66,11 @@ export function ConfigureForm({
     targetAudience?: string | null
     customHook?: string | null
     ctaText?: string | null
+    includeVideo?: boolean
+    videoFormat?: TrailerAspectRatio
+    videoStyle?: TrailerStyle
+    videoMood?: TrailerMusicMood
+    videoLength?: TrailerLength
   }
   book: { title: string; author: string; blurb: string; coverUrl: string | null }
   error?: string
@@ -70,6 +86,14 @@ export function ConfigureForm({
   const [targetAudience, setTargetAudience] = useState(initial.targetAudience ?? '')
   const [customHook, setCustomHook] = useState(initial.customHook ?? '')
   const [ctaText, setCtaText] = useState(initial.ctaText ?? CTA_PRESETS[0])
+
+  const [includeVideo, setIncludeVideo] = useState(initial.includeVideo ?? true)
+  const [videoFormat, setVideoFormat] = useState<TrailerAspectRatio>(initial.videoFormat ?? '16:9')
+  const [videoStyle, setVideoStyle] = useState<TrailerStyle>(
+    (initial.videoStyle as TrailerStyle) || (initial.templateKey as TrailerStyle) || 'cinematic'
+  )
+  const [videoMood, setVideoMood] = useState<TrailerMusicMood>(initial.videoMood ?? 'epic')
+  const [videoLength, setVideoLength] = useState<TrailerLength>(initial.videoLength ?? '15s')
 
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -102,6 +126,11 @@ export function ConfigureForm({
         targetAudience: targetAudience.trim() || undefined,
         customHook: customHook.trim() || undefined,
         ctaText: ctaText.trim() || undefined,
+        includeVideo,
+        videoFormat,
+        videoStyle,
+        videoMood,
+        videoLength,
       }),
     })
     if (!res.ok) {
@@ -233,43 +262,101 @@ export function ConfigureForm({
       </Card>
 
       {/* Platforms Selection */}
+      {/* Platforms Selection & Amazon Suite */}
       <Card className="p-6">
         <fieldset>
-          <legend className="font-display text-lg font-semibold">Where will these ads run?</legend>
-          <p className="text-sm text-ink-muted">We’ll make every size each platform needs.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="flex items-center gap-2">
+            <Layers className="size-4 text-accent" aria-hidden />
+            <legend className="font-display text-lg font-semibold">Amazon Advertising & KDP A+ Content Suite</legend>
+          </div>
+          <p className="mt-1 text-sm text-ink-muted">
+            Engineered specifically for Amazon Kindle Direct Publishing (KDP) and Amazon Advertising Console.
+          </p>
+          <div className="mt-4 grid gap-3">
             {PLATFORMS.map((p) => {
               const selected = platforms.includes(p.key)
               return (
-                <button
+                <div
                   key={p.key}
-                  type="button"
-                  role="checkbox"
-                  aria-checked={selected}
-                  onClick={() => togglePlatform(p.key)}
                   className={cn(
-                    'relative flex flex-col items-start gap-2 rounded-2xl border border-transparent p-4 text-left transition-all',
+                    'relative flex flex-col gap-3 rounded-2xl border p-5 transition-all',
                     selected
-                      ? 'border-accent bg-accent-soft/60 shadow-inset ring-2 ring-accent/30'
-                      : 'bg-surface shadow-subtle hover:border-accent/40'
+                      ? 'border-accent bg-accent-soft/40 shadow-inset ring-2 ring-accent/20'
+                      : 'border-line bg-surface shadow-subtle'
                   )}
                 >
-                  <span
-                    className={cn(
-                      'absolute right-3 top-3 grid size-5 place-items-center rounded-full border',
-                      selected ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface-2'
-                    )}
-                  >
-                    {selected && <Check className="size-3" aria-hidden />}
-                  </span>
-                  <span className="font-semibold">{p.label}</span>
-                  <span className="text-xs text-ink-muted">{p.description}</span>
-                  <span className="mt-1 flex flex-wrap gap-1">
-                    {sizesFor(p.key).map((s) => (
-                      <span key={s} className="rounded-md bg-surface-2/80 px-1.5 py-0.5 font-mono text-[11px] text-ink-muted">{s}</span>
-                    ))}
-                  </span>
-                </button>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-ink">{p.label}</span>
+                        <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-bold text-accent">
+                          Primary
+                        </span>
+                      </div>
+                      <p className="text-xs text-ink-muted mt-0.5">{p.description}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={selected}
+                      onClick={() => togglePlatform(p.key)}
+                      className={cn(
+                        'grid size-6 place-items-center rounded-full border transition-colors',
+                        selected ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface-2'
+                      )}
+                    >
+                      {selected && <Check className="size-3.5" aria-hidden />}
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3 pt-2 sm:grid-cols-2">
+                    <div className="rounded-xl bg-surface/80 p-3 border border-line/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-accent">
+                          Amazon KDP A+ Content Modules
+                        </span>
+                        <span className="text-[10px] font-mono text-ink-muted">KDP Enhanced</span>
+                      </div>
+                      <ul className="mt-2 space-y-1.5 text-xs text-ink-muted">
+                        <li className="flex items-center justify-between">
+                          <span>Standard Image Header Banner</span>
+                          <span className="font-mono text-[11px] font-semibold text-ink">970×600</span>
+                        </li>
+                        <li className="flex items-center justify-between">
+                          <span>Standard Technical / Feature Banner</span>
+                          <span className="font-mono text-[11px] font-semibold text-ink">970×300</span>
+                        </li>
+                        <li className="flex items-center justify-between">
+                          <span>Standard Quad Module / Single Square</span>
+                          <span className="font-mono text-[11px] font-semibold text-ink">300×300</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="rounded-xl bg-surface/80 p-3 border border-line/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-accent">
+                          Amazon Sponsored Ads & Video
+                        </span>
+                        <span className="text-[10px] font-mono text-ink-muted">AMS Console</span>
+                      </div>
+                      <ul className="mt-2 space-y-1.5 text-xs text-ink-muted">
+                        <li className="flex items-center justify-between">
+                          <span>Sponsored Display & Lockscreen Ad</span>
+                          <span className="font-mono text-[11px] font-semibold text-ink">300×250</span>
+                        </li>
+                        <li className="flex items-center justify-between">
+                          <span>Sponsored Brands Headline Banner</span>
+                          <span className="font-mono text-[11px] font-semibold text-ink">1200×628</span>
+                        </li>
+                        <li className="flex items-center justify-between">
+                          <span>Sponsored Brands Video Trailer</span>
+                          <span className="font-mono text-[11px] font-semibold text-ink">16:9 HD MP4</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               )
             })}
           </div>
@@ -377,6 +464,152 @@ export function ConfigureForm({
         </fieldset>
       </Card>
 
+      {/* Amazon Video Trailer & Hyperframes Motion Suite */}
+      <Card className="p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-9 place-items-center rounded-xl bg-accent/15 text-accent">
+              <Film className="size-5" aria-hidden />
+            </span>
+            <div>
+              <h3 className="font-display text-lg font-semibold">Amazon Sponsored Brands Video Trailer</h3>
+              <p className="text-sm text-ink-muted">
+                Render a Remotion video trailer with dynamic 3D depth, specular catchlights, kinetic typography, and motion sweeps.
+              </p>
+            </div>
+          </div>
+          <label className="relative inline-flex cursor-pointer items-center gap-2 self-start sm:self-auto">
+            <input
+              type="checkbox"
+              checked={includeVideo}
+              onChange={(e) => setIncludeVideo(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-surface-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+            <span className="text-sm font-medium">{includeVideo ? 'Video Enabled' : 'Video Disabled'}</span>
+          </label>
+        </div>
+
+        {includeVideo && (
+          <div className="mt-6 flex flex-col gap-6 border-t border-line/60 pt-6">
+            <div className="grid gap-6 xl:grid-cols-[1fr_24rem]">
+              <div className="flex flex-col gap-5">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                    Video Aspect Ratio / Placement
+                  </label>
+                  <div className="mt-2 grid grid-cols-3 gap-2.5">
+                    {ASPECT_RATIO_OPTIONS.map((asp) => (
+                      <button
+                        key={asp.key}
+                        type="button"
+                        onClick={() => setVideoFormat(asp.key)}
+                        className={cn(
+                          'flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition-all',
+                          videoFormat === asp.key
+                            ? 'border-accent bg-accent-soft/60 ring-2 ring-accent/30 font-semibold'
+                            : 'border-line bg-surface hover:border-accent/40'
+                        )}
+                      >
+                        <span className="text-sm font-semibold">{asp.key}</span>
+                        <span className="text-[11px] text-ink-muted leading-tight">
+                          {asp.key === '16:9' ? 'Amazon Sponsored (Rec.)' : asp.key === '1:1' ? 'Square Feed' : 'Vertical Reels'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                      Trailer Length
+                    </label>
+                    <select
+                      value={videoLength}
+                      onChange={(e) => setVideoLength(e.target.value as TrailerLength)}
+                      className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                    >
+                      {LENGTH_OPTIONS.map((l) => (
+                        <option key={l.key} value={l.key}>
+                          {l.label} ({l.durationSec}s)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                      Audio Mood & Atmosphere
+                    </label>
+                    <select
+                      value={videoMood}
+                      onChange={(e) => setVideoMood(e.target.value as TrailerMusicMood)}
+                      className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                    >
+                      {MUSIC_MOOD_OPTIONS.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.label} ({m.description})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                    Visual Cinematics & Motion Style
+                  </label>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {STYLE_OPTIONS.map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        onClick={() => setVideoStyle(s.key)}
+                        className={cn(
+                          'flex flex-col items-start gap-0.5 rounded-xl border p-2.5 text-left transition-all',
+                          videoStyle === s.key
+                            ? 'border-accent bg-accent-soft/60 ring-2 ring-accent/30 font-semibold'
+                            : 'border-line bg-surface hover:border-accent/40'
+                        )}
+                      >
+                        <span className="text-xs font-semibold">{s.label}</span>
+                        <span className="line-clamp-1 text-[10px] text-ink-muted">{s.tagline}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Remotion Live Preview */}
+              <div className="flex flex-col gap-2 rounded-2xl bg-surface-2 p-4 shadow-inset">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                    Remotion Live Preview
+                  </span>
+                  <span className="rounded-md bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
+                    Hyperframes Engine
+                  </span>
+                </div>
+                <div className="grid place-items-center overflow-hidden rounded-xl bg-canvas p-2">
+                  <TrailerLivePreviewPlayer
+                    title={book.title || 'Untitled Book'}
+                    author={book.author || 'Author'}
+                    blurb={book.blurb || 'A gripping journey waiting to be discovered.'}
+                    hookText={customHook || previewHeadline}
+                    ctaText={ctaText}
+                    style={videoStyle}
+                    musicMood={videoMood}
+                    coverUrl={book.coverUrl}
+                    defaultAspectRatio={videoFormat}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+
       {error && (
         <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
           {error}
@@ -387,10 +620,10 @@ export function ConfigureForm({
         <span className="text-sm text-ink-muted">
           {platforms.length === 0
             ? 'No platforms selected'
-            : `${CREATIVE_SIZES.filter((s) => platforms.includes(s.platform)).length} ad sizes`}
+            : `${CREATIVE_SIZES.filter((s) => platforms.includes(s.platform)).length} image sizes${includeVideo ? ' + 1 HD video trailer' : ''}`}
         </span>
-        <Button type="submit" size="lg" loading={pending} disabled={platforms.length === 0}>
-          <Sparkles className="size-4" aria-hidden /> Generate creatives
+        <Button type="submit" size="lg" loading={pending} disabled={pending}>
+          <Sparkles className="size-4" aria-hidden /> Generate Amazon Creatives & Video
         </Button>
       </div>
     </form>

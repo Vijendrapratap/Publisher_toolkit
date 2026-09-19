@@ -24,7 +24,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const details = { title: book.title ?? '', author: book.author ?? '', blurb: book.blurb ?? '' }
 
   try {
-    const coverDataUri = toDataUri(await readStoredFile(book.frontCoverUrl))
+    const coverFile = await readStoredFile(book.frontCoverUrl)
+    const coverDataUri = toDataUri(coverFile)
     const objective = getCampaignObjective(book.campaignObjective)
     const [variants, renderedImages] = await Promise.all([
       generateAdCopy(details, {
@@ -64,6 +65,47 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       })
     )
 
+    let videoUrl: string | null = null
+    let videoPosterUrl: string | null = null
+    let videoDuration: number | null = null
+
+    if (book.includeVideo !== false) {
+      try {
+        const { renderTrailerVideoAndPoster } = await import('@/lib/services/trailer/video')
+        const videoOutput = await renderTrailerVideoAndPoster({
+          title: details.title,
+          author: details.author,
+          blurb: details.blurb,
+          length: (book.videoLength as any) ?? '15s',
+          style: (book.videoStyle as any) ?? (book.templateKey as any) ?? 'cinematic',
+          musicMood: (book.videoMood as any) ?? 'epic',
+          aspectRatio: (book.videoFormat as any) ?? '16:9',
+          coverPngBuffer: coverFile.data,
+          hookText: book.customHook ?? undefined,
+          ctaText: book.ctaText ?? objective.defaultCta,
+        })
+
+        const [videoUpload, posterUpload] = await Promise.all([
+          storeFile(
+            `ads/${publisherId}/creatives/${creativeSetId}/video-trailer.mp4`,
+            videoOutput.videoBuffer,
+            'video/mp4'
+          ),
+          storeFile(
+            `ads/${publisherId}/creatives/${creativeSetId}/video-poster.png`,
+            videoOutput.posterBuffer,
+            'image/png'
+          ),
+        ])
+
+        videoUrl = videoUpload.url
+        videoPosterUrl = posterUpload.url
+        videoDuration = videoOutput.durationSec
+      } catch (videoErr) {
+        console.warn('Video trailer generation in ads pipeline skipped or failed:', videoErr)
+      }
+    }
+
     await prisma.book.update({
       where: { id: book.id },
       data: {
@@ -74,6 +116,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
             campaignName: book.campaignName,
             campaignObjective: book.campaignObjective,
             templateKey: book.templateKey,
+            videoUrl,
+            videoPosterUrl,
+            videoDuration,
             adCopies: {
               createMany: {
                 data: copyRows.map(({ platform, headline, primaryText, description }) => ({

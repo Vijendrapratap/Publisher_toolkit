@@ -48,3 +48,87 @@ export function getGeneratedTrailerForPublisher(
     },
   })
 }
+
+export async function getPublisherTrailerBookLibrary(publisherId: string) {
+  const [books, trailers] = await Promise.all([
+    prisma.book.findMany({
+      where: { publisherId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        blurb: true,
+        frontCoverUrl: true,
+        createdAt: true,
+      },
+    }),
+    prisma.trailerProject.findMany({
+      where: { publisherId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        blurb: true,
+        frontCoverUrl: true,
+        createdAt: true,
+      },
+    }),
+  ])
+
+  const map = new Map<
+    string,
+    {
+      id: string
+      title: string
+      author: string
+      blurb: string
+      frontCoverUrl: string | null
+      createdAt: Date
+      source: 'book' | 'trailer'
+    }
+  >()
+
+  for (const b of books) {
+    const key = (b.title || b.id).trim().toLowerCase()
+    if (!map.has(key)) {
+      map.set(key, {
+        id: b.id,
+        title: b.title || 'Untitled book',
+        author: b.author || '',
+        blurb: b.blurb || '',
+        frontCoverUrl: b.frontCoverUrl,
+        createdAt: b.createdAt,
+        source: 'book',
+      })
+    } else {
+      const existing = map.get(key)!
+      if (!existing.frontCoverUrl && b.frontCoverUrl) {
+        existing.frontCoverUrl = b.frontCoverUrl
+      }
+    }
+  }
+
+  for (const t of trailers) {
+    const key = (t.title || t.id).trim().toLowerCase()
+    if (!map.has(key)) {
+      map.set(key, {
+        id: t.id,
+        title: t.title || 'Untitled book',
+        author: t.author || '',
+        blurb: t.blurb || '',
+        frontCoverUrl: t.frontCoverUrl,
+        createdAt: t.createdAt,
+        source: 'trailer',
+      })
+    } else {
+      const existing = map.get(key)!
+      if (!existing.frontCoverUrl && t.frontCoverUrl) {
+        existing.frontCoverUrl = t.frontCoverUrl
+      }
+    }
+  }
+
+  return Array.from(map.values())
+}

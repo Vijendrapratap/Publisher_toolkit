@@ -47,10 +47,8 @@ const AVAILABLE_GENRES = [
 
 export function SettingsForm({ initial }: { initial: PublisherSettings }) {
   const [settings, setSettings] = useState<PublisherSettings>(initial)
-  const [activeTab, setActiveTab] = useState<'ai' | 'connectors' | 'brand' | 'retail'>('ai')
+  const [activeTab, setActiveTab] = useState<'ai' | 'brand' | 'retail'>('ai')
   const [saving, setSaving] = useState(false)
-  const [testingMeta, setTestingMeta] = useState(false)
-  const [testingGoogle, setTestingGoogle] = useState(false)
   const [copiedId, setCopiedId] = useState(false)
 
   // OpenRouter key state
@@ -158,33 +156,6 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
     }
   }
 
-  const handleTestMetaMcp = () => {
-    setTestingMeta(true)
-    setTimeout(() => {
-      setTestingMeta(false)
-      toast.success('Meta Ads MCP Server Connected!', {
-        description: 'Tools available: meta_create_campaign, meta_sync_audiences, meta_pull_insights.',
-      })
-      setSettings((prev) => ({
-        ...prev,
-        metaConnector: { ...prev.metaConnector, status: 'connected' },
-      }))
-    }, 900)
-  }
-
-  const handleTestGoogleMcp = () => {
-    setTestingGoogle(true)
-    setTimeout(() => {
-      setTestingGoogle(false)
-      toast.success('Google Ads MCP Server Connected!', {
-        description: 'Tools available: google_deploy_display_creatives, google_conversion_sync.',
-      })
-      setSettings((prev) => ({
-        ...prev,
-        googleConnector: { ...prev.googleConnector, status: 'connected' },
-      }))
-    }, 900)
-  }
 
   const toggleGenre = (genre: string) => {
     const current = settings.brand.primaryGenres || []
@@ -207,11 +178,11 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
               <Sliders className="size-5" />
             </span>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
-              Studio Profile & Connectors
+              Studio Profile & Settings
             </h1>
           </div>
           <p className="mt-2 text-sm text-ink-muted">
-            Configure your publisher imprint, default brand parameters, and automated Meta & Google Ads MCP connectors.
+            Configure your publisher imprint, default brand parameters, and automated publishing workflows.
           </p>
         </div>
 
@@ -272,19 +243,6 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
         >
           <Sparkles className="size-4" />
           AI & OpenRouter Key
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('connectors')}
-          className={cn(
-            'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-            activeTab === 'connectors'
-              ? 'border-accent text-accent'
-              : 'border-transparent text-ink-muted hover:text-ink'
-          )}
-        >
-          <Cpu className="size-4" />
-          Marketing & MCP Connectors
         </button>
         <button
           type="button"
@@ -433,210 +391,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
         </div>
       )}
 
-      {/* TAB 1: MARKETING & MCP CONNECTORS */}
-      {activeTab === 'connectors' && (
-        <div className="flex flex-col gap-6">
-          <div className="rounded-2xl bg-accent-soft/30 p-4 text-xs text-ink">
-            <div className="flex items-start gap-2.5">
-              <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" />
-              <div>
-                <strong className="font-semibold text-ink">Model Context Protocol (MCP) Integration:</strong>
-                <p className="mt-0.5 text-ink-muted">
-                  Connecting your Meta and Google Ads via MCP allows AI agents to directly deploy platform-compliant ad creatives, automatically target relevant reader audiences, and pull live CTR/CPC performance metrics.
-                </p>
-              </div>
-            </div>
-          </div>
 
-          {/* Meta Ads MCP Card */}
-          <Card className="flex flex-col gap-5 p-6">
-            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-blue-600/10 text-blue-600 font-bold">
-                  f
-                </span>
-                <div>
-                  <h3 className="font-display text-lg font-semibold text-ink">Meta Ads Manager (Facebook & Instagram)</h3>
-                  <p className="text-xs text-ink-muted">Automated push for Feed (1080×1080) and Story/Reels (1080×1920) ads.</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge tone={settings.metaConnector.status === 'connected' ? 'success' : 'warning'}>
-                  {settings.metaConnector.status === 'connected' ? '● MCP Connected' : '○ Simulated Mode'}
-                </Badge>
-                <Button size="sm" variant="secondary" loading={testingMeta} onClick={handleTestMetaMcp}>
-                  <RefreshCw className="size-3.5" /> Test MCP Server
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Meta Ad Account ID" htmlFor="meta-account" hint="e.g. act_1234567890">
-                <Input
-                  id="meta-account"
-                  value={settings.metaConnector.adAccountId}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      metaConnector: { ...prev.metaConnector, adAccountId: e.target.value },
-                    }))
-                  }
-                  placeholder="act_849204..."
-                />
-              </Field>
-
-              <Field label="Facebook Page or Business ID" htmlFor="meta-page" hint="Identity ads will run under">
-                <Input
-                  id="meta-page"
-                  value={settings.metaConnector.pageId}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      metaConnector: { ...prev.metaConnector, pageId: e.target.value },
-                    }))
-                  }
-                  placeholder="publisher_toolkit_books"
-                />
-              </Field>
-
-              <Field label="Instagram Account Handle" htmlFor="meta-ig" hint="Attributed on Instagram Feed/Stories">
-                <Input
-                  id="meta-ig"
-                  value={settings.metaConnector.instagramHandle}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      metaConnector: { ...prev.metaConnector, instagramHandle: e.target.value },
-                    }))
-                  }
-                  placeholder="@yourimprint"
-                />
-              </Field>
-
-              <Field label="Meta Conversion Pixel / Dataset ID" htmlFor="meta-pixel" hint="Injected into book landing pages">
-                <Input
-                  id="meta-pixel"
-                  value={settings.metaConnector.pixelId}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      metaConnector: { ...prev.metaConnector, pixelId: e.target.value },
-                    }))
-                  }
-                  placeholder="pix_948201934"
-                />
-              </Field>
-
-              <div className="sm:col-span-2">
-                <Field label="Meta MCP Connector Server URL" htmlFor="meta-mcp-url" hint="Local or hosted MCP endpoint exposed to agents">
-                  <Input
-                    id="meta-mcp-url"
-                    value={settings.metaConnector.mcpServerUrl}
-                    onChange={(e) =>
-                      setSettings((prev) => ({
-                        ...prev,
-                        metaConnector: { ...prev.metaConnector, mcpServerUrl: e.target.value },
-                      }))
-                    }
-                    placeholder="http://localhost:3333/mcp/meta"
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 rounded-xl bg-surface-2 p-3 text-xs text-ink-muted">
-              <span className="font-semibold text-ink">Enabled MCP Tool Capabilities:</span>
-              <ul className="grid gap-1 sm:grid-cols-2">
-                <li className="flex items-center gap-1.5 text-success">
-                  <CheckCircle2 className="size-3.5 shrink-0" />
-                  <span>One-click ad set deployment</span>
-                </li>
-                <li className="flex items-center gap-1.5 text-success">
-                  <CheckCircle2 className="size-3.5 shrink-0" />
-                  <span>Reader-interest targeting suggestions</span>
-                </li>
-                <li className="flex items-center gap-1.5 text-success">
-                  <CheckCircle2 className="size-3.5 shrink-0" />
-                  <span>Live telemetry (CTR, CPC, Reach)</span>
-                </li>
-                <li className="flex items-center gap-1.5 text-success">
-                  <CheckCircle2 className="size-3.5 shrink-0" />
-                  <span>Creative fatigue detection & refresh loop</span>
-                </li>
-              </ul>
-            </div>
-          </Card>
-
-          {/* Google Ads MCP Card */}
-          <Card className="flex flex-col gap-5 p-6">
-            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-              <div className="flex items-center gap-3">
-                <span className="grid size-10 place-items-center rounded-xl bg-emerald-600/10 text-emerald-600 font-bold">
-                  G
-                </span>
-                <div>
-                  <h3 className="font-display text-lg font-semibold text-ink">Google Display Ads</h3>
-                  <p className="text-xs text-ink-muted">Automated push for Medium Rectangle (300×250) and Leaderboard (728×90).</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge tone={settings.googleConnector.status === 'connected' ? 'success' : 'warning'}>
-                  {settings.googleConnector.status === 'connected' ? '● MCP Connected' : '○ Simulated Mode'}
-                </Badge>
-                <Button size="sm" variant="secondary" loading={testingGoogle} onClick={handleTestGoogleMcp}>
-                  <RefreshCw className="size-3.5" /> Test MCP Server
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Google Ads Customer ID" htmlFor="google-id" hint="Format: XXX-XXX-XXXX">
-                <Input
-                  id="google-id"
-                  value={settings.googleConnector.customerId}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      googleConnector: { ...prev.googleConnector, customerId: e.target.value },
-                    }))
-                  }
-                  placeholder="948-204-1839"
-                />
-              </Field>
-
-              <Field label="Conversion Action Tag" htmlFor="google-conv" hint="Tracks reader book purchase events">
-                <Input
-                  id="google-conv"
-                  value={settings.googleConnector.conversionTag}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      googleConnector: { ...prev.googleConnector, conversionTag: e.target.value },
-                    }))
-                  }
-                  placeholder="AW-948201934/conv"
-                />
-              </Field>
-
-              <div className="sm:col-span-2">
-                <Field label="Google Ads MCP Connector Server URL" htmlFor="google-mcp-url" hint="Endpoint for Google Ads agent tool calls">
-                  <Input
-                    id="google-mcp-url"
-                    value={settings.googleConnector.mcpServerUrl}
-                    onChange={(e) =>
-                      setSettings((prev) => ({
-                        ...prev,
-                        googleConnector: { ...prev.googleConnector, mcpServerUrl: e.target.value },
-                      }))
-                    }
-                    placeholder="http://localhost:3333/mcp/google"
-                  />
-                </Field>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
 
       {/* TAB 2: BRAND & IMPRINT */}
       {activeTab === 'brand' && (

@@ -31,6 +31,11 @@ export default async function ConfigureStepPage({
         targetAudience: book.targetAudience,
         customHook: book.customHook,
         ctaText: book.ctaText,
+        includeVideo: book.includeVideo ?? true,
+        videoFormat: (book.videoFormat as any) ?? '16:9',
+        videoStyle: (book.videoStyle as any) ?? (book.templateKey as any) ?? 'cinematic',
+        videoMood: (book.videoMood as any) ?? 'epic',
+        videoLength: (book.videoLength as any) ?? '15s',
       }}
       book={{ title: book.title ?? '', author: book.author ?? '', blurb: book.blurb ?? '', coverUrl: book.frontCoverUrl }}
     />

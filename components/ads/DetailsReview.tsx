@@ -72,7 +72,7 @@ export function DetailsReview({
           <>
             <p className="flex gap-2 rounded-xl bg-warning-soft p-3 text-sm text-warning">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-              We couldn’t find a cover in your PDF. Add one to continue.
+              Add a front cover image to generate your ad creatives.
             </p>
             <Dropzone id="frontCover" label="Front cover" rule={COVER_RULE} file={newCover} onFileChange={setNewCover} compact />
           </>

@@ -25,6 +25,11 @@ model Book {
   targetAudience    String?
   customHook        String?
   ctaText           String?       @default("Order Your Copy Today")
+  includeVideo      Boolean       @default(true)
+  videoFormat       String?       @default("16:9")
+  videoStyle        String?       @default("cinematic")
+  videoMood         String?       @default("suspenseful")
+  videoLength       String?       @default("30s")
   parentBookId      String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @default(now()) @updatedAt
@@ -41,6 +46,9 @@ model CreativeSet {
   campaignName      String?
   campaignObjective String?
   templateKey       String?
+  videoUrl          String?
+  videoPosterUrl    String?
+  videoDuration     Int?
   createdAt         DateTime        @default(now())
   adCopies          AdCopy[]
   images            CreativeImage[]

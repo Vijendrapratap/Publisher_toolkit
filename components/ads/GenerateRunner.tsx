@@ -2,11 +2,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2, ShieldCheck, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
 
-const STAGES = ['Reading your book', 'Writing ad copy', 'Composing images', 'Saving your creatives']
+const STAGES = [
+  'Synthesizing book metadata',
+  'Writing ad copy with AI (~250 text tokens)',
+  'Composing banner creatives',
+  'Finalizing ad package',
+]
 const STAGE_MS = 2200
 
 export function GenerateRunner({
@@ -20,31 +26,84 @@ export function GenerateRunner({
 }) {
   const router = useRouter()
   const started = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isCancelledRef = useRef(false)
   const [stage, setStage] = useState(0)
+  const [cancelling, setCancelling] = useState(false)
+
+  const handleCancel = () => {
+    if (cancelling || isCancelledRef.current) return
+    isCancelledRef.current = true
+    setCancelling(true)
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    toast.info('Generation cancelled')
+    router.replace(`/ads/${projectId}/configure`)
+    router.refresh()
+  }
 
   useEffect(() => {
     // React strict mode mounts twice in dev; generation must run once.
     if (started.current) return
     started.current = true
 
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     const timer = setInterval(() => setStage((s) => Math.min(s + 1, STAGES.length - 1)), STAGE_MS)
+    timerRef.current = timer
 
     ;(async () => {
-      const res = await fetch(`/api/ads/projects/${projectId}/generate`, { method: 'POST' }).catch(() => null)
-      clearInterval(timer)
-      if (res?.ok) {
-        setStage(STAGES.length)
-        toast.success('Your creatives are ready')
-        router.replace(`/ads/${projectId}/results`)
+      try {
+        const res = await fetch(`/api/ads/projects/${projectId}/generate`, {
+          method: 'POST',
+          signal: controller.signal,
+        })
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+        }
+        if (isCancelledRef.current) return
+
+        if (res.ok) {
+          setStage(STAGES.length)
+          toast.success('Your creatives are ready')
+          router.replace(`/ads/${projectId}/results`)
+          router.refresh()
+          return
+        }
+        const message = (await res.json().catch(() => ({})))?.error ?? 'Something went wrong. Please try again.'
+        router.replace(`/ads/${projectId}/configure?error=${encodeURIComponent(message)}`)
         router.refresh()
-        return
+      } catch (err: unknown) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+        }
+        if (isCancelledRef.current) return
+
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return
+        }
+        if (err instanceof Error && err.name === 'AbortError') {
+          return
+        }
+
+        router.replace(`/ads/${projectId}/configure?error=${encodeURIComponent('Something went wrong. Please try again.')}`)
+        router.refresh()
       }
-      const message = (await res?.json().catch(() => ({})))?.error ?? 'Something went wrong. Please try again.'
-      router.replace(`/ads/${projectId}/configure?error=${encodeURIComponent(message)}`)
-      router.refresh()
     })()
 
-    return () => clearInterval(timer)
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
   }, [projectId, router])
 
   const percent = Math.round((Math.min(stage + 1, STAGES.length) / STAGES.length) * 100)
@@ -63,6 +122,18 @@ export function GenerateRunner({
           {sizeCount} sizes across {platformCount} {platformCount === 1 ? 'platform' : 'platforms'}. This usually takes under a minute.
         </p>
       </div>
+
+      {/* Transparency callout */}
+      <div className="flex w-full flex-col items-center gap-2 rounded-2xl border border-line/70 bg-surface-2/60 p-4 text-center">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-xs font-semibold text-accent shadow-subtle">
+          <ShieldCheck className="size-3.5 text-accent" aria-hidden />
+          Text-only prompt • Zero interior images processed • ~250 tokens total
+        </span>
+        <p className="text-xs text-ink-muted">
+          Full book text and images are never sent to the AI model.
+        </p>
+      </div>
+
       <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2 shadow-inset" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
         <div className="h-full rounded-full bg-accent transition-[width] duration-700 ease-out" style={{ width: `${percent}%` }} />
       </div>
@@ -87,6 +158,30 @@ export function GenerateRunner({
           )
         })}
       </ol>
+
+      {/* Stop / Cancel generation */}
+      <div className="pt-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={cancelling}
+          onClick={handleCancel}
+          className="gap-2 text-ink-muted hover:border-danger/30 hover:bg-danger/10 hover:text-danger"
+        >
+          {cancelling ? (
+            <>
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              Cancelling…
+            </>
+          ) : (
+            <>
+              <XCircle className="size-4" aria-hidden />
+              Stop / Cancel generation
+            </>
+          )}
+        </Button>
+      </div>
     </Card>
   )
 }

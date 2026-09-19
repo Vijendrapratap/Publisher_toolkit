@@ -99,3 +99,53 @@ export async function extractBookAssets(pdfBytes: Buffer): Promise<ExtractedBook
 
   return { title, author, blurb, frontCoverPng, backCoverPng }
 }
+
+export function createPlaceholderCover(title: string, author?: string | null): Buffer {
+  const width = 600
+  const height = 900
+  const canvas = createCanvas(width, height)
+  const ctx = canvas.getContext('2d')
+
+  const grad = ctx.createLinearGradient(0, 0, width, height)
+  grad.addColorStop(0, '#1e293b')
+  grad.addColorStop(1, '#0f172a')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, width, height)
+
+  ctx.strokeStyle = '#6366f1'
+  ctx.lineWidth = 10
+  ctx.strokeRect(30, 30, width - 60, height - 60)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 42px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+
+  const words = (title || 'Untitled Book').split(' ')
+  let currentLine = ''
+  const lines: string[] = []
+  for (const w of words) {
+    const testLine = currentLine ? `${currentLine} ${w}` : w
+    if (ctx.measureText(testLine).width > width - 120) {
+      lines.push(currentLine)
+      currentLine = w
+    } else {
+      currentLine = testLine
+    }
+  }
+  if (currentLine) lines.push(currentLine)
+
+  const startY = 400 - lines.length * 28
+  lines.forEach((l, i) => {
+    ctx.fillText(l, width / 2, startY + i * 56)
+  })
+
+  if (author) {
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = '26px sans-serif'
+    ctx.fillText(`by ${author}`, width / 2, startY + lines.length * 56 + 60)
+  }
+
+  return canvas.toBuffer('image/png')
+}
+

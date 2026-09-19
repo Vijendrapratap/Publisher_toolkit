@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { PLATFORMS, TONES, TEMPLATES, getTemplate, projectUpdateSchema, COPY_LIMITS, adCopyUpdateSchema } from './options'
 
 describe('ads options', () => {
-  it('offers the three platforms, tones and templates', () => {
-    expect(PLATFORMS.map((p) => p.key)).toEqual(['META', 'GOOGLE', 'AMAZON'])
+  it('offers the Amazon platform, tones and templates', () => {
+    expect(PLATFORMS.map((p) => p.key)).toEqual(['AMAZON'])
     expect(TONES.map((t) => t.key)).toEqual(['literary', 'punchy', 'bold', 'intriguing', 'social'])
     expect(TEMPLATES.map((t) => t.key)).toEqual([
       'classic',
@@ -27,14 +27,23 @@ describe('projectUpdateSchema', () => {
     expect(projectUpdateSchema.safeParse({ title: 'New title' }).success).toBe(true)
   })
 
-  it('accepts a full config update', () => {
-    const r = projectUpdateSchema.safeParse({ platforms: ['META'], copyTone: 'bold', templateKey: 'minimal' })
+  it('accepts a full config update with video parameters', () => {
+    const r = projectUpdateSchema.safeParse({
+      platforms: ['AMAZON'],
+      copyTone: 'bold',
+      templateKey: 'minimal',
+      includeVideo: true,
+      videoFormat: '16:9',
+      videoStyle: 'cinematic',
+      videoMood: 'epic',
+      videoLength: '30s',
+    })
     expect(r.success).toBe(true)
   })
 
   it('dedupes repeated platforms so a PATCH cannot create duplicate AdCopy rows', () => {
-    const r = projectUpdateSchema.safeParse({ platforms: ['META', 'META', 'GOOGLE'] })
-    expect(r.success && r.data.platforms).toEqual(['META', 'GOOGLE'])
+    const r = projectUpdateSchema.safeParse({ platforms: ['AMAZON', 'AMAZON'] })
+    expect(r.success && r.data.platforms).toEqual(['AMAZON'])
   })
 
   it('rejects an empty platform list, unknown tone, and an empty body', () => {

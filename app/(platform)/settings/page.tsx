@@ -4,8 +4,8 @@ import { getPublisherSettings } from '@/lib/publisher/settings'
 import { SettingsForm } from '@/components/platform/SettingsForm'
 
 export const metadata: Metadata = {
-  title: 'Studio Profile & Connectors',
-  description: 'Manage publisher imprint branding, buy links, and Meta & Google Ads MCP connectors.',
+  title: 'Studio Profile & Settings',
+  description: 'Manage publisher imprint branding, buy links, and production defaults.',
 }
 
 export default async function SettingsPage() {

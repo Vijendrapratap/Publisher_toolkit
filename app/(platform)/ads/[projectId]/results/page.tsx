@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Download, RefreshCw } from 'lucide-react'
+import { Download, RefreshCw, ShoppingBag } from 'lucide-react'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getCapabilityStatus } from '@/lib/providers/status'
 import { getBookForPublisher, getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
 import { PLATFORMS } from '@/lib/services/ads/options'
 import type { AdPlatform } from '@/lib/services/ads/copy'
@@ -10,7 +9,7 @@ import { buttonClasses } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { CreativeGallery } from '@/components/ads/CreativeGallery'
 import { CopyEditor } from '@/components/ads/CopyEditor'
-import { PushPanel } from '@/components/ads/PushPanel'
+import { AmazonPackagePanel } from '@/components/ads/AmazonPackagePanel'
 
 export default async function ResultsStepPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params
@@ -26,13 +25,18 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
     copy: set.adCopies.find((c) => c.platform === p.key),
   })).filter((s) => s.images.length > 0 || s.copy)
 
+  const primaryCopy = set.adCopies.find((c) => c.platform === 'AMAZON') || set.adCopies[0]
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="font-display text-2xl font-semibold tracking-tight">Your creatives</h2>
-          <p className="text-sm text-ink-muted">
-            {set.images.length} images across {sections.length} {sections.length === 1 ? 'platform' : 'platforms'}. Edit copy, download, or launch.
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="size-5 text-accent" />
+            <h2 className="font-display text-2xl font-semibold tracking-tight">Amazon Campaign & A+ Content Package</h2>
+          </div>
+          <p className="mt-1 text-sm text-ink-muted">
+            {set.images.length} creative modules{set.videoUrl ? ' and 1 HD video trailer' : ''} generated for Amazon KDP and Advertising.
           </p>
         </div>
         <div className="flex gap-2">
@@ -53,10 +57,18 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
                 <h3 className="font-display text-xl font-semibold">{s.label}</h3>
                 <p className="text-sm text-ink-muted">{s.description}</p>
               </div>
-              {s.images.length > 0 && <CreativeGallery images={s.images} platformLabel={s.label} />}
+              <CreativeGallery
+                images={s.images}
+                platformLabel={s.label}
+                video={{
+                  videoUrl: set.videoUrl,
+                  videoPosterUrl: set.videoPosterUrl,
+                  videoDuration: set.videoDuration,
+                }}
+              />
               {s.copy && (
                 <div className="rounded-2xl bg-surface p-5 shadow-subtle">
-                  <h4 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ink-muted">Ad copy</h4>
+                  <h4 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ink-muted">Amazon Ad & Product Copy</h4>
                   <CopyEditor copy={{ ...s.copy, platform: s.copy.platform as AdPlatform }} />
                 </div>
               )}
@@ -64,10 +76,12 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
           ))}
         </div>
         <aside className="xl:sticky xl:top-24 xl:self-start">
-          <PushPanel
+          <AmazonPackagePanel
             projectId={book.id}
-            platforms={book.platforms as AdPlatform[]}
-            simulated={getCapabilityStatus().adsPush === 'local'}
+            title={book.title ?? 'Untitled book'}
+            copy={primaryCopy}
+            hasVideo={Boolean(set.videoUrl)}
+            imageCount={set.images.length}
           />
         </aside>
       </div>

@@ -37,31 +37,30 @@
 }
 
 .dark {
-  --color-canvas: oklch(0.225 0.01 65);
-  --color-surface: oklch(0.225 0.01 65);
-  --color-surface-2: oklch(0.265 0.012 65);
+  --color-canvas: oklch(0.17 0.008 65);
+  --color-surface: oklch(0.215 0.01 65);
+  --color-surface-2: oklch(0.255 0.012 65);
   --color-ink: oklch(0.945 0.008 75);
   --color-ink-muted: oklch(0.735 0.014 70);
-  --color-line: oklch(0.325 0.012 65);
+  --color-line: oklch(0.32 0.01 65);
   --color-accent: oklch(0.72 0.105 262);
   --color-accent-strong: oklch(0.79 0.1 262);
-  --color-accent-soft: oklch(0.315 0.055 262);
+  --color-accent-soft: oklch(0.29 0.045 262);
   --color-on-accent: oklch(0.18 0.015 65);
   --color-danger: oklch(0.68 0.18 27);
   --color-success: oklch(0.72 0.12 150);
   --color-warning: oklch(0.78 0.09 75);
-  --color-warning-soft: oklch(0.32 0.05 75);
-  --color-tint-ads: oklch(0.315 0.055 262);
-  --color-tint-trailer: oklch(0.315 0.05 300);
-  --color-tint-audiobook: oklch(0.315 0.055 165);
-  --color-tint-landing: oklch(0.315 0.05 230);
-  /* The briefed light-side alphas (0.45-0.6) bloomed into a visible halo round
-     every card on a dark ground. Deepened the dark side, cut the light side to
-     a rim: same extrusion, no glow. */
-  --shadow-card: 6px 6px 14px oklch(0.1 0.01 65 / 0.85), -6px -6px 14px oklch(0.32 0.012 65 / 0.28);
-  --shadow-lift: 10px 10px 24px oklch(0.1 0.01 65 / 0.9), -8px -8px 20px oklch(0.33 0.012 65 / 0.32);
-  --shadow-inset: inset 4px 4px 9px oklch(0.1 0.01 65 / 0.8), inset -4px -4px 9px oklch(0.32 0.012 65 / 0.24);
-  --shadow-subtle: 3px 3px 8px oklch(0.1 0.01 65 / 0.7), -3px -3px 8px oklch(0.32 0.012 65 / 0.22);
+  --color-warning-soft: oklch(0.30 0.04 75);
+  --color-tint-ads: oklch(0.29 0.045 262);
+  --color-tint-trailer: oklch(0.29 0.04 300);
+  --color-tint-audiobook: oklch(0.29 0.045 165);
+  --color-tint-landing: oklch(0.29 0.04 230);
+
+  /* Subtle, elegant dark-mode depth: natural dark grounding shadows and crisp hairline edge definitions, zero white halos */
+  --shadow-card: 0 4px 20px -2px oklch(0 0 0 / 0.5), 0 1px 3px oklch(0 0 0 / 0.35), inset 0 0 0 1px oklch(1 0 0 / 0.07), inset 0 1px 0 0 oklch(1 0 0 / 0.06);
+  --shadow-lift: 0 16px 36px -4px oklch(0 0 0 / 0.65), 0 4px 12px oklch(0 0 0 / 0.45), inset 0 0 0 1px oklch(1 0 0 / 0.1), inset 0 1px 0 0 oklch(1 0 0 / 0.08);
+  --shadow-inset: inset 0 2px 4px oklch(0 0 0 / 0.45), inset 0 0 0 1px oklch(0 0 0 / 0.25);
+  --shadow-subtle: 0 1px 3px 0 oklch(0 0 0 / 0.4), inset 0 0 0 1px oklch(1 0 0 / 0.06);
 }
 
 @layer base {

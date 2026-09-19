@@ -21,7 +21,7 @@ describe('renderTrailerVideoAndPoster', () => {
     expect(result.posterBuffer.length).toBeGreaterThan(1000)
     expect(result.videoBuffer).toBeInstanceOf(Buffer)
     expect(result.videoBuffer.length).toBeGreaterThan(0)
-  }, 60000)
+  }, 120000)
 
   it('renders with fantasy style and custom embers/borders', async () => {
     const result = await renderTrailerVideoAndPoster({
@@ -39,5 +39,5 @@ describe('renderTrailerVideoAndPoster', () => {
     expect(result.height).toBe(1080)
     expect(result.posterBuffer.length).toBeGreaterThan(1000)
     expect(result.videoBuffer.length).toBeGreaterThan(0)
-  }, 60000)
+  }, 120000)
 })

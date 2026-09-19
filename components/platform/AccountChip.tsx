@@ -457,8 +457,8 @@ export function AccountChip({
                 className="flex items-center justify-between rounded-xl bg-accent/10 p-2.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20"
               >
                 <span className="flex items-center gap-2">
-                  <Cpu className="size-4" />
-                  <span>Meta & Google MCP Connectors</span>
+                  <Sliders className="size-4" />
+                  <span>Studio Profile & Settings</span>
                 </span>
                 <ArrowRight className="size-3.5" />
               </Link>
@@ -619,7 +619,7 @@ export function AccountChip({
               className="flex items-center gap-1 text-accent hover:underline"
             >
               <Cpu className="size-3" />
-              <span>Studio & MCP Settings</span>
+              <span>Studio Profile & Settings</span>
             </Link>
             <button
               type="button"
