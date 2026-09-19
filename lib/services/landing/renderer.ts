@@ -5,6 +5,11 @@ export interface RenderLandingPageInput {
   subtitle?: string | null
   author: string
   authorBio?: string | null
+  authorOriginStory?: string | null
+  authorQuote?: string | null
+  authorPhotoUrl?: string | null
+  newsletterHeading?: string | null
+  newsletterIncentive?: string | null
   synopsis?: string | null
   coverUrl?: string | null
   template: LandingTemplateKey
@@ -69,6 +74,17 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
     input.authorBio ||
       `${cleanAuthor} is an acclaimed author whose novels have resonated with readers globally, known for captivating storytelling and unforgettable characters.`
   )
+  const cleanAuthorQuote = escapeHtml(
+    input.authorQuote ||
+      'Stories are the only compass we have to navigate the uncharted corners of human nature.'
+  )
+  const cleanNewsletterHeading = escapeHtml(
+    input.newsletterHeading || `Join ${cleanAuthor}’s Reader Inner Circle`
+  )
+  const cleanNewsletterIncentive = escapeHtml(
+    input.newsletterIncentive ||
+      'Be the first to read exclusive bonus chapters, receive author annotated commentary, and get insider updates before anyone else.'
+  )
   const sampleTitle = escapeHtml(input.sampleChapterTitle || 'Chapter 1: The Threshold')
   const sampleText = escapeHtml(
     input.sampleChapterText ||
@@ -95,6 +111,7 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
     body {
       background-color: var(--bg);
       color: var(--text);
@@ -112,10 +129,13 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
       background: ${isLight ? 'rgba(252,251,249,0.92)' : isMatt ? 'rgba(18,19,22,0.92)' : 'rgba(9,10,15,0.92)'};
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--border);
-      padding: 16px 0;
+      padding: 14px 0;
     }
     .nav-inner { display: flex; justify-content: space-between; align-items: center; }
-    .nav-brand { font-weight: 700; font-size: 1.125rem; letter-spacing: -0.01em; }
+    .nav-brand { font-weight: 700; font-size: 1.125rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+    .nav-links { display: flex; align-items: center; gap: 24px; font-size: 0.875rem; font-weight: 500; color: var(--text-muted); }
+    @media (max-width: 800px) { .nav-links { display: none; } }
+    .nav-links a:hover { color: var(--text); }
     .nav-cta {
       background: var(--accent); color: #fff;
       padding: 8px 20px; border-radius: 9999px;
@@ -252,23 +272,93 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
       border: 2px solid var(--accent);
     }
 
-    /* Reviews Ticker */
-    .reviews-section {
-      padding: 50px 0;
+    /* Author Section - Centered on the Author */
+    .author-section {
+      padding: 90px 0;
+      background: var(--surface);
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
-      background: var(--surface);
+      position: relative;
+    }
+    .author-card {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 48px;
+      align-items: start;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 48px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.06);
+    }
+    @media (max-width: 800px) {
+      .author-card { grid-template-columns: 1fr; text-align: center; gap: 32px; padding: 32px 24px; }
+    }
+    .author-profile-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .author-avatar {
+      width: 160px; height: 160px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, var(--accent), #4338ca);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3.5rem; font-weight: 800; font-family: var(--font-serif);
+      box-shadow: 0 16px 32px rgba(0,0,0,0.2), 0 0 0 4px var(--surface-2), 0 0 0 6px var(--accent);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .author-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .author-role-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      background: rgba(255,255,255,0.06);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+    }
+    .author-quote {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1.25rem;
+      color: var(--text);
+      line-height: 1.6;
+      margin-bottom: 20px;
+      padding-left: 20px;
+      border-left: 3px solid var(--accent);
+    }
+    @media (max-width: 800px) {
+      .author-quote { padding-left: 0; border-left: none; }
+    }
+    .author-bio-text {
+      color: var(--text-muted);
+      line-height: 1.8;
+      font-size: 1.05rem;
+      white-space: pre-line;
+    }
+
+    /* Praise & Reviews */
+    .reviews-section {
+      padding: 70px 0;
     }
     .reviews-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 28px;
+      margin-top: 32px;
     }
     .review-card {
-      padding: 24px;
-      border-radius: 16px;
-      background: var(--surface-2);
+      padding: 28px;
+      border-radius: 20px;
+      background: var(--surface);
       border: 1px solid var(--border);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
     }
     .stars { color: #f59e0b; font-size: 1.1rem; margin-bottom: 8px; }
     .quote { font-style: italic; color: var(--text); margin-bottom: 16px; line-height: 1.5; font-size: 0.95rem; }
@@ -278,6 +368,9 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
     /* Synopsis Section */
     .synopsis-section {
       padding: 80px 0;
+      background: var(--surface-2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
     .section-title {
       font-family: var(--font-serif);
@@ -289,22 +382,21 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
       font-size: 1.125rem;
       color: var(--text-muted);
       line-height: 1.8;
-      max-width: 800px;
+      max-width: 840px;
       white-space: pre-line;
     }
 
-    /* Sample Chapter Reader Drawer */
+    /* Sample Chapter Reader */
     .reader-section {
-      padding: 60px 0;
+      padding: 70px 0;
       background: var(--surface);
-      border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
     }
     .reader-box {
       background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 40px;
+      border-radius: 24px;
+      padding: 44px;
       max-width: 860px;
       margin: 0 auto;
     }
@@ -341,53 +433,107 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
       cursor: pointer;
     }
 
-    /* Author Section */
-    .author-section {
+    /* Author Newsletter / Inner Circle Club */
+    .newsletter-section {
       padding: 80px 0;
+      position: relative;
     }
-    .author-card {
-      display: flex;
-      gap: 40px;
-      align-items: center;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 40px;
+    .newsletter-card {
+      max-width: 760px;
+      margin: 0 auto;
+      text-align: center;
+      background: linear-gradient(135deg, var(--surface), var(--surface-2));
+      border: 2px solid var(--accent);
+      border-radius: 28px;
+      padding: 56px 40px;
+      box-shadow: 0 20px 50px -10px ${accent}25;
     }
-    @media (max-width: 760px) {
-      .author-card { flex-direction: column; text-align: center; }
-    }
-    .author-avatar {
-      width: 120px; height: 120px;
-      border-radius: 50%;
+    .newsletter-badge {
+      display: inline-block;
+      padding: 4px 14px;
       background: var(--accent);
       color: #fff;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 2.5rem; font-weight: 700;
-      flex-shrink: 0;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      border-radius: 9999px;
+      margin-bottom: 16px;
     }
+    .newsletter-title {
+      font-family: var(--font-serif);
+      font-size: 2rem;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    .newsletter-desc {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 580px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+    }
+    .newsletter-form {
+      display: flex;
+      gap: 12px;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    @media (max-width: 600px) {
+      .newsletter-form { flex-direction: column; }
+    }
+    .newsletter-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 1rem;
+      color: var(--text);
+      outline: none;
+    }
+    .newsletter-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+    .newsletter-btn:hover { opacity: 0.92; }
 
     /* Footer */
     footer {
-      padding: 40px 0;
+      padding: 50px 0;
       border-top: 1px solid var(--border);
       text-align: center;
       color: var(--text-muted);
       font-size: 0.875rem;
+      background: var(--surface);
     }
   </style>
 </head>
 <body>
   <header>
     <div class="container nav-inner">
-      <div class="nav-brand">${cleanTitle}</div>
+      <div class="nav-brand">
+        <span>${cleanAuthor}</span>
+      </div>
+      <nav class="nav-links">
+        <a href="#book">The Book</a>
+        <a href="#author">About the Author</a>
+        <a href="#reviews">Praise</a>
+        <a href="#excerpt">Excerpt</a>
+        <a href="#newsletter">Inner Circle</a>
+      </nav>
       <a href="#buy" class="nav-cta">${escapeHtml(input.ctaText || 'Get The Book')}</a>
     </div>
   </header>
 
   <main>
-    <section class="hero">
+    <section id="book" class="hero">
       <div class="container hero-grid">
         <div>
           <span class="badge">Official Book Release</span>
@@ -428,8 +574,10 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
     </section>
 
     <!-- Praise & Reviews -->
-    <section class="reviews-section">
+    <section id="reviews" class="reviews-section">
       <div class="container">
+        <h2 class="section-title" style="text-align: center; margin-bottom: 8px;">Praise &amp; Acclaim</h2>
+        <p style="text-align: center; color: var(--text-muted); font-size: 0.95rem;">What critics and fellow authors are saying</p>
         <div class="reviews-grid">
           ${reviews
             .map(
@@ -455,8 +603,32 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
       </div>
     </section>
 
+    <!-- Author Profile - Prominent Author Focus -->
+    <section id="author" class="author-section">
+      <div class="container">
+        <div class="author-card">
+          <div class="author-profile-col">
+            <div class="author-avatar">
+              ${
+                input.authorPhotoUrl
+                  ? `<img src="${escapeHtml(input.authorPhotoUrl)}" alt="${cleanAuthor}" />`
+                  : cleanAuthor.charAt(0)
+              }
+            </div>
+            <span class="author-role-badge">Featured Author</span>
+          </div>
+
+          <div>
+            <h2 class="section-title" style="margin-bottom: 8px;">Meet ${cleanAuthor}</h2>
+            <blockquote class="author-quote">“${cleanAuthorQuote}”</blockquote>
+            <p class="author-bio-text">${cleanBio}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Sample Chapter Reader -->
-    <section class="reader-section">
+    <section id="excerpt" class="reader-section">
       <div class="container">
         <div class="reader-box">
           <h3 class="reader-title">${sampleTitle}</h3>
@@ -469,15 +641,18 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
       </div>
     </section>
 
-    <!-- Author Profile -->
-    <section class="author-section">
+    <!-- Author Newsletter / Reader Magnet Club -->
+    <section id="newsletter" class="newsletter-section">
       <div class="container">
-        <div class="author-card">
-          <div class="author-avatar">${cleanAuthor.charAt(0)}</div>
-          <div>
-            <h2 class="section-title" style="margin-bottom: 12px;">About ${cleanAuthor}</h2>
-            <p style="color: var(--text-muted); line-height: 1.7; font-size: 1.05rem;">${cleanBio}</p>
-          </div>
+        <div class="newsletter-card">
+          <span class="newsletter-badge">Reader Club</span>
+          <h2 class="newsletter-title">${cleanNewsletterHeading}</h2>
+          <p class="newsletter-desc">${cleanNewsletterIncentive}</p>
+          <form class="newsletter-form" onsubmit="event.preventDefault(); document.getElementById('nl-msg').style.display='block'; this.style.display='none';">
+            <input type="email" placeholder="Enter your email address..." required class="newsletter-input" />
+            <button type="submit" class="newsletter-btn">Join Inner Circle</button>
+          </form>
+          <p id="nl-msg" style="display: none; margin-top: 16px; color: var(--accent); font-weight: 600;">✓ Thank you for subscribing! Your welcome gift is on its way.</p>
         </div>
       </div>
     </section>
@@ -486,7 +661,7 @@ export function renderLandingPageHtml(input: RenderLandingPageInput): string {
   <footer>
     <div class="container">
       <p>&copy; ${new Date().getFullYear()} ${cleanAuthor}. All rights reserved.</p>
-      <p style="margin-top: 6px; font-size: 0.8rem; opacity: 0.75;">Published via Publisher Toolkit</p>
+      <p style="margin-top: 6px; font-size: 0.8rem; opacity: 0.75;">Published with Publisher Toolkit</p>
     </div>
   </footer>
 

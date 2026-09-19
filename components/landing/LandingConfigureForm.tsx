@@ -9,7 +9,7 @@ import {
   Sparkles,
   Check,
   Globe,
-  ExternalLink,
+  Download,
   BookOpen,
   Smartphone,
   Monitor,
@@ -17,6 +17,12 @@ import {
   Quote,
   Plus,
   Trash2,
+  RefreshCw,
+  User,
+  Target,
+  Mail,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -25,7 +31,6 @@ import { cn } from '@/components/ui/cn'
 import {
   LANDING_TEMPLATES,
   THEME_OPTIONS,
-  RETAILER_PRESETS,
   type LandingTemplateKey,
   type LandingThemeKey,
 } from '@/lib/services/landing/options'
@@ -38,6 +43,33 @@ const ACCENT_PRESETS = [
   { label: 'Cyan', hex: '#06b6d4' },
   { label: 'Rose', hex: '#fb7185' },
 ]
+
+const OBJECTIVE_OPTIONS = [
+  {
+    key: 'preorder',
+    label: 'Book Launch & Pre-Orders',
+    description: 'High-urgency hero layout designed to maximize immediate sales on Amazon, Barnes & Noble, and Apple Books.',
+    icon: ShoppingBag,
+  },
+  {
+    key: 'newsletter',
+    label: 'Author Fanbase & Newsletter',
+    description: 'Build a dedicated reader inner circle with a prominent reader magnet gift (free chapter, novella, bonus scenes).',
+    icon: Mail,
+  },
+  {
+    key: 'brand',
+    label: 'Author Brand & Series Universe',
+    description: 'Spotlight the author’s credentials, origin story, literary philosophy, and overarching book series universe.',
+    icon: User,
+  },
+  {
+    key: 'speaking',
+    label: 'Media, Press & Speaking',
+    description: 'Highlight critical acclaim, press coverage, speaking topics, and media kit inquiries for prestige positioning.',
+    icon: Target,
+  },
+] as const
 
 export function LandingConfigureForm({
   projectId,
@@ -68,9 +100,25 @@ export function LandingConfigureForm({
   const [subtitle, setSubtitle] = useState<string>(initial.subtitle || '')
   const [synopsis, setSynopsis] = useState<string>(initial.synopsis || '')
   const [authorBio, setAuthorBio] = useState<string>(initial.authorBio || '')
-  const [sampleChapterTitle, setSampleChapterTitle] = useState<string>(initial.sampleChapterTitle || 'Chapter 1: The Beginning')
+  const [sampleChapterTitle, setSampleChapterTitle] = useState<string>(
+    initial.sampleChapterTitle || 'Chapter 1: The Beginning'
+  )
   const [sampleChapterText, setSampleChapterText] = useState<string>(initial.sampleChapterText || '')
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
+  const [previewKey, setPreviewKey] = useState(0)
+
+  // Agent Questionnaire State
+  const [agentOpen, setAgentOpen] = useState(true)
+  const [agentRunning, setAgentRunning] = useState(false)
+  const [primaryObjective, setPrimaryObjective] = useState<'preorder' | 'newsletter' | 'brand' | 'speaking'>(
+    'preorder'
+  )
+  const [authorPersona, setAuthorPersona] = useState('')
+  const [authorVoice, setAuthorVoice] = useState('Atmospheric, captivating, and emotionally profound')
+  const [authorQuote, setAuthorQuote] = useState('')
+  const [targetAudience, setTargetAudience] = useState('')
+  const [readerMagnet, setReaderMagnet] = useState('')
+  const [otherWorks, setOtherWorks] = useState('')
 
   const [retailers, setRetailers] = useState<{ retailer: string; url: string }[]>(
     initial.retailerLinks && initial.retailerLinks.length > 0
@@ -79,6 +127,7 @@ export function LandingConfigureForm({
           { retailer: 'Amazon', url: 'https://amazon.com' },
           { retailer: 'Barnes & Noble', url: 'https://barnesandnoble.com' },
           { retailer: 'Apple Books', url: 'https://books.apple.com' },
+          { retailer: 'Audible', url: 'https://audible.com' },
         ]
   )
 
@@ -86,8 +135,16 @@ export function LandingConfigureForm({
     initial.reviews && initial.reviews.length > 0
       ? initial.reviews
       : [
-          { quote: 'An extraordinary achievement in contemporary storytelling.', reviewer: 'Literary Review', outlet: 'Starred Review' },
-          { quote: 'Unputdownable, richly atmospheric, and thoroughly brilliant.', reviewer: 'Book Chronicle', outlet: 'Editor’s Pick' },
+          {
+            quote: 'An extraordinary achievement in contemporary storytelling. Gripping and unforgettable.',
+            reviewer: 'Literary Chronicle',
+            outlet: 'Starred Review',
+          },
+          {
+            quote: 'Breathless pacing, richly drawn characters, and twists you will never see coming.',
+            reviewer: 'Book Review Weekly',
+            outlet: 'Editor’s Choice',
+          },
         ]
   )
 
@@ -103,11 +160,61 @@ export function LandingConfigureForm({
   }
 
   const addReview = () => {
-    setReviews((prev) => [...prev, { quote: 'A thrilling, unforgettable page-turner.', reviewer: 'New Critic', outlet: 'Book World' }])
+    setReviews((prev) => [
+      ...prev,
+      { quote: 'A thrilling, unforgettable page-turner.', reviewer: 'New Critic', outlet: 'Book World' },
+    ])
   }
 
   const removeReview = (index: number) => {
     setReviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // DeepSeek v4.1 Author & Objective Agent Execution
+  async function handleRunAgent() {
+    setAgentRunning(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/landing/projects/${projectId}/agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookTitle: book.title,
+          authorName: book.author,
+          authorPersona,
+          authorVoice,
+          authorQuote,
+          primaryObjective,
+          targetAudience,
+          readerMagnet,
+          otherWorks,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Agent generation failed')
+
+      const out = data.agentResult
+      if (out) {
+        if (out.subtitle) setSubtitle(out.subtitle)
+        if (out.authorBio) setAuthorBio(out.authorBio)
+        if (out.synopsis) setSynopsis(out.synopsis)
+        if (out.ctaText) setCtaText(out.ctaText)
+        if (out.recommendedTemplate) setTemplate(out.recommendedTemplate)
+        if (out.recommendedTheme) setTheme(out.recommendedTheme)
+        if (out.recommendedAccent) setAccentColor(out.recommendedAccent)
+        if (out.reviews && out.reviews.length > 0) setReviews(out.reviews)
+      }
+
+      setPreviewKey((k) => k + 1)
+      toast.success('Landing page generated with DeepSeek v4.1!', {
+        description: `Optimized for ${book.author} and the ${primaryObjective} objective.`,
+      })
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to generate landing page with AI')
+    } finally {
+      setAgentRunning(false)
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -149,50 +256,239 @@ export function LandingConfigureForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-6" noValidate>
       {/* Live Preview Bar */}
       <Card className="overflow-hidden p-0 border border-line/70">
-        <div className="flex items-center justify-between border-b border-line/60 bg-surface-2/60 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/60 bg-surface-2/60 px-5 py-3">
           <div className="flex items-center gap-2">
             <Globe className="size-4 text-accent" />
-            <span className="font-semibold text-sm">Interactive Landing Page Preview</span>
+            <span className="font-semibold text-sm">Interactive Sandbox Preview</span>
+            <span className="rounded-md bg-accent/15 px-2 py-0.5 text-[10px] font-mono text-accent font-semibold">
+              Live Refresh
+            </span>
           </div>
 
-          <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
+          <div className="flex items-center gap-2">
+            <a
+              href={`/api/landing/projects/${projectId}/html`}
+              download
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink shadow-subtle hover:bg-surface-2 transition-colors"
+            >
+              <Download className="size-3.5 text-accent" /> Download index.html
+            </a>
+
             <button
               type="button"
-              onClick={() => setPreviewMode('desktop')}
-              className={cn(
-                'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-all',
-                previewMode === 'desktop' ? 'bg-surface text-ink shadow-subtle' : 'text-ink-muted hover:text-ink'
-              )}
+              onClick={() => setPreviewKey((k) => k + 1)}
+              className="p-1.5 text-ink-muted hover:text-ink rounded-md transition-colors"
+              title="Refresh Preview"
             >
-              <Monitor className="size-3.5" /> Desktop
+              <RefreshCw className="size-3.5" />
             </button>
-            <button
-              type="button"
-              onClick={() => setPreviewMode('mobile')}
-              className={cn(
-                'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-all',
-                previewMode === 'mobile' ? 'bg-surface text-ink shadow-subtle' : 'text-ink-muted hover:text-ink'
-              )}
-            >
-              <Smartphone className="size-3.5" /> Mobile
-            </button>
+
+            <div className="flex items-center gap-1 rounded-lg bg-surface-3 p-1">
+              <button
+                type="button"
+                onClick={() => setPreviewMode('desktop')}
+                className={cn(
+                  'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-all',
+                  previewMode === 'desktop' ? 'bg-surface text-ink shadow-subtle' : 'text-ink-muted hover:text-ink'
+                )}
+              >
+                <Monitor className="size-3.5" /> Desktop
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewMode('mobile')}
+                className={cn(
+                  'flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-all',
+                  previewMode === 'mobile' ? 'bg-surface text-ink shadow-subtle' : 'text-ink-muted hover:text-ink'
+                )}
+              >
+                <Smartphone className="size-3.5" /> Mobile
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-center bg-black/90 p-4 sm:p-6 overflow-hidden">
+        <div className="flex justify-center bg-black/95 p-4 sm:p-6 overflow-hidden">
           <div
             className={cn(
-              'h-[460px] overflow-hidden rounded-xl border border-line/30 bg-surface transition-all duration-300 shadow-2xl',
+              'h-[480px] overflow-hidden rounded-xl border border-line/30 bg-surface transition-all duration-300 shadow-2xl',
               previewMode === 'desktop' ? 'w-full max-w-5xl' : 'w-[375px]'
             )}
           >
             <iframe
-              src={`/api/landing/projects/${projectId}/preview`}
+              key={previewKey}
+              src={`/api/landing/projects/${projectId}/preview?ts=${previewKey}`}
               className="h-full w-full border-0 bg-background"
               title="Landing Page Preview"
             />
           </div>
         </div>
+      </Card>
+
+      {/* AI Author & Objective Agent Section (DeepSeek v4.1) */}
+      <Card className="border-accent/40 bg-gradient-to-br from-accent/10 via-surface to-surface p-6 shadow-card">
+        <div className="flex items-start justify-between cursor-pointer" onClick={() => setAgentOpen((o) => !o)}>
+          <div className="flex items-start gap-3">
+            <div className="grid size-10 place-items-center rounded-xl bg-accent text-on-accent shadow-card shrink-0">
+              <Sparkles className="size-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-display text-lg font-bold">DeepSeek v4.1 Author &amp; Objective Agent</h3>
+                <span className="rounded-full bg-accent/20 px-2.5 py-0.5 font-mono text-[10px] font-bold text-accent uppercase">
+                  DeepSeek v4.1
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">
+                Design a page crafted around the author’s persona and campaign objective. Answer the questions below to have DeepSeek v4.1 synthesize compelling copy, origin story, and conversion strategy.
+              </p>
+            </div>
+          </div>
+
+          <button type="button" className="text-ink-muted hover:text-ink p-1">
+            {agentOpen ? <ChevronUp className="size-5" /> : <ChevronDown className="size-5" />}
+          </button>
+        </div>
+
+        {agentOpen && (
+          <div className="mt-6 flex flex-col gap-5 border-t border-line/40 pt-5">
+            {/* Question 1: Campaign Objective */}
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-ink">
+                1. What is the primary objective of this landing page?
+              </label>
+              <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
+                {OBJECTIVE_OPTIONS.map((opt) => {
+                  const selected = primaryObjective === opt.key
+                  const Icon = opt.icon
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setPrimaryObjective(opt.key)}
+                      className={cn(
+                        'flex items-start gap-3 rounded-xl border p-3.5 text-left transition-all',
+                        selected
+                          ? 'border-accent bg-accent/15 ring-2 ring-accent/30 font-semibold'
+                          : 'border-line/60 bg-surface hover:border-accent/40'
+                      )}
+                    >
+                      <Icon className={cn('size-4 mt-0.5 shrink-0', selected ? 'text-accent' : 'text-ink-muted')} />
+                      <div>
+                        <div className="font-semibold text-sm text-ink">{opt.label}</div>
+                        <div className="text-xs text-ink-muted mt-0.5 leading-relaxed">{opt.description}</div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Question 2: Author Persona & Origin Story */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="2. Author Background & Origin Story"
+                hint="e.g., Former cold case investigator, folklore scholar, debut voice, award-winning journalist"
+                htmlFor="agent-persona"
+              >
+                <Input
+                  id="agent-persona"
+                  value={authorPersona}
+                  onChange={(e) => setAuthorPersona(e.target.value)}
+                  placeholder="e.g., Investigative journalist with 15 years in international reporting"
+                />
+              </Field>
+
+              <Field
+                label="Author Voice & Tone"
+                hint="e.g., Atmospheric & Lyrical, Gritty Noir, Witty & Intimate, Cerebral"
+                htmlFor="agent-voice"
+              >
+                <Input
+                  id="agent-voice"
+                  value={authorVoice}
+                  onChange={(e) => setAuthorVoice(e.target.value)}
+                  placeholder="e.g., Atmospheric, cinematic, and emotionally intense"
+                />
+              </Field>
+            </div>
+
+            {/* Question 3: Guiding Quote & Target Readers */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="3. Author Philosophy or Personal Quote"
+                hint="Reflective motto or signature quote by the author"
+                htmlFor="agent-quote"
+              >
+                <Input
+                  id="agent-quote"
+                  value={authorQuote}
+                  onChange={(e) => setAuthorQuote(e.target.value)}
+                  placeholder="e.g., The darkest truths are always whispered in silence."
+                />
+              </Field>
+
+              <Field
+                label="Target Readers & Comparable Authors (Comps)"
+                hint="e.g., Fans of Gillian Flynn, Alex Michaelides, and V.E. Schwab"
+                htmlFor="agent-target"
+              >
+                <Input
+                  id="agent-target"
+                  value={targetAudience}
+                  onChange={(e) => setTargetAudience(e.target.value)}
+                  placeholder="e.g., Fans of Tana French and David Fincher style mysteries"
+                />
+              </Field>
+            </div>
+
+            {/* Question 4: Reader Magnet & Backlist */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="4. Reader Magnet / Incentive for Email Club"
+                hint="Free gift to convert readers into lifelong fans"
+                htmlFor="agent-magnet"
+              >
+                <Input
+                  id="agent-magnet"
+                  value={readerMagnet}
+                  onChange={(e) => setReaderMagnet(e.target.value)}
+                  placeholder="e.g., Exclusive prequel novella & annotated chapter 1"
+                />
+              </Field>
+
+              <Field
+                label="Other Works / Series Universe"
+                hint="e.g., Book 1 of The Eldoria Trilogy, Author of The Whispering Tide"
+                htmlFor="agent-works"
+              >
+                <Input
+                  id="agent-works"
+                  value={otherWorks}
+                  onChange={(e) => setOtherWorks(e.target.value)}
+                  placeholder="e.g., Author of the acclaimed 'Shadows of Dublin' series"
+                />
+              </Field>
+            </div>
+
+            {/* Trigger Button */}
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-ink-muted">
+                Generates author profile, synopsis, quote, reviews, and template styling.
+              </span>
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                loading={agentRunning}
+                onClick={handleRunAgent}
+                className="shadow-card"
+              >
+                <Sparkles className="size-4" /> Synthesize with DeepSeek v4.1
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Template Selection */}
@@ -323,7 +619,7 @@ export function LandingConfigureForm({
 
       {/* Hero Content & Synopsis */}
       <Card className="p-6">
-        <h3 className="font-display text-base font-semibold">Book Headlines & Synopsis</h3>
+        <h3 className="font-display text-base font-semibold">Headlines &amp; Book Synopsis</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="Subtitle / Hook Headline" htmlFor="lp-sub">
             <Input
@@ -362,7 +658,7 @@ export function LandingConfigureForm({
               rows={3}
               value={authorBio}
               onChange={(e) => setAuthorBio(e.target.value)}
-              placeholder="Author bio and accolades..."
+              placeholder="Author bio, origin story, and accolades..."
             />
           </Field>
         </div>
@@ -429,9 +725,9 @@ export function LandingConfigureForm({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="flex items-center gap-2 font-display text-base font-semibold">
-              <Quote className="size-4 text-accent" /> Praise & Critical Acclaim
+              <Quote className="size-4 text-accent" /> Praise &amp; Critical Acclaim
             </h3>
-            <p className="text-xs text-ink-muted">Quotes from media, authors, and starred reviews.</p>
+            <p className="text-xs text-ink-muted">Quotes from media, critics, and starred reviews.</p>
           </div>
           <Button type="button" variant="ghost" size="sm" onClick={addReview}>
             <Plus className="size-4" /> Add Quote
@@ -534,9 +830,17 @@ export function LandingConfigureForm({
         </p>
       )}
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <a
+          href={`/api/landing/projects/${projectId}/html`}
+          download
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
+        >
+          <Download className="size-3.5" /> Download standalone HTML file (index.html)
+        </a>
+
         <Button type="submit" size="lg" loading={pending}>
-          <Sparkles className="size-4" /> Save & Publish Website
+          <Sparkles className="size-4" /> Save &amp; Publish Website
         </Button>
       </div>
     </form>

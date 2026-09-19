@@ -1,20 +1,48 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { getAdCopyModel } from './ai'
+import {
+  getAdCopyModel,
+  getLandingPageModel,
+  getProcessingModel,
+  getImageModelName,
+  getVideoModelName,
+  DEFAULT_PROCESSING_MODEL,
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_VIDEO_MODEL,
+} from './ai'
 
-const original = process.env.OPENROUTER_MODEL
+const originalModel = process.env.OPENROUTER_MODEL
+const originalLanding = process.env.OPENROUTER_LANDING_MODEL
+
 afterEach(() => {
-  if (original === undefined) delete process.env.OPENROUTER_MODEL
-  else process.env.OPENROUTER_MODEL = original
+  if (originalModel === undefined) delete process.env.OPENROUTER_MODEL
+  else process.env.OPENROUTER_MODEL = originalModel
+
+  if (originalLanding === undefined) delete process.env.OPENROUTER_LANDING_MODEL
+  else process.env.OPENROUTER_LANDING_MODEL = originalLanding
 })
 
-describe('getAdCopyModel', () => {
-  it('falls back to the default model when OPENROUTER_MODEL is unset', () => {
+describe('ai provider models', () => {
+  it('falls back to DeepSeek v4.1 for processing and ad copy when OPENROUTER_MODEL is unset', () => {
     delete process.env.OPENROUTER_MODEL
-    expect(getAdCopyModel().modelId).toBe('anthropic/claude-sonnet-5')
+    expect(getProcessingModel().modelId).toBe(DEFAULT_PROCESSING_MODEL)
+    expect(getAdCopyModel().modelId).toBe('deepseek/deepseek-v4.1-flash')
   })
 
   it('reads OPENROUTER_MODEL when set', () => {
-    process.env.OPENROUTER_MODEL = 'openai/gpt-5'
-    expect(getAdCopyModel().modelId).toBe('openai/gpt-5')
+    process.env.OPENROUTER_MODEL = 'deepseek/deepseek-chat'
+    expect(getAdCopyModel().modelId).toBe('deepseek/deepseek-chat')
+  })
+
+  it('uses DeepSeek v4.1 for landing page generation', () => {
+    delete process.env.OPENROUTER_LANDING_MODEL
+    expect(getLandingPageModel().modelId).toBe('deepseek/deepseek-v4.1-flash')
+  })
+
+  it('defaults image model to Nano-Banana / Gemini Flash Image family', () => {
+    expect(getImageModelName()).toBe(DEFAULT_IMAGE_MODEL)
+  })
+
+  it('defaults video preview model to Google Veo 2', () => {
+    expect(getVideoModelName()).toBe(DEFAULT_VIDEO_MODEL)
   })
 })

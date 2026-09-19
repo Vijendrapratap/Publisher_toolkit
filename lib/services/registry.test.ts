@@ -11,13 +11,13 @@ describe('service registry', () => {
     }
   })
 
-  it('marks all four services as live', () => {
+  it('marks ads, trailer, and landing as live, and audiobook as coming-soon', () => {
     expect(SERVICES.filter((s) => s.availability === 'live').map((s) => s.key)).toEqual([
       'ads',
       'trailer',
-      'audiobook',
       'landing',
     ])
+    expect(getService('audiobook').availability).toBe('coming-soon')
   })
 
   it('looks services up by key', () => {

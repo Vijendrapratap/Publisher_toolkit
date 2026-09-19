@@ -55,7 +55,7 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
 
   // OpenRouter key state
   const [openRouterKey, setOpenRouterKey] = useState('')
-  const [openRouterModel, setOpenRouterModel] = useState('anthropic/claude-sonnet-5')
+  const [openRouterModel, setOpenRouterModel] = useState('deepseek/deepseek-v4.1-flash')
   const [aiConfigured, setAiConfigured] = useState(false)
   const [maskedKey, setMaskedKey] = useState<string | null>(null)
   const [showKey, setShowKey] = useState(false)
@@ -389,12 +389,15 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
                   onChange={(e) => setOpenRouterModel(e.target.value)}
                   className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 font-mono"
                 >
-                  <option value="anthropic/claude-sonnet-5">anthropic/claude-sonnet-5 (Recommended for Literary & Ad Copy)</option>
-                  <option value="google/gemini-2.0-flash-exp:free">google/gemini-2.0-flash-exp:free (Free Tier Model)</option>
+                  <option value="deepseek/deepseek-v4.1-flash">deepseek/deepseek-v4.1-flash (Recommended: Ultra-fast DeepSeek v4.1 for Ads & Landing Pages)</option>
+                  <option value="deepseek/deepseek-chat">deepseek/deepseek-chat (DeepSeek Chat General Reasoning)</option>
+                  <option value="google/gemini-2.5-flash-image">google/gemini-2.5-flash-image (Nano-Banana / Gemini Image Generation)</option>
+                  <option value="openai/gpt-5-image">openai/gpt-5-image (OpenAI GPT-5 Image Model)</option>
+                  <option value="google/veo-2">google/veo-2 (Google Veo 2 Cinematic Video Preview)</option>
+                  <option value="anthropic/claude-sonnet-5">anthropic/claude-sonnet-5 (Anthropic Claude Sonnet 5)</option>
                   <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b-instruct:free (Free Tier Model)</option>
                   <option value="deepseek/deepseek-r1:free">deepseek/deepseek-r1:free (Free Reasoning Model)</option>
                   <option value="openai/gpt-4o">openai/gpt-4o (OpenAI Omni)</option>
-                  <option value="anthropic/claude-3.5-haiku">anthropic/claude-3.5-haiku (Fast & Cost Effective)</option>
                 </select>
               </div>
 

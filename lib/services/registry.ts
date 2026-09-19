@@ -45,8 +45,8 @@ export const SERVICES: ServiceDefinition[] = [
     href: '/audiobook',
     icon: 'headphones',
     tintClass: 'bg-tint-audiobook',
-    availability: 'live',
-    highlights: ['Automatic chapter detection', 'Fish Audio & Qwen TTS voices', 'Download per chapter or complete'],
+    availability: 'coming-soon',
+    highlights: ['Automatic chapter detection', 'Fish Audio & Qwen TTS neural voices', 'Multi-speaker character voiceover coming soon'],
   },
   {
     key: 'landing',

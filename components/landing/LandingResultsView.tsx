@@ -87,6 +87,11 @@ export function LandingResultsView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 pt-2 lg:pt-0">
+            <a href={`/api/landing/projects/${projectId}/html`} download className="inline-flex">
+              <Button variant="secondary" size="md">
+                <Download className="size-4" /> Download index.html
+              </Button>
+            </a>
             <a href={`/api/landing/projects/${projectId}/download`} download className="inline-flex">
               <Button variant="primary" size="md" className="shadow-card">
                 <FileArchive className="size-4" /> Download Website ZIP
