@@ -621,13 +621,17 @@ export function AccountChip({
               <Cpu className="size-3" />
               <span>Studio & MCP Settings</span>
             </Link>
-            <Link
-              href="/"
-              onClick={() => setOpen(false)}
-              className="text-ink-muted hover:text-ink"
+            <button
+              type="button"
+              onClick={async () => {
+                await fetch('/api/auth/logout', { method: 'POST' })
+                toast.success('Signed out')
+                window.location.href = '/sign-in'
+              }}
+              className="text-danger hover:underline"
             >
-              Tool Hub
-            </Link>
+              Sign Out
+            </button>
           </div>
         </div>
       )}

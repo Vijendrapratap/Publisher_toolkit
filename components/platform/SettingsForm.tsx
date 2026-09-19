@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -20,6 +20,10 @@ import {
   Radio,
   Copy,
   Check,
+  Key,
+  Eye,
+  EyeOff,
+  ShieldCheck,
 } from 'lucide-react'
 import type { PublisherSettings } from '@/lib/publisher/settings'
 import { Card } from '@/components/ui/card'
@@ -43,11 +47,84 @@ const AVAILABLE_GENRES = [
 
 export function SettingsForm({ initial }: { initial: PublisherSettings }) {
   const [settings, setSettings] = useState<PublisherSettings>(initial)
-  const [activeTab, setActiveTab] = useState<'connectors' | 'brand' | 'retail'>('connectors')
+  const [activeTab, setActiveTab] = useState<'ai' | 'connectors' | 'brand' | 'retail'>('ai')
   const [saving, setSaving] = useState(false)
   const [testingMeta, setTestingMeta] = useState(false)
   const [testingGoogle, setTestingGoogle] = useState(false)
   const [copiedId, setCopiedId] = useState(false)
+
+  // OpenRouter key state
+  const [openRouterKey, setOpenRouterKey] = useState('')
+  const [openRouterModel, setOpenRouterModel] = useState('anthropic/claude-sonnet-5')
+  const [aiConfigured, setAiConfigured] = useState(false)
+  const [maskedKey, setMaskedKey] = useState<string | null>(null)
+  const [showKey, setShowKey] = useState(false)
+  const [testingAi, setTestingAi] = useState(false)
+  const [savingAi, setSavingAi] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/settings/ai-key')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data) {
+          setAiConfigured(Boolean(data.isConfigured))
+          if (data.model) setOpenRouterModel(data.model)
+          if (data.maskedKey) setMaskedKey(data.maskedKey)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleTestAiKey = async () => {
+    if (!openRouterKey.trim()) {
+      toast.error('Please enter an OpenRouter API key to test')
+      return
+    }
+    setTestingAi(true)
+    try {
+      const res = await fetch('/api/settings/ai-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: openRouterKey, model: openRouterModel, testOnly: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Connection failed')
+      toast.success('OpenRouter Connection Successful!', {
+        description: 'API key is valid and ready to generate ad copy.',
+      })
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to verify OpenRouter key')
+    } finally {
+      setTestingAi(false)
+    }
+  }
+
+  const handleSaveAiKey = async () => {
+    if (!openRouterKey.trim()) {
+      toast.error('Please enter an OpenRouter API key')
+      return
+    }
+    setSavingAi(true)
+    try {
+      const res = await fetch('/api/settings/ai-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: openRouterKey, model: openRouterModel }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to save')
+      setAiConfigured(true)
+      setMaskedKey(`${openRouterKey.trim().slice(0, 7)}...${openRouterKey.trim().slice(-4)}`)
+      setOpenRouterKey('')
+      toast.success('OpenRouter API Key Saved!', {
+        description: 'AI copywriting is now running live via OpenRouter.',
+      })
+    } catch (err: any) {
+      toast.error(err.message || 'Could not save OpenRouter key')
+    } finally {
+      setSavingAi(false)
+    }
+  }
 
   const handleCopyId = () => {
     try {
@@ -185,6 +262,19 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
       <div className="flex gap-2 border-b border-line pb-px">
         <button
           type="button"
+          onClick={() => setActiveTab('ai')}
+          className={cn(
+            'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+            activeTab === 'ai'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-ink-muted hover:text-ink'
+          )}
+        >
+          <Sparkles className="size-4" />
+          AI & OpenRouter Key
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab('connectors')}
           className={cn(
             'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
@@ -223,6 +313,122 @@ export function SettingsForm({ initial }: { initial: PublisherSettings }) {
           Retail & Buy Links
         </button>
       </div>
+
+      {/* TAB: AI & OPENROUTER */}
+      {activeTab === 'ai' && (
+        <div className="flex flex-col gap-6">
+          <Card className="flex flex-col gap-5 p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-5 text-accent" />
+                  <h2 className="font-display text-lg font-semibold text-ink">OpenRouter AI Configuration</h2>
+                </div>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Connect your OpenRouter API key to unlock live AI ad copywriting with Claude, Gemini, or Llama models.
+                </p>
+              </div>
+              <Badge tone={aiConfigured ? 'success' : 'neutral'} className="gap-1.5">
+                <span className={cn('size-2 rounded-full', aiConfigured ? 'bg-success animate-pulse' : 'bg-ink-muted')} />
+                {aiConfigured ? 'OpenRouter Active' : 'Deterministic Sample Fallback'}
+              </Badge>
+            </div>
+
+            {maskedKey && (
+              <div className="flex items-center justify-between rounded-xl bg-surface-2 p-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Key className="size-4 text-accent" />
+                  <span className="text-ink-muted">Current configured key:</span>
+                  <code className="font-mono text-ink font-semibold">{maskedKey}</code>
+                </div>
+                <span className="text-success font-medium flex items-center gap-1">
+                  <CheckCircle2 className="size-3.5" /> Ready for generation
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <label htmlFor="openRouterKey" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  {maskedKey ? 'Update OpenRouter API Key' : 'Enter OpenRouter API Key'}
+                </label>
+                <div className="relative mt-1.5">
+                  <Key className="absolute left-3.5 top-3 size-4 text-ink-muted" aria-hidden />
+                  <input
+                    id="openRouterKey"
+                    type={showKey ? 'text' : 'password'}
+                    value={openRouterKey}
+                    onChange={(e) => setOpenRouterKey(e.target.value)}
+                    placeholder="sk-or-v1-..."
+                    className="w-full rounded-xl border border-line bg-surface py-2.5 pl-10 pr-10 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-3 top-2.5 rounded p-1 text-ink-muted hover:text-ink"
+                  >
+                    {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-ink-muted">
+                  Get your API key at{' '}
+                  <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                    openrouter.ai/keys
+                  </a>
+                  . Both paid and free-tier models are supported.
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="openRouterModel" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  AI Model ID
+                </label>
+                <select
+                  id="openRouterModel"
+                  value={openRouterModel}
+                  onChange={(e) => setOpenRouterModel(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 font-mono"
+                >
+                  <option value="anthropic/claude-sonnet-5">anthropic/claude-sonnet-5 (Recommended for Literary & Ad Copy)</option>
+                  <option value="google/gemini-2.0-flash-exp:free">google/gemini-2.0-flash-exp:free (Free Tier Model)</option>
+                  <option value="meta-llama/llama-3.3-70b-instruct:free">meta-llama/llama-3.3-70b-instruct:free (Free Tier Model)</option>
+                  <option value="deepseek/deepseek-r1:free">deepseek/deepseek-r1:free (Free Reasoning Model)</option>
+                  <option value="openai/gpt-4o">openai/gpt-4o (OpenAI Omni)</option>
+                  <option value="anthropic/claude-3.5-haiku">anthropic/claude-3.5-haiku (Fast & Cost Effective)</option>
+                </select>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={testingAi}
+                  disabled={!openRouterKey.trim() || savingAi}
+                  onClick={handleTestAiKey}
+                >
+                  <RefreshCw className="size-3.5" /> Test Key
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  loading={savingAi}
+                  disabled={!openRouterKey.trim() || testingAi}
+                  onClick={handleSaveAiKey}
+                >
+                  <Save className="size-3.5" /> Save OpenRouter Key
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-xs text-ink-muted">
+              <ShieldCheck className="size-4 shrink-0 text-success mt-0.5" />
+              <span>
+                Your API key is stored securely in your local environment file (<code className="text-ink">.env.local</code>) and runtime environment. It is used solely to generate book ad copy and creative variants.
+              </span>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* TAB 1: MARKETING & MCP CONNECTORS */}
       {activeTab === 'connectors' && (

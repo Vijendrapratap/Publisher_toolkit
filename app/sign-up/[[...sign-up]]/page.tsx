@@ -1,9 +1,16 @@
-import { redirect } from 'next/navigation'
 import { SignUp } from '@clerk/nextjs'
 import { isClerkConfigured } from '@/lib/providers/auth'
+import { LoginForm } from '@/components/auth/LoginForm'
 
-export default function Page() {
-  if (!isClerkConfigured()) redirect('/')
+export default function SignUpPage() {
+  if (!isClerkConfigured()) {
+    return (
+      <main className="grid min-h-dvh place-items-center bg-canvas p-6">
+        <LoginForm />
+      </main>
+    )
+  }
+
   return (
     <main className="grid min-h-dvh place-items-center bg-canvas p-6">
       <SignUp />

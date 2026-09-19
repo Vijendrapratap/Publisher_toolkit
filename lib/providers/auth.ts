@@ -18,8 +18,20 @@ export function isClerkConfigured(): boolean {
 }
 
 export async function requireCurrentPublisherId(): Promise<string> {
-  if (!isClerkConfigured()) return DEV_PUBLISHER_ID
-  const { userId } = await auth()
-  if (!userId) throw new UnauthenticatedError()
-  return userId
+  if (isClerkConfigured()) {
+    const { userId } = await auth()
+    if (!userId) throw new UnauthenticatedError()
+    return userId
+  }
+
+  try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const sessionCookie = cookieStore.get('pt_publisher_id')?.value
+    if (sessionCookie) return sessionCookie
+  } catch {
+    // Falls back gracefully outside Next.js request context (e.g. tests or build)
+  }
+
+  return DEV_PUBLISHER_ID
 }
