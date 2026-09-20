@@ -3,7 +3,7 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getTrailerProjectForPublisher } from '@/lib/services/trailer/queries'
 import { storeFile } from '@/lib/providers/storage'
 import { trailerProjectUpdateSchema } from '@/lib/services/trailer/options'
-import { COVER_RULE } from '@/lib/services/ads/validation'
+import { isAllowedCoverType, storeUploadedImage, COVER_RULE } from '@/lib/services/shared/upload'
 import { prisma } from '@/lib/db'
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -49,7 +49,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (cover.size > COVER_RULE.maxBytes) {
       return NextResponse.json({ error: 'cover image exceeds the 10MB size limit' }, { status: 400 })
     }
-    if (!COVER_RULE.accept.includes(cover.type)) {
+    if (!isAllowedCoverType(cover.type, cover.name)) {
       return NextResponse.json({ error: 'cover image must be png, jpeg, or webp' }, { status: 400 })
     }
   }
@@ -57,14 +57,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'frontCover or backCover is required' }, { status: 400 })
   }
 
-  const data: { frontCoverUrl?: string; backCoverUrl?: string } = {}
-  if (frontCover) {
-    const bytes = Buffer.from(await frontCover.arrayBuffer())
-    data.frontCoverUrl = (await storeFile(`trailer/${publisherId}/${Date.now()}-front.png`, bytes, frontCover.type)).url
-  }
-  if (backCover) {
-    const bytes = Buffer.from(await backCover.arrayBuffer())
-    data.backCoverUrl = (await storeFile(`trailer/${publisherId}/${Date.now()}-back.png`, bytes, backCover.type)).url
+  const [frontCoverUrl, backCoverUrl] = await Promise.all([
+    storeUploadedImage(frontCover, 'trailer', publisherId, 'front', storeFile),
+    storeUploadedImage(backCover, 'trailer', publisherId, 'back', storeFile),
+  ])
+  const data = {
+    ...(frontCoverUrl ? { frontCoverUrl } : {}),
+    ...(backCoverUrl ? { backCoverUrl } : {}),
   }
 
   const updated = await prisma.trailerProject.update({ where: { id: project.id }, data })

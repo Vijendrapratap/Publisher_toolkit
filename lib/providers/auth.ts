@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import { cookies } from 'next/headers'
 
 export class UnauthenticatedError extends Error {
   constructor() {
@@ -7,14 +8,26 @@ export class UnauthenticatedError extends Error {
   }
 }
 
-// Local mode: no Clerk key (or the .env.example placeholder) means every
-// request acts as one fixed local publisher. Set a real key and real auth
-// takes over with no code change.
+// Local mode: no Clerk keys (or the .env.example placeholders) means every
+// request acts as one fixed local publisher. Set real keys and real auth takes
+// over with no code change.
 export const DEV_PUBLISHER_ID = 'dev-local-publisher'
+export const PUBLISHER_COOKIE = 'pt_publisher_id'
 
+const PLACEHOLDERS = ['sk_test_placeholder', 'pk_test_placeholder']
+
+/**
+ * Both keys, not just the secret: mounting ClerkProvider and clerkMiddleware
+ * with a secret but no publishable key crashes the app at boot.
+ */
 export function isClerkConfigured(): boolean {
-  const key = process.env.CLERK_SECRET_KEY
-  return Boolean(key) && key !== 'sk_test_placeholder'
+  const secret = process.env.CLERK_SECRET_KEY
+  const publishable = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  return (
+    Boolean(secret && publishable) &&
+    !PLACEHOLDERS.includes(secret!) &&
+    !PLACEHOLDERS.includes(publishable!)
+  )
 }
 
 export async function requireCurrentPublisherId(): Promise<string> {
@@ -24,14 +37,9 @@ export async function requireCurrentPublisherId(): Promise<string> {
     return userId
   }
 
-  try {
-    const { cookies } = await import('next/headers')
-    const cookieStore = await cookies()
-    const sessionCookie = cookieStore.get('pt_publisher_id')?.value
-    if (sessionCookie) return sessionCookie
-  } catch {
-    // Falls back gracefully outside Next.js request context (e.g. tests or build)
-  }
-
-  return DEV_PUBLISHER_ID
+  // Deliberately not wrapped in try/catch. `cookies()` throws a control-flow
+  // signal during prerendering that Next uses to mark the route dynamic;
+  // swallowing it let pages bake in the dev publisher's data at build time.
+  const sessionCookie = (await cookies()).get(PUBLISHER_COOKIE)?.value
+  return sessionCookie || DEV_PUBLISHER_ID
 }

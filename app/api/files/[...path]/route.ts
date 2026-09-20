@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { contentTypeFor, resolveLocalPath } from '@/lib/providers/storage'
 
-const notFound = () => new Response('Not found', { status: 404 })
+const notFound = () => Response.json({ error: 'Not found' }, { status: 404 })
 
 export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: segments } = await params

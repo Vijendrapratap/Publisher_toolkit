@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { getPublisherSettings, savePublisherSettings, defaultPublisherSettings } from './settings'
+import {
+  getPublisherSettings,
+  savePublisherSettings,
+  defaultPublisherSettings,
+  redactSettings,
+  getPublisherAiCredentials,
+} from './settings'
 
 describe('Publisher Settings', () => {
   const pubA = 'test_pub_a_' + Math.random().toString(36).slice(2)
@@ -60,5 +66,43 @@ describe('Publisher Settings', () => {
     const settingsB = await getPublisherSettings(pubB)
     expect(settingsB.brand.name).toBe('Local Publisher Studio')
     expect(settingsB.brand.name).not.toBe('Publisher A Only')
+  })
+})
+
+describe('redactSettings', () => {
+  it("never lets the publisher's key into the returned object", async () => {
+    const pub = 'test_redact_' + Math.random().toString(36).slice(2)
+    const saved = await savePublisherSettings(pub, {
+      ai: { openRouterKey: 'sk-or-v1-supersecretvalue', model: 'openai/gpt-5' },
+    })
+
+    const redacted = redactSettings(saved)
+    expect(JSON.stringify(redacted)).not.toContain('supersecretvalue')
+    expect(redacted.ai).toEqual({
+      hasKey: true,
+      maskedKey: 'sk-or-v...alue',
+      model: 'openai/gpt-5',
+    })
+  })
+
+  it('reports no key rather than a masked empty string', () => {
+    const redacted = redactSettings(defaultPublisherSettings('pub_x'))
+    expect(redacted.ai).toEqual({ hasKey: false, maskedKey: null, model: undefined })
+  })
+})
+
+describe('getPublisherAiCredentials', () => {
+  it("prefers the publisher's own key and model", async () => {
+    const pub = 'test_creds_' + Math.random().toString(36).slice(2)
+    await savePublisherSettings(pub, { ai: { openRouterKey: 'sk-theirs', model: 'openai/gpt-5' } })
+
+    expect(await getPublisherAiCredentials(pub)).toEqual({
+      apiKey: 'sk-theirs',
+      model: 'openai/gpt-5',
+    })
+  })
+
+  it('reports nothing configured so the server key is used instead', async () => {
+    expect(await getPublisherAiCredentials('test_creds_none')).toEqual({ apiKey: null, model: null })
   })
 })

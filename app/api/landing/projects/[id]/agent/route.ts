@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getLandingProjectForPublisher } from '@/lib/services/landing/queries'
 import { runAuthorLandingAgent, authorLandingAgentInputSchema } from '@/lib/services/landing/agent'
+import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { prisma } from '@/lib/db'
 
 export const maxDuration = 120
@@ -14,20 +15,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Landing project not found' }, { status: 404 })
   }
 
-  let body: any = {}
-  try {
-    body = await request.json()
-  } catch {
-    body = {}
-  }
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
 
   const parseResult = authorLandingAgentInputSchema.safeParse({
-    bookTitle: body.bookTitle || project.title || 'Untitled Book',
-    authorName: body.authorName || project.author || 'Author',
+    bookTitle: (body.bookTitle as string) || project.title || 'Untitled Book',
+    authorName: (body.authorName as string) || project.author || 'Author',
     authorPersona: body.authorPersona,
     authorVoice: body.authorVoice,
     authorQuote: body.authorQuote,
-    primaryObjective: body.primaryObjective || 'preorder',
+    primaryObjective: (body.primaryObjective as string) || 'preorder',
     targetAudience: body.targetAudience,
     readerMagnet: body.readerMagnet,
     otherWorks: body.otherWorks,
@@ -43,7 +39,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     )
   }
 
-  const generated = await runAuthorLandingAgent(parseResult.data)
+  const credentials = await getPublisherAiCredentials(publisherId)
+  const { data: generated, source, reason } = await runAuthorLandingAgent(parseResult.data, credentials)
 
   // Persist the synthesized output into the project record
   const updated = await prisma.landingProject.update({
@@ -64,6 +61,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     {
       success: true,
       agentResult: generated,
+      source,
+      reason,
       project: updated,
     },
     { status: 200 }

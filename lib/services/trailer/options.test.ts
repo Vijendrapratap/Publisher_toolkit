@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  toTrailerLength,
   LENGTH_OPTIONS,
   STYLE_OPTIONS,
   MUSIC_MOOD_OPTIONS,
@@ -10,12 +11,19 @@ import {
 } from './options'
 
 describe('trailer options', () => {
-  it('defines 15s, 30s, and 60s lengths with accurate duration seconds', () => {
-    expect(LENGTH_OPTIONS.map((l) => l.key)).toEqual(['15s', '30s', '60s'])
+  it('offers the Amazon-appropriate durations, not the old YouTube ones', () => {
+    // 60s was a book-trailer length. Sponsored Brands accepts 6-45s and these
+    // ads are watched in a carousel tile, so the ladder now tops out at 30s.
+    expect(LENGTH_OPTIONS.map((l) => l.key)).toEqual(['6s', '15s', '20s', '30s'])
+    expect(getDurationForLength('6s')).toBe(6)
     expect(getDurationForLength('15s')).toBe(15)
+    expect(getDurationForLength('20s')).toBe(20)
     expect(getDurationForLength('30s')).toBe(30)
-    expect(getDurationForLength('60s')).toBe(60)
+  })
+
+  it('falls back to the recommended length for an unknown value', () => {
     expect(getDurationForLength('unknown')).toBe(30)
+    expect(toTrailerLength('60s')).toBe('15s')
   })
 
   it('defines 8 visual genre styles with palettes and metadata', () => {

@@ -1,8 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
+import { lookup } from 'node:dns/promises'
 import { parseBookHtml, extractBookFromUrl } from './urlExtractor'
 
 vi.mock('@/lib/providers/storage', () => ({
   storeFile: vi.fn().mockResolvedValue({ url: '/api/files/ads/pub_1/cover.jpg' }),
+}))
+
+// The SSRF guard resolves every host before fetching it; these tests must not
+// depend on real DNS.
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]),
 }))
 
 describe('parseBookHtml', () => {
@@ -65,22 +72,19 @@ describe('extractBookFromUrl', () => {
   it('fetches and downloads the cover image into storage', async () => {
     const mockFetch = vi.fn().mockImplementation(async (url: string) => {
       if (url.includes('image.jpg')) {
-        return {
-          ok: true,
-          headers: new Headers({ 'content-type': 'image/jpeg' }),
-          arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
-        }
+        return new Response(new Uint8Array([1, 2, 3]), {
+          headers: { 'content-type': 'image/jpeg' },
+        })
       }
-      return {
-        ok: true,
-        text: async () => `
+      return new Response(`
           <html>
             <span id="productTitle">Shadows of the Forgotten</span>
             <span class="author notFaded"><a href="#">K. L. Vance</a></span>
             <meta property="og:image" content="https://mock.example/image.jpg" />
           </html>
         `,
-      }
+        { headers: { 'content-type': 'text/html' } }
+      )
     })
 
     const result = await extractBookFromUrl('https://amazon.com/dp/12345', 'pub_1', mockFetch as any)
@@ -91,5 +95,19 @@ describe('extractBookFromUrl', () => {
 
   it('throws a helpful error on invalid URLs', async () => {
     await expect(extractBookFromUrl('not-a-url', 'pub_1')).rejects.toThrow(/Invalid URL/)
+  })
+
+  it('refuses non-http schemes', async () => {
+    await expect(extractBookFromUrl('file:///etc/passwd', 'pub_1')).rejects.toThrow(/http/)
+  })
+
+  it('refuses hosts that resolve to a private address', async () => {
+    vi.mocked(lookup).mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }] as never)
+    const mockFetch = vi.fn()
+
+    await expect(
+      extractBookFromUrl('http://metadata.internal/latest', 'pub_1', mockFetch as never)
+    ).rejects.toThrow(/cannot be reached/)
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 })

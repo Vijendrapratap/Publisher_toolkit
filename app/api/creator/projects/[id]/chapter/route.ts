@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getCreatorProjectForPublisher, updateCreatorProject } from '@/lib/services/creator/queries'
 import { generateIndividualChapter } from '@/lib/services/creator/generator'
+import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -36,7 +38,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const prevChapter = chapterIdx > 0 ? chapters[chapterIdx - 1] : undefined
 
   try {
-    const { content, wordCount } = await generateIndividualChapter({
+    const credentials = await getPublisherAiCredentials(publisherId)
+    const {
+      data: { content, wordCount },
+      source,
+      reason,
+    } = await generateIndividualChapter({
       bookTitle: project.title || 'Untitled Book',
       premise: project.promptConcept || project.content.novel.premise,
       chapterNumber: targetChapter.chapterNumber,
@@ -44,13 +51,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       chapterSummary: targetChapter.summary,
       previousChapterSummary: prevChapter ? prevChapter.summary : undefined,
       styleTheme: project.styleTheme || 'thriller_suspense',
-    })
+    }, credentials)
 
     chapters[chapterIdx] = {
       ...targetChapter,
       content,
       wordCount,
-      status: 'completed',
+      // A placeholder is not a written chapter — leaving it 'draft' keeps the
+      // outline honest about what still needs writing.
+      status: source === 'ai' ? 'completed' : 'draft',
     }
 
     const totalWords = chapters.reduce((acc, c) => acc + (c.wordCount || 0), 0)
@@ -65,14 +74,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
       wordCount: totalWords,
     })
+    if (!updated) {
+      return NextResponse.json({ error: 'Book project not found' }, { status: 404 })
+    }
 
     return NextResponse.json({
       chapter: chapters[chapterIdx],
       totalWords,
       project: updated,
+      source,
+      reason,
     })
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to generate chapter:', err)
-    return NextResponse.json({ error: err.message || 'Failed to generate chapter' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Failed to generate chapter'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

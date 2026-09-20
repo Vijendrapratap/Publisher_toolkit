@@ -10,6 +10,8 @@ vi.mock('@/lib/services/landing/queries', () => ({
 
 vi.mock('@/lib/services/landing/agent', () => ({
   runAuthorLandingAgent: vi.fn().mockResolvedValue({
+    source: 'ai',
+    data: {
     headline: 'New Masterpiece by Elena Rostova',
     subtitle: 'A thrilling mystery in the heart of winter',
     authorBio: 'Elena Rostova is an acclaimed mystery writer.',
@@ -22,6 +24,7 @@ vi.mock('@/lib/services/landing/agent', () => ({
     recommendedTheme: 'matt',
     recommendedAccent: '#f59e0b',
     reviews: [{ quote: 'Brilliant!', reviewer: 'Critic', outlet: 'Press' }],
+    },
   }),
   authorLandingAgentInputSchema: {
     safeParse: vi.fn().mockReturnValue({

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Megaphone, Plus, Sparkles, Settings2, Upload, Images } from 'lucide-react'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getBooksForPublisher } from '@/lib/services/ads/queries'
+import { countBooksForPublisher } from '@/lib/services/ads/queries'
 import { EmptyState } from '@/components/platform/EmptyState'
 import { buttonClasses } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -15,7 +15,7 @@ const HOW = [
 
 export default async function AdsHomePage() {
   const publisherId = await requireCurrentPublisherId()
-  const projects = await getBooksForPublisher(publisherId)
+  const projectCount = await countBooksForPublisher(publisherId)
   const newButton = (
     <Link href="/ads/new" className={buttonClasses({ size: 'lg' })}>
       <Plus className="size-4" aria-hidden /> New campaign
@@ -28,7 +28,7 @@ export default async function AdsHomePage() {
         <p className="text-sm font-semibold uppercase tracking-widest text-accent">Ads Creative</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Ads that sell your book</h1>
       </header>
-      {projects.length === 0 ? (
+      {projectCount === 0 ? (
         <EmptyState
           icon={<Megaphone className="size-7" aria-hidden />}
           title="Create your first ad campaign"

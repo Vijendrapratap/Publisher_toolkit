@@ -1,9 +1,10 @@
 import { z } from 'zod'
 
 export const LENGTH_OPTIONS = [
-  { key: '15s', label: '15 seconds', description: 'Fast-paced teaser for Reels & Shorts', durationSec: 15 },
-  { key: '30s', label: '30 seconds', description: 'Classic book trailer with blurb hook', durationSec: 30 },
-  { key: '60s', label: '60 seconds', description: 'In-depth cinematic preview for YouTube', durationSec: 60 },
+  { key: '6s', label: '6 seconds', description: 'Bumper — one claim, one cover', durationSec: 6 },
+  { key: '15s', label: '15 seconds', description: 'Recommended for Amazon', durationSec: 15 },
+  { key: '20s', label: '20 seconds', description: 'Room for an interior showcase', durationSec: 20 },
+  { key: '30s', label: '30 seconds', description: 'Full feature walkthrough', durationSec: 30 },
 ] as const
 export type TrailerLength = (typeof LENGTH_OPTIONS)[number]['key']
 
@@ -110,7 +111,7 @@ export const trailerProjectUpdateSchema = z
     title: z.string().trim().max(200),
     author: z.string().trim().max(200),
     blurb: z.string().trim().max(2000),
-    length: z.enum(['15s', '30s', '60s']),
+    length: z.enum(['6s', '15s', '20s', '30s']),
     style: z.enum([
       'fantasy',
       'thriller',
@@ -128,6 +129,35 @@ export const trailerProjectUpdateSchema = z
       .transform((a) => [...new Set(a)]),
     hookText: z.string().trim().max(300).nullable().optional(),
     ctaText: z.string().trim().max(200).nullable().optional(),
+    // Video-ad configuration. The cinematic style/mood fields above are kept
+    // for existing projects; new ads are driven by the preset and the script.
+    adPreset: z.enum(['puzzle', 'children', 'coloring', 'trade']),
+    adHeadline: z.string().trim().max(70).nullable().optional(),
+    adBenefits: z.array(z.string().trim().min(1).max(40)).max(4),
+    aiScene: z.boolean(),
+    showProof: z.boolean(),
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, 'Nothing to update')
+
+/**
+ * Database columns are plain strings, so every value read back has to be
+ * narrowed before it reaches the renderer. These coercions keep the `as any`
+ * casts out of the call sites and make an unknown stored value fall back to a
+ * working default instead of reaching canvas code that expects a union member.
+ */
+function coerce<T extends string>(options: readonly { key: T }[], value: string | null | undefined, fallback: T): T {
+  return options.some((o) => o.key === value) ? (value as T) : fallback
+}
+
+export const toTrailerLength = (v?: string | null, fallback: TrailerLength = '15s') =>
+  coerce(LENGTH_OPTIONS, v, fallback)
+
+export const toTrailerStyle = (v?: string | null, fallback: TrailerStyle = 'cinematic') =>
+  coerce(STYLE_OPTIONS, v, fallback)
+
+export const toTrailerMusicMood = (v?: string | null, fallback: TrailerMusicMood = 'suspenseful') =>
+  coerce(MUSIC_MOOD_OPTIONS, v, fallback)
+
+export const toTrailerAspectRatio = (v?: string | null, fallback: TrailerAspectRatio = '16:9') =>
+  coerce(ASPECT_RATIO_OPTIONS, v, fallback)

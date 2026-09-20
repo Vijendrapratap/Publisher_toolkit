@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Layers,
   Loader2,
+  ImageIcon,
   Megaphone,
   Share2,
   Sparkles,
@@ -27,6 +28,53 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
   const router = useRouter()
   const [project, setProject] = useState<BookCreatorProjectData>(initialProject)
   const [sendingToAds, setSendingToAds] = useState(false)
+  const [illustrating, setIllustrating] = useState(false)
+
+  const illustratable = project.content?.type === 'children' || project.content?.type === 'coloring'
+  const pageCount = illustratable && project.content ? ('pages' in project.content ? project.content.pages.length : 0) : 0
+  const missingArt =
+    illustratable && project.content && 'pages' in project.content
+      ? project.content.pages.filter((p) => !p.generatedImageUrl).length
+      : 0
+
+  async function handleIllustrate() {
+    setIllustrating(true)
+    // A long, paid job: say what it will cost before it starts, not after.
+    const toastId = toast.loading(`Illustrating ${missingArt || pageCount} pages…`, {
+      description: 'Each page is drawn separately. This can take a few minutes.',
+    })
+    try {
+      const res = await fetch(`/api/creator/projects/${project.id}/illustrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to generate illustrations')
+
+      setProject(data.project)
+      router.refresh()
+
+      if (data.failures?.length) {
+        toast.warning(`Illustrated ${data.succeeded} of ${data.requested}`, {
+          id: toastId,
+          description: `${data.failures.length} did not render. Run it again to fill the gaps.`,
+        })
+      } else {
+        toast.success(`Illustrated ${data.succeeded} images`, {
+          id: toastId,
+          description: 'Your book now has artwork on every page.',
+        })
+      }
+    } catch (err) {
+      toast.error('Illustration failed', {
+        id: toastId,
+        description: err instanceof Error ? err.message : undefined,
+      })
+    } finally {
+      setIllustrating(false)
+    }
+  }
 
   async function handleSendToAds() {
     setSendingToAds(true)
@@ -134,6 +182,19 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
           >
             <Download className="size-4" /> Download Manuscript
           </Button>
+
+          {illustratable && (
+            <Button
+              type="button"
+              variant={missingArt > 0 ? 'primary' : 'secondary'}
+              size="sm"
+              loading={illustrating}
+              onClick={handleIllustrate}
+            >
+              <ImageIcon className="size-4" />
+              {missingArt > 0 ? `Illustrate ${missingArt} pages` : 'Redraw illustrations'}
+            </Button>
+          )}
 
           <Button
             type="button"

@@ -1,12 +1,38 @@
 import { prisma } from '@/lib/db'
 import type { Book, AdCopy } from '@prisma/client'
+import {
+  dedupeByTitle,
+  LIBRARY_ROW_LIMIT,
+  LIBRARY_SELECT,
+  type LibraryEntry,
+} from '@/lib/services/shared/library'
 
-export function getBooksForPublisher(publisherId: string): Promise<Book[]> {
-  return prisma.book.findMany({ where: { publisherId }, orderBy: { createdAt: 'desc' } })
+/** The rail and the hub both show a short recent list, never the whole table. */
+export const RAIL_SELECT = {
+  id: true,
+  title: true,
+  status: true,
+  frontCoverUrl: true,
+  updatedAt: true,
+} as const
+
+export type RailBook = Pick<Book, 'id' | 'title' | 'status' | 'frontCoverUrl' | 'updatedAt'>
+
+export function getRecentBooksForPublisher(publisherId: string, take: number): Promise<RailBook[]> {
+  return prisma.book.findMany({
+    where: { publisherId },
+    orderBy: { updatedAt: 'desc' },
+    take,
+    select: RAIL_SELECT,
+  })
 }
 
 export function getBookForPublisher(publisherId: string, bookId: string): Promise<Book | null> {
   return prisma.book.findFirst({ where: { id: bookId, publisherId } })
+}
+
+export function countBooksForPublisher(publisherId: string): Promise<number> {
+  return prisma.book.count({ where: { publisherId } })
 }
 
 export function getLatestCreativeSetForBook(bookId: string, publisherId: string) {
@@ -21,64 +47,25 @@ export function getAdCopyForPublisher(publisherId: string, copyId: string): Prom
   return prisma.adCopy.findFirst({ where: { id: copyId, creativeSet: { book: { publisherId } } } })
 }
 
-export async function getPublisherBookLibrary(publisherId: string) {
-  const books = await prisma.book.findMany({
+export async function getPublisherBookLibrary(publisherId: string): Promise<LibraryEntry[]> {
+  const rows = await prisma.book.findMany({
     where: { publisherId },
     orderBy: { createdAt: 'desc' },
-    include: {
-      creativeSets: { select: { id: true } },
-    },
+    take: LIBRARY_ROW_LIMIT,
+    select: LIBRARY_SELECT,
   })
-
-  // Deduplicate by distinct title/PDF to present a clean catalog of books,
-  // showing total campaigns associated with each book.
-  const map = new Map<string, {
-    id: string
-    title: string
-    author: string
-    blurb: string
-    pdfUrl: string
-    frontCoverUrl: string | null
-    backCoverUrl: string | null
-    campaignCount: number
-    createdAt: Date
-  }>()
-
-  for (const b of books) {
-    const key = (b.title ?? b.id).trim().toLowerCase()
-    const existing = map.get(key)
-    if (!existing) {
-      map.set(key, {
-        id: b.id,
-        title: b.title || 'Untitled book',
-        author: b.author || 'Unknown author',
-        blurb: b.blurb || '',
-        pdfUrl: b.pdfUrl,
-        frontCoverUrl: b.frontCoverUrl,
-        backCoverUrl: b.backCoverUrl,
-        campaignCount: 1,
-        createdAt: b.createdAt,
-      })
-    } else {
-      existing.campaignCount += 1
-      if (!existing.frontCoverUrl && b.frontCoverUrl) {
-        existing.frontCoverUrl = b.frontCoverUrl
-      }
-    }
-  }
-
-  return Array.from(map.values())
+  return dedupeByTitle([{ rows, source: 'book' }])
 }
 
-export async function getCampaignsForBook(publisherId: string, bookId: string) {
-  const target = await prisma.book.findFirst({ where: { id: bookId, publisherId } })
+export async function getCampaignsForBook(publisherId: string, bookId: string): Promise<Book[]> {
+  const target = await prisma.book.findFirst({
+    where: { id: bookId, publisherId },
+    select: { id: true, parentBookId: true },
+  })
   if (!target) return []
   const rootId = target.parentBookId ?? target.id
   return prisma.book.findMany({
-    where: {
-      publisherId,
-      OR: [{ id: rootId }, { parentBookId: rootId }],
-    },
+    where: { publisherId, OR: [{ id: rootId }, { parentBookId: rootId }] },
     orderBy: { createdAt: 'desc' },
   })
 }

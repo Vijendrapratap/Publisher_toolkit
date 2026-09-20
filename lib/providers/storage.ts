@@ -30,7 +30,10 @@ export function resolveLocalPath(pathname: string): string {
   if (pathname.startsWith('/') || segments.some((s) => s === '..' || s === '')) {
     throw new Error('invalid path')
   }
-  return path.join(localStorageRoot(), ...segments)
+  // turbopackIgnore: the root is deliberately configurable (LOCAL_STORAGE_DIR)
+  // and only used in local mode; without this the bundler traces the entire
+  // project into every function that can touch storage.
+  return path.join(/*turbopackIgnore: true*/ localStorageRoot(), ...segments)
 }
 
 export async function storeFile(pathname: string, data: Buffer, contentType: string): Promise<{ url: string }> {

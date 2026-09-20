@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
+import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { generateAdCopy, type AdPlatform } from '@/lib/services/ads/copy'
 import { renderCreativeImages } from '@/lib/services/ads/render'
 import { readStoredFile, storeFile, toDataUri } from '@/lib/providers/storage'
 import { getCampaignObjective, type CopyTone } from '@/lib/services/ads/options'
+import {
+  toTrailerAspectRatio,
+  toTrailerLength,
+  toTrailerMusicMood,
+  toTrailerStyle,
+} from '@/lib/services/trailer/options'
 import { prisma } from '@/lib/db'
 
 export const maxDuration = 300
@@ -24,43 +31,51 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const details = { title: book.title ?? '', author: book.author ?? '', blurb: book.blurb ?? '' }
 
   try {
-    const coverFile = await readStoredFile(book.frontCoverUrl)
-    const coverDataUri = toDataUri(coverFile)
+    const [coverFile, credentials] = await Promise.all([
+      readStoredFile(book.frontCoverUrl),
+      getPublisherAiCredentials(publisherId),
+    ])
     const objective = getCampaignObjective(book.campaignObjective)
-    const [variants, renderedImages] = await Promise.all([
+    const ctaText = book.ctaText ?? objective.defaultCta
+
+    const [copyResult, renderedImages] = await Promise.all([
       generateAdCopy(details, {
         tone: book.copyTone as CopyTone,
         platforms,
         campaignObjective: book.campaignObjective ?? 'launch',
         targetAudience: book.targetAudience ?? undefined,
         customHook: book.customHook ?? undefined,
-        ctaText: book.ctaText ?? objective.defaultCta,
+        ctaText,
+        credentials,
       }),
       renderCreativeImages({
-        coverImageUrl: coverDataUri,
+        coverImageUrl: toDataUri(coverFile),
         title: details.title,
         author: details.author,
         templateKey: book.templateKey,
         platforms,
         campaignBadge: objective.badge,
-        ctaText: book.ctaText ?? objective.defaultCta,
+        ctaText,
       }),
     ])
 
     // One editable row per selected platform, blank when AI copy failed.
     const copyRows = platforms.map(
       (platform) =>
-        variants.find((v) => v.platform === platform) ?? { platform, headline: '', primaryText: '', description: '' }
+        copyResult.data.find((v) => v.platform === platform) ?? {
+          platform,
+          headline: '',
+          primaryText: '',
+          description: '',
+        }
     )
 
     const creativeSetId = crypto.randomUUID()
+    const setDir = `ads/${publisherId}/creatives/${creativeSetId}`
+
     const images = await Promise.all(
       renderedImages.map(async (img) => {
-        const { url } = await storeFile(
-          `ads/${publisherId}/creatives/${creativeSetId}/${img.sizeKey}.png`,
-          img.pngBuffer,
-          'image/png'
-        )
+        const { url } = await storeFile(`${setDir}/${img.sizeKey}.png`, img.pngBuffer, 'image/png')
         return { platform: img.platform, sizeKey: img.sizeKey, width: img.width, height: img.height, imageUrl: url }
       })
     )
@@ -68,41 +83,37 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     let videoUrl: string | null = null
     let videoPosterUrl: string | null = null
     let videoDuration: number | null = null
+    let videoError: string | null = null
 
     if (book.includeVideo !== false) {
       try {
         const { renderTrailerVideoAndPoster } = await import('@/lib/services/trailer/video')
-        const videoOutput = await renderTrailerVideoAndPoster({
+        const video = await renderTrailerVideoAndPoster({
           title: details.title,
           author: details.author,
           blurb: details.blurb,
-          length: (book.videoLength as any) ?? '15s',
-          style: (book.videoStyle as any) ?? (book.templateKey as any) ?? 'cinematic',
-          musicMood: (book.videoMood as any) ?? 'epic',
-          aspectRatio: (book.videoFormat as any) ?? '16:9',
+          length: toTrailerLength(book.videoLength, '15s'),
+          style: toTrailerStyle(book.videoStyle ?? book.templateKey),
+          musicMood: toTrailerMusicMood(book.videoMood, 'epic'),
+          aspectRatio: toTrailerAspectRatio(book.videoFormat),
           coverPngBuffer: coverFile.data,
           hookText: book.customHook ?? undefined,
-          ctaText: book.ctaText ?? objective.defaultCta,
+          ctaText,
         })
 
         const [videoUpload, posterUpload] = await Promise.all([
-          storeFile(
-            `ads/${publisherId}/creatives/${creativeSetId}/video-trailer.mp4`,
-            videoOutput.videoBuffer,
-            'video/mp4'
-          ),
-          storeFile(
-            `ads/${publisherId}/creatives/${creativeSetId}/video-poster.png`,
-            videoOutput.posterBuffer,
-            'image/png'
-          ),
+          storeFile(`${setDir}/video-trailer.mp4`, video.videoBuffer, 'video/mp4'),
+          storeFile(`${setDir}/video-poster.png`, video.posterBuffer, 'image/png'),
         ])
 
         videoUrl = videoUpload.url
         videoPosterUrl = posterUpload.url
-        videoDuration = videoOutput.durationSec
-      } catch (videoErr) {
-        console.warn('Video trailer generation in ads pipeline skipped or failed:', videoErr)
+        videoDuration = video.durationSec
+      } catch (err) {
+        // The images are the deliverable; a failed trailer must not discard
+        // them — but it must not be silent either.
+        videoError = err instanceof Error ? err.message : 'Video rendering failed'
+        console.warn('ads generation: trailer skipped —', videoError)
       }
     }
 
@@ -119,23 +130,27 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
             videoUrl,
             videoPosterUrl,
             videoDuration,
-            adCopies: {
-              createMany: {
-                data: copyRows.map(({ platform, headline, primaryText, description }) => ({
-                  platform,
-                  headline,
-                  primaryText,
-                  description,
-                })),
-              },
-            },
+            adCopies: { createMany: { data: copyRows } },
             images: { createMany: { data: images } },
           },
         },
       },
     })
 
-    return NextResponse.json({ creativeSetId }, { status: 201 })
+    const warning =
+      [
+        copyResult.source === 'fallback'
+          ? 'Ad copy is sample text — AI generation was unavailable, so review it before running.'
+          : null,
+        videoError ? 'The video trailer could not be rendered; the images are ready.' : null,
+      ]
+        .filter(Boolean)
+        .join(' ') || undefined
+
+    return NextResponse.json(
+      { creativeSetId, copySource: copyResult.source, videoError, warning },
+      { status: 201 }
+    )
   } catch (err) {
     console.error('ads generation failed', err)
     return NextResponse.json(

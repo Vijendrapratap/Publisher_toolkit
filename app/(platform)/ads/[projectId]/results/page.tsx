@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Download, RefreshCw, ShoppingBag } from 'lucide-react'
+import { AlertTriangle, Download, RefreshCw, ShoppingBag } from 'lucide-react'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher, getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
 import { PLATFORMS } from '@/lib/services/ads/options'
@@ -26,6 +26,9 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
   })).filter((s) => s.images.length > 0 || s.copy)
 
   const primaryCopy = set.adCopies.find((c) => c.platform === 'AMAZON') || set.adCopies[0]
+  // A trailer was asked for and none was stored: say so rather than quietly
+  // shipping a package that is missing a piece the publisher configured.
+  const trailerMissing = book.includeVideo !== false && !set.videoUrl
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,6 +51,18 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
           </a>
         </div>
       </div>
+
+      {trailerMissing && (
+        <Card className="flex items-start gap-3 border border-warning/30 bg-warning/5 p-4">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
+          <p className="text-sm">
+            <span className="font-medium">The video trailer wasn&rsquo;t rendered.</span>{' '}
+            <span className="text-ink-muted">
+              Your images and copy are ready. Regenerate to try the trailer again.
+            </span>
+          </p>
+        </Card>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
         <div className="flex flex-col gap-6">

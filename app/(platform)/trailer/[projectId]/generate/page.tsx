@@ -1,7 +1,15 @@
 import { notFound, redirect } from 'next/navigation'
+import { Clapperboard } from 'lucide-react'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getTrailerProjectForPublisher } from '@/lib/services/trailer/queries'
-import { TrailerGenerateRunner } from '@/components/trailer/TrailerGenerateRunner'
+import { GenerateRunner } from '@/components/platform/GenerateRunner'
+
+const STAGES = [
+  'Analyzing manuscript & story blurb',
+  'Composing cinematic scene cards',
+  'Synthesizing mood soundtrack',
+  'Rendering & encoding MP4 cuts',
+]
 
 export default async function TrailerGenerateStepPage({
   params,
@@ -17,13 +25,19 @@ export default async function TrailerGenerateStepPage({
     redirect(`/trailer/${project.id}/results`)
   }
 
-  const formatCount = project.aspectRatios.length > 0 ? project.aspectRatios.length : 3
+  const formatCount = project.aspectRatios.length || 3
 
   return (
-    <TrailerGenerateRunner
-      projectId={project.id}
-      formatCount={formatCount}
-      durationLabel={project.length}
+    <GenerateRunner
+      endpoint={`/api/trailer/projects/${project.id}/generate`}
+      successHref={`/trailer/${project.id}/results`}
+      cancelHref={`/trailer/${project.id}/configure`}
+      title="Creating your book trailer"
+      subtitle={`Rendering ${formatCount} video cut${formatCount === 1 ? '' : 's'} (${project.length}) with synced soundtrack and poster frames.`}
+      stages={STAGES}
+      stageMs={2400}
+      icon={<Clapperboard className="size-7 animate-pulse" aria-hidden />}
+      successMessage="Your trailers are ready"
     />
   )
 }

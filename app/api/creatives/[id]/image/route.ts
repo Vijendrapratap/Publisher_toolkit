@@ -1,32 +1,34 @@
 import { prisma } from '@/lib/db'
+import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { readStoredFile } from '@/lib/providers/storage'
+
+const notFound = () => Response.json({ error: 'Not found' }, { status: 404 })
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const url = new URL(request.url)
-  const isDownload = url.searchParams.get('download') === '1'
+  const publisherId = await requireCurrentPublisherId()
 
-  const image = await prisma.creativeImage.findUnique({
-    where: { id },
-    select: { imageUrl: true, sizeKey: true, platform: true },
+  // Scoped through the creative set to the owning book: a creative id alone
+  // must not be enough to read another publisher's artwork.
+  const image = await prisma.creativeImage.findFirst({
+    where: { id, creativeSet: { book: { publisherId } } },
+    select: { imageUrl: true, sizeKey: true },
   })
-
-  if (!image) {
-    return new Response('Not found', { status: 404 })
-  }
+  if (!image) return notFound()
 
   try {
     const file = await readStoredFile(image.imageUrl)
     const headers: Record<string, string> = {
       'Content-Type': file.contentType,
-      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+      // Private: the URL is per-publisher, so shared caches must not hold it.
+      'Cache-Control': 'private, max-age=86400',
     }
-    if (isDownload) {
+    if (new URL(request.url).searchParams.get('download') === '1') {
       headers['Content-Disposition'] = `attachment; filename="${image.sizeKey}.png"`
     }
     return new Response(new Uint8Array(file.data), { headers })
   } catch (err) {
     console.error('Failed to serve creative image', id, err)
-    return new Response('Failed to read image', { status: 500 })
+    return Response.json({ error: 'Failed to read image' }, { status: 500 })
   }
 }

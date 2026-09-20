@@ -7,6 +7,9 @@ const book = {
 
 vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
 vi.mock('@/lib/services/ads/queries', () => ({ getBookForPublisher: vi.fn() }))
+vi.mock('@/lib/publisher/settings', () => ({
+  getPublisherAiCredentials: vi.fn().mockResolvedValue({ apiKey: null, model: null }),
+}))
 vi.mock('@/lib/services/ads/copy', () => ({ generateAdCopy: vi.fn() }))
 vi.mock('@/lib/services/ads/render', () => ({ renderCreativeImages: vi.fn() }))
 vi.mock('@/lib/services/trailer/video', () => ({
@@ -47,7 +50,7 @@ describe('POST /api/ads/projects/:id/generate', () => {
   })
 
   it('generates with the saved configuration and marks the project generated', async () => {
-    vi.mocked(generateAdCopy).mockResolvedValue([{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }])
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }] })
 
     const res = await POST(new Request('http://localhost'), ctx('book_1'))
     const json = await res.json()
@@ -76,7 +79,7 @@ describe('POST /api/ads/projects/:id/generate', () => {
   })
 
   it('writes a blank, editable copy row per platform when copy generation fails', async () => {
-    vi.mocked(generateAdCopy).mockResolvedValue([])
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
     const res = await POST(new Request('http://localhost'), ctx('book_1'))
     expect(res.status).toBe(201)
     expect(prisma.book.update).toHaveBeenCalledWith({
@@ -93,7 +96,7 @@ describe('POST /api/ads/projects/:id/generate', () => {
   })
 
   it('returns a readable 500 and writes nothing when image rendering fails', async () => {
-    vi.mocked(generateAdCopy).mockResolvedValue([])
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
     vi.mocked(renderCreativeImages).mockRejectedValue(new Error('satori exploded'))
     const res = await POST(new Request('http://localhost'), ctx('book_1'))
     expect(res.status).toBe(500)
@@ -102,7 +105,7 @@ describe('POST /api/ads/projects/:id/generate', () => {
   })
 
   it('returns a readable 500 and no partial state when the atomic write fails', async () => {
-    vi.mocked(generateAdCopy).mockResolvedValue([{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }])
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [{ platform: 'META', headline: 'H', primaryText: 'P', description: 'D' }] })
     vi.mocked(prisma.book.update).mockRejectedValue(new Error('db exploded'))
     const res = await POST(new Request('http://localhost'), ctx('book_1'))
     expect(res.status).toBe(500)

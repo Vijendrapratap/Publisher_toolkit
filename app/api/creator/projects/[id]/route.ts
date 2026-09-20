@@ -35,6 +35,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const updated = await updateCreatorProject(publisherId, id, json)
+  if (!updated) {
+    return NextResponse.json({ error: 'Book project not found' }, { status: 404 })
+  }
   return NextResponse.json({ project: updated })
 }
 

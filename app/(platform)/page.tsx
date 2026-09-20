@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { BookImage } from 'lucide-react'
 import { SERVICES } from '@/lib/services/registry'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getBooksForPublisher } from '@/lib/services/ads/queries'
+import { getRecentBooksForPublisher } from '@/lib/services/ads/queries'
 import { statusDisplay } from '@/lib/services/ads/steps'
 import { timeAgo } from '@/lib/format'
 import { ServiceCard } from '@/components/platform/ServiceCard'
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function HubPage() {
   const publisherId = await requireCurrentPublisherId()
-  const recent = (await getBooksForPublisher(publisherId)).slice(0, 4)
+  const recent = await getRecentBooksForPublisher(publisherId, 4)
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-12 sm:py-16">

@@ -1,45 +1,97 @@
 # Known follow-ups
 
-Captured from the final whole-branch review of the platform shell + Ads Creative work. Everything here was found, triaged and deliberately deferred — none of it blocks local use.
+Triaged and deliberately deferred. Everything listed here is reachable but not
+blocking. Items fixed in the platform-hardening pass are recorded at the bottom
+so they are not re-litigated.
 
 ## Before anyone sets a real Clerk key
 
-These three are one piece of work. They are unreachable in local mode (Clerk's middleware is never constructed), but the first is auth-bypass-shaped and must be fixed before real credentials exist.
-
-- **`proxy.ts` route matcher is too broad.** `'/((?!sign-in|sign-up).*)'` also treats `/sign-in-anything` as public. Fix: `createRouteMatcher(['/((?!sign-in(?:/|$)|sign-up(?:/|$)).*)'])`.
-- **Half-configured Clerk crashes.** `isClerkConfigured()` keys on `CLERK_SECRET_KEY` alone, so setting the secret without `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` mounts `ClerkProvider` and `clerkMiddleware` with no publishable key. Check both.
-- **`createRouteMatcher` is deprecated** — Clerk logs a warning on every boot. Look up the current API once and apply it here.
+- **`createRouteMatcher` is deprecated** — Clerk logs a warning on every boot.
+  Look up the current API once and apply it in `proxy.ts`.
+- **No route test covers the protected/public split.** `proxy.ts` is only
+  exercised by hand. Worth one test once real keys exist.
 
 ## Before enabling Vercel Blob storage
 
-- **Per-tile Download becomes "navigate to image".** `CreativeGallery` uses `<a download>`, which browsers honour same-origin (`/api/files/...`) but silently ignore cross-origin (`*.blob.vercel-storage.com`). Route downloads through an endpoint when blob mode lands.
-- **Cover files are always named `*.png`** regardless of the accepted jpeg/webp type. In blob mode the stored content type is correct; in local mode `/api/files` re-derives it from the extension and serves a JPEG as `image/png`. Derive the extension from the type.
+- **Per-tile Download becomes "navigate to image".** `CreativeGallery` uses
+  `<a download>`, which browsers honour same-origin (`/api/files/...`) but
+  silently ignore cross-origin (`*.blob.vercel-storage.com`). Route those
+  downloads through `/api/creatives/[id]/image?download=1`, which already sets
+  `Content-Disposition`.
+- **Published landing covers are served by `/p/[slug]/cover`,** which proxies
+  blob reads through the server. Fine, but it means a public page's images are
+  not on the CDN. Consider signing a blob URL instead if traffic warrants it.
 
-## Before a publisher has many projects
+## Before a publisher has thousands of projects
 
-- **Unbounded queries.** The hub fetches every book then slices to 4; the Ads layout fetches every book for the rail on every `/ads/**` render. Add `take` to `getBooksForPublisher` while the call sites are still two.
+- **Library pickers cap at `LIBRARY_ROW_LIMIT` (200) rows** and dedupe in
+  application code. Past that, move the dedupe into a `DISTINCT ON` query.
+- **The project rail caps at 30.** There is no "see all" view yet beyond the
+  service home page.
 
-## Before the second service (Trailer / Audio Book / Landing Page)
+## Storage lifecycle
 
-- **Generic components import Ads-specific helpers.** `ProjectRail` imports `statusDisplay` and `Dropzone` imports `validation` from `lib/services/ads/`. Fine while Ads is the only live service; generalise when the second one lands. This is the one structural debt that gets more expensive, not less.
+- **Orphaned files on failure.** The upload route stores the PDF before
+  validating covers, so a cover rejection leaves an unreferenced PDF.
+  Re-generating a creative set also orphans the previous set's PNGs. No cleanup
+  job exists.
+- **Deleting a project leaves its files.** `DELETE` removes rows, not blobs.
 
 ## Smaller items
 
-- **Orphaned files on failure.** The upload route stores the PDF before validating covers, so a cover rejection leaves an unreferenced PDF. Re-generating a creative set also orphans the previous set's PNGs. No cleanup job exists.
-- **`CreativeGallery` tile layout uses viewport breakpoints** (`sm:`/`xl:`) inside a much narrower container, so tiles are ~155px when the grid thinks they're wider. The caption row works around this with `flex-wrap`; container queries would be the real fix.
-- **`/api/files` returns plain text on 404** while every other route returns `{ error }`. Breaks a generic client-side `json.error` read.
-- **`Field` silently drops its aria wiring when given multiple children** (`isValidElement` is false for an array). Latent — no current consumer sets `hint`/`error` there.
-- **`author` clamp is untested.** `extractBookAssets` clamps title/author/blurb to the update schema's caps, but the test only exercises title and blurb.
-- **`Dropzone` has two `<label htmlFor>` on one input** in the empty state (visible label + drop-target wrapper). Accessible names concatenate, which works but is unusual.
-- **`AccountChip`** puts `aria-label` on a role-less `<div>`, widely ignored by assistive tech.
+- **`CreativeGallery` tile layout uses viewport breakpoints** (`sm:`/`xl:`)
+  inside a much narrower container, so tiles are ~155px when the grid thinks
+  they're wider. Container queries would be the real fix.
+- **`Field` silently drops its aria wiring when given multiple children**
+  (`isValidElement` is false for an array). Latent — no current consumer sets
+  `hint`/`error` there.
+- **`Dropzone` has two `<label htmlFor>` on one input** in the empty state.
+  Accessible names concatenate, which works but is unusual.
+- **`AccountChip`** puts `aria-label` on a role-less `<div>`, widely ignored by
+  assistive tech.
 - **`CreativeGallery`'s `<dialog>` has no accessible name** — add `aria-label`.
-- **Coming-soon pages bake capability status at build time** (`/trailer`, `/audiobook`, `/landing` prerender), so a build-without-keys deployed-with-keys would show a stale "Local mode" badge.
-- **Hub "Pick up where you left off" sorts by `createdAt`** while displaying `updatedAt`, so a recently-edited older project won't surface.
-- **Minor consistency:** duplicated error-banner markup in three forms; `PLATFORMS` not `as const`; `steps.ts` helpers typed `status: string` rather than `ProjectStatus`; the cover+details save is two PATCHes; `CONTENT_TYPES` falls back silently to `application/octet-stream`; no test posts literally unparsable JSON.
+- **`generateAiImage` has no callers.** Illustration and line-art prompts are
+  generated but never rendered to images. Either wire it into the create-book
+  flow or delete it and its `OPENROUTER_IMAGE_MODEL` config.
+- **`/api/ads/projects` and `/api/trailer/projects` POST handlers are long**
+  (three intake shapes each: JSON, PDF upload, manual FormData). The cover
+  handling is shared via `lib/services/shared/upload.ts`; the branching is not.
+- **No test posts literally unparsable JSON** to the mutation routes.
+- **`AiResult.source` is not persisted.** The results page can tell a trailer
+  is missing (stored state) but not that ad copy was sample text — that only
+  surfaces as a toast at generation time. Persisting it would need a column.
 
 ## Not bugs — deliberate, don't re-litigate
 
-- **Raw `<img>` rather than `next/image`** throughout, because URLs are dynamic local-or-blob and no `remotePatterns` are configured.
-- **Prisma pinned to 6.x.** Prisma 7 removes `datasource.url` in favour of a driver-adapter constructor, which would mean redesigning `lib/db.ts` and every consumer.
-- **Image rendering has no per-size error isolation** — one failed render fails the batch. The spec's "must not fail outright" rule is explicit for ad copy only.
-- **Ad copy is not composited into the creative images.** Real ad platforms take the image as the creative and the copy as separate campaign fields.
+- **Raw `<img>` rather than `next/image`** throughout, because URLs are dynamic
+  local-or-blob and no `remotePatterns` are configured.
+- **Prisma pinned to 6.x.** Prisma 7 removes `datasource.url` in favour of a
+  driver-adapter constructor, which would mean redesigning `lib/db.ts` and every
+  consumer.
+- **Image rendering has no per-size error isolation** — one failed render fails
+  the batch. Deliberate: a partial ad set is not shippable.
+- **Ad copy is not composited into the creative images.** Real ad platforms take
+  the image as the creative and the copy as separate campaign fields.
+- **Ads push is simulated.** `lib/providers/adsPush.ts` says so in its receipt.
+
+## Fixed in the hardening pass
+
+- Build-blocking type error in `getPublisherBookLibrary` (masked by a stale
+  `tsconfig.tsbuildinfo`).
+- `/api/creatives/[id]/image` served any creative by id, unauthenticated.
+- `/api/settings/ai-key` was unauthenticated and wrote the key into
+  `.env.local` and `process.env` process-globally. Keys are now per-publisher
+  and redacted on every path to the browser.
+- SSRF in `/api/extract-url`: no private-address block, no timeout, no size cap.
+- `updateCreatorProject` ignored its `publisherId` argument.
+- `requireCurrentPublisherId` swallowed Next's dynamic-rendering signal, so
+  pages could prerender as the dev publisher.
+- `isClerkConfigured` keyed on the secret alone; a half-configured Clerk crashed
+  at boot. The `proxy.ts` matcher treated `/sign-in-anything` as public.
+- Trailer rendering stored a 32-byte stub `.mp4` when ffmpeg failed and reported
+  success; its temp directory was never removed.
+- Published landing pages showed a broken cover to every visitor.
+- `publishedSlug` collisions threw a 500.
+- Asset filenames collided within a millisecond and were always named `.png`.
+- Ads image sizes, trailer aspect ratios and audiobook chapters rendered
+  serially; the hub and ads rail fetched every row to show four.

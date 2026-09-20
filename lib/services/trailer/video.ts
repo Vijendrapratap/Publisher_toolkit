@@ -1,6 +1,6 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { spawn } from 'node:child_process'
-import { writeFile, unlink, mkdir } from 'node:fs/promises'
+import { writeFile, mkdir, readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import {
@@ -704,7 +704,7 @@ async function runFfmpegVideoGeneration(
   audioMood: TrailerMusicMood,
   totalDurationSec: number,
   outputPath: string
-): Promise<boolean> {
+): Promise<string | null> {
   const sceneDuration = totalDurationSec / 4
   const fadeDuration = Math.min(0.5, sceneDuration * 0.15)
   const fadeOutStart = sceneDuration - fadeDuration
@@ -752,34 +752,31 @@ async function runFfmpegVideoGeneration(
     '-y',
   ]
 
-  return new Promise<boolean>((resolve) => {
-    const proc = spawn('ffmpeg', ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'] })
+  // Resolves to null on success, or a message explaining the failure.
+  return new Promise<string | null>((resolve) => {
+    const proc = spawn('ffmpeg', ffmpegArgs, { stdio: ['ignore', 'ignore', 'pipe'] })
     let stderr = ''
     proc.stderr?.on('data', (d) => {
       stderr += d.toString()
     })
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve(true)
-      } else {
-        console.warn('ffmpeg failed with code', code, stderr.slice(-300))
-        resolve(false)
-      }
-    })
-    proc.on('error', (err) => {
-      console.warn('ffmpeg spawn error:', err.message)
-      resolve(false)
-    })
+    proc.on('close', (code) =>
+      resolve(code === 0 ? null : `ffmpeg exited with code ${code}: ${stderr.trim().slice(-300)}`)
+    )
+    proc.on('error', (err) =>
+      resolve(
+        err.message.includes('ENOENT')
+          ? 'ffmpeg is not installed on this server, so video cannot be rendered.'
+          : `ffmpeg could not be started: ${err.message}`
+      )
+    )
   })
 }
 
-function createMockMp4Buffer(): Buffer {
-  return Buffer.from([
-    0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70,
-    0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00,
-    0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x32,
-    0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31,
-  ])
+export class VideoRenderError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'VideoRenderError'
+  }
 }
 
 export async function renderTrailerVideoAndPoster(
@@ -818,61 +815,43 @@ export async function renderTrailerVideoAndPoster(
     input.ctaText
   )
 
-  // Use Scene 3 (high-res cover showcase) as the primary poster image
-  const posterBuffer = s3Buffer
-
   // Temporary files for ffmpeg assembly
   const tmpDir = path.join(os.tmpdir(), `trailer-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(tmpDir, { recursive: true })
 
-  const s1Path = path.join(tmpDir, 's1.png')
-  const s2Path = path.join(tmpDir, 's2.png')
-  const s3Path = path.join(tmpDir, 's3.png')
-  const s4Path = path.join(tmpDir, 's4.png')
-  const outMp4Path = path.join(tmpDir, 'output.mp4')
-
-  await Promise.all([
-    writeFile(s1Path, s1Buffer),
-    writeFile(s2Path, s2Buffer),
-    writeFile(s3Path, s3Buffer),
-    writeFile(s4Path, s4Buffer),
-  ])
-
-  let videoBuffer: Buffer | null = null
   try {
-    const success = await runFfmpegVideoGeneration(
-      [s1Path, s2Path, s3Path, s4Path],
-      input.musicMood,
-      durationSec,
-      outMp4Path
+    const scenePaths = [s1Buffer, s2Buffer, s3Buffer, s4Buffer].map((_, i) =>
+      path.join(tmpDir, `s${i + 1}.png`)
+    )
+    const outMp4Path = path.join(tmpDir, 'output.mp4')
+
+    await Promise.all(
+      [s1Buffer, s2Buffer, s3Buffer, s4Buffer].map((buf, i) => writeFile(scenePaths[i], buf))
     )
 
-    if (success) {
-      const { readFile } = await import('node:fs/promises')
-      videoBuffer = await readFile(outMp4Path)
+    const failure = await runFfmpegVideoGeneration(scenePaths, input.musicMood, durationSec, outMp4Path)
+    if (failure) {
+      // Returning a stub .mp4 here is what let the UI announce "your trailer is
+      // ready" over a 32-byte file that no player can open.
+      throw new VideoRenderError(failure)
     }
-  } catch (err) {
-    console.warn('ffmpeg video execution failed, falling back:', err)
+
+    const videoBuffer = await readFile(outMp4Path)
+    if (videoBuffer.length === 0) {
+      throw new VideoRenderError('ffmpeg produced an empty file')
+    }
+
+    return {
+      videoBuffer,
+      // Scene 3 (the cover showcase) doubles as the poster frame.
+      posterBuffer: s3Buffer,
+      durationSec,
+      width: spec.width,
+      height: spec.height,
+      aspectRatio: input.aspectRatio,
+    }
   } finally {
-    await Promise.all([
-      unlink(s1Path).catch(() => {}),
-      unlink(s2Path).catch(() => {}),
-      unlink(s3Path).catch(() => {}),
-      unlink(s4Path).catch(() => {}),
-      unlink(outMp4Path).catch(() => {}),
-    ])
-  }
-
-  if (!videoBuffer || videoBuffer.length === 0) {
-    videoBuffer = createMockMp4Buffer()
-  }
-
-  return {
-    videoBuffer,
-    posterBuffer,
-    durationSec,
-    width: spec.width,
-    height: spec.height,
-    aspectRatio: input.aspectRatio,
+    // The whole directory, not just the files in it.
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
   }
 }

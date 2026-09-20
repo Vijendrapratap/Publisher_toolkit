@@ -31,7 +31,7 @@ import { Dropzone } from '@/components/platform/Dropzone'
 import { InteriorImagesDropzone } from '@/components/platform/InteriorImagesDropzone'
 import { CustomPalettePicker } from '@/components/ads/CustomPalettePicker'
 import { CustomCampaignPicker } from '@/components/ads/CustomCampaignPicker'
-import { COVER_RULE, PDF_RULE } from '@/lib/services/ads/validation'
+import { COVER_RULE, PDF_RULE } from '@/lib/services/shared/upload'
 import {
   CAMPAIGN_OBJECTIVES,
   CTA_PRESETS,

@@ -3,7 +3,7 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { storeFile } from '@/lib/providers/storage'
 import { extractBookAssets } from '@/lib/services/ads/extract'
 import { parseManuscriptChapters, extractPdfManuscriptText } from '@/lib/services/audiobook/chapterParser'
-import { COVER_RULE, PDF_RULE } from '@/lib/services/ads/validation'
+import { COVER_RULE, PDF_RULE } from '@/lib/services/shared/upload'
 import { listAudiobookProjectsForPublisher } from '@/lib/services/audiobook/queries'
 import { prisma } from '@/lib/db'
 

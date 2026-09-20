@@ -24,7 +24,7 @@ import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
 import { Dropzone } from '@/components/platform/Dropzone'
 import { InteriorImagesDropzone } from '@/components/platform/InteriorImagesDropzone'
-import { COVER_RULE, PDF_RULE } from '@/lib/services/ads/validation'
+import { COVER_RULE, PDF_RULE } from '@/lib/services/shared/upload'
 import {
   STYLE_OPTIONS,
   LENGTH_OPTIONS,
@@ -68,6 +68,10 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
     sourceUrl: string
     rating?: number | null
     reviewCount?: number | null
+    price?: string | null
+    categories?: string[]
+    bullets?: string[]
+    printLength?: number | null
   } | null>(null)
 
   // Manual Details & 2-5 Interior Pages
@@ -210,6 +214,13 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
           length,
           musicMood,
           aspectRatios,
+          // Listing facts feed the ad preset, the benefit lines and the
+          // social-proof beat, so they must survive the import.
+          rating: extractedData?.rating ?? null,
+          reviewCount: extractedData?.reviewCount ?? null,
+          price: extractedData?.price ?? null,
+          categories: extractedData?.categories ?? [],
+          bullets: extractedData?.bullets ?? [],
         }),
       })
 

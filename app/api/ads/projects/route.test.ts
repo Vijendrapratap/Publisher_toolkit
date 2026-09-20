@@ -72,12 +72,12 @@ describe('POST /api/ads/projects', () => {
 
     expect(json.needsManualCover).toBe(false)
     expect(storeFile).toHaveBeenCalledWith(
-      expect.stringContaining('-front.png'),
+      expect.stringContaining('-front.'),
       manualFrontCoverBytes,
       'image/jpeg'
     )
     expect(storeFile).not.toHaveBeenCalledWith(
-      expect.stringContaining('-front.png'),
+      expect.stringContaining('-front.'),
       Buffer.from('png'),
       'image/png'
     )
@@ -100,7 +100,7 @@ describe('POST /api/ads/projects', () => {
 
     expect(json.needsManualCover).toBe(false)
     expect(storeFile).toHaveBeenCalledWith(
-      expect.stringContaining('-front.png'),
+      expect.stringContaining('-front.'),
       manualFrontCoverBytes,
       'image/jpeg'
     )
@@ -313,7 +313,7 @@ describe('POST /api/ads/projects', () => {
     expect(json.needsManualCover).toBe(false)
     expect(json.isDirect).toBe(true)
     expect(storeFile).toHaveBeenCalledWith(
-      expect.stringContaining('-front.png'),
+      expect.stringContaining('-front.'),
       manualFrontCoverBytes,
       'image/jpeg'
     )

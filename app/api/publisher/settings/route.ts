@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getPublisherSettings, savePublisherSettings } from '@/lib/publisher/settings'
+import { getPublisherSettings, savePublisherSettings, redactSettings } from '@/lib/publisher/settings'
 
 export async function GET() {
   const publisherId = await requireCurrentPublisherId()
   const settings = await getPublisherSettings(publisherId)
-  return NextResponse.json(settings, { status: 200 })
+  return NextResponse.json(redactSettings(settings))
 }
 
 export async function PATCH(request: Request) {
@@ -14,6 +14,10 @@ export async function PATCH(request: Request) {
   if (!body || typeof body !== 'object') {
     return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
   }
-  const updated = await savePublisherSettings(publisherId, body)
-  return NextResponse.json(updated, { status: 200 })
+
+  // Credentials only ever change through /api/settings/ai-key, which verifies
+  // the key first — otherwise a round-trip of a redacted GET would wipe it.
+  const { ai: _ignored, ...updates } = body as Record<string, unknown>
+  const updated = await savePublisherSettings(publisherId, updates)
+  return NextResponse.json(redactSettings(updated))
 }

@@ -3,7 +3,7 @@
 import { useId, useState, useEffect, type DragEvent, type ChangeEvent } from 'react'
 import { ImageIcon, Plus, Trash2, UploadCloud } from 'lucide-react'
 import { cn } from '@/components/ui/cn'
-import { formatBytes, COVER_RULE } from '@/lib/services/ads/validation'
+import { formatBytes, COVER_RULE } from '@/lib/services/shared/upload'
 
 export interface InteriorImagesDropzoneProps {
   id?: string

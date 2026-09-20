@@ -3,8 +3,10 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { createBookProjectSchema } from '@/lib/services/creator/options'
 import { generateBookProjectContent } from '@/lib/services/creator/generator'
 import { createCreatorProject, getCreatorProjectsForPublisher } from '@/lib/services/creator/queries'
+import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 export async function GET() {
   const publisherId = await requireCurrentPublisherId()
@@ -23,12 +25,16 @@ export async function POST(req: Request) {
   }
 
   try {
-    const generatedContent = await generateBookProjectContent(parsed.data)
-    const project = await createCreatorProject(publisherId, parsed.data, generatedContent)
+    const credentials = await getPublisherAiCredentials(publisherId)
+    const { data: content, source, reason } = await generateBookProjectContent(parsed.data, credentials)
+    const project = await createCreatorProject(publisherId, parsed.data, content)
 
-    return NextResponse.json({ id: project.id, project }, { status: 201 })
-  } catch (err: any) {
+    // `source` lets the studio tell the publisher they are looking at sample
+    // content rather than their concept, instead of passing it off as theirs.
+    return NextResponse.json({ id: project.id, project, source, reason }, { status: 201 })
+  } catch (err) {
     console.error('Failed to create book project:', err)
-    return NextResponse.json({ error: err.message || 'Failed to create book project' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Failed to create book project'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

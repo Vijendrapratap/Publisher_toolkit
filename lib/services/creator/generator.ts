@@ -1,5 +1,11 @@
-import { generateText } from 'ai'
-import { isAiConfigured, getProcessingModel } from '@/lib/providers/ai'
+import { generateStructured, type AiCredentials, type AiResult } from '@/lib/providers/ai'
+import {
+  CONTENT_SCHEMAS,
+  chapterProseSchema,
+  type BookContentDraft,
+  type WordGameDraft,
+} from './schemas'
+import type { ZodType } from 'zod'
 import type {
   StoryPage,
   ColoringPage,
@@ -10,7 +16,7 @@ import type {
   ShortStoryContent,
   GeneratedBookContent,
 } from './types'
-import type { CreateBookProjectInput } from './options'
+import type { BookTypeKey, CreateBookProjectInput } from './options'
 
 /**
  * Generates a valid NxN word search matrix with words placed into the grid
@@ -332,73 +338,151 @@ The light dipped in greeting, and across forty miles of dark Atlantic water, eve
 }
 
 /**
- * Main AI generation entrypoint
+ * House style every generator shares. Kept in one place so the voice does not
+ * drift between book types.
  */
-export async function generateBookProjectContent(
-  input: CreateBookProjectInput
-): Promise<GeneratedBookContent> {
-  if (!isAiConfigured()) {
-    return sampleBookContent(input)
-  }
+const BASE_SYSTEM = `You are a working author and book producer. You write finished pages, not pitches.
 
-  try {
-    const model = getProcessingModel()
-    const prompt = `You are a world-class book author, children's book writer, and creative editor.
-Generate a complete structured project for a book of type: "${input.bookType}".
+Rules you never break:
+- Write the actual content. Never describe what you would write, never leave placeholders or "[insert here]".
+- No meta commentary, no notes to the reader, no restating the brief back.
+- Plain, concrete language. Cut "magical", "whimsical", "captivating", "journey", "tapestry", "delve".
+- Stay consistent: the same character has the same name, age and appearance on every page.
+- Honour the requested count exactly. If asked for 8 pages, produce 8.`
 
-Title: "${input.title}"
-Concept/Premise: "${input.promptConcept}"
-Target Audience: "${input.targetAudience}"
-Visual/Narrative Style: "${input.styleTheme}"
-Target page/chapter count: ${input.pageCount}
+const TYPE_SYSTEM: Record<BookTypeKey, string> = {
+  children: `${BASE_SYSTEM}
+- Vocabulary and sentence length must suit the stated age band, read aloud in one sitting.
+- Give the story a want, an obstacle and a resolution. Not a list of pleasant scenes.
+- Every illustrationPrompt must stand alone: restate the character's species, colour, clothing and the setting each time, because each page is drawn without sight of the others.`,
 
-Return a valid JSON object matching the book type:
-- If children: { "type": "children", "pages": [{ "pageNumber": 1, "spreadHeading": "...", "storyText": "...", "illustrationPrompt": "...", "characterFocus": "..." }] }
-- If coloring: { "type": "coloring", "pages": [{ "pageNumber": 1, "title": "...", "sceneDescription": "...", "lineArtPrompt": "...", "detailLevel": "simple"|"moderate"|"intricate" }] }
-- If word_game: { "type": "word_game", "wordSearches": [{ "puzzleNumber": 1, "title": "...", "theme": "...", "gridSize": 12, "words": ["WORD1", "WORD2", ...], "hiddenFact": "..." }] }
-- If novel_chapter: { "type": "novel_chapter", "novel": { "premise": "...", "logline": "...", "protagonist": "...", "antagonistOrConflict": "...", "chapters": [{ "chapterNumber": 1, "title": "...", "summary": "...", "sceneGoal": "...", "status": "completed", "content": "Full chapter opening text...", "wordCount": 800 }] } }
-- If short_story: { "type": "short_story", "story": { "title": "...", "synopsis": "...", "theme": "...", "storyText": "...", "wordCount": 1200, "readingTimeMinutes": 5 } }
+  coloring: `${BASE_SYSTEM}
+- These pages are printed and coloured in by hand. Every lineArtPrompt must demand pure black outlines on pure white, closed shapes, no shading, no gradients, no gray fill, no photographic background.
+- Match detailLevel to the audience: "simple" means thick lines and large areas for small children; "intricate" means dense pattern work for adults.
+- Vary the subjects across pages. Do not produce five variations of one scene.`,
 
-Return strictly pure JSON with zero markdown code fences.`
+  word_game: `${BASE_SYSTEM}
+- Words must be real, spelled correctly, and genuinely on theme.
+- Supply letters only — no spaces, hyphens, plurals-of-convenience or proper nouns unless the theme is names.
+- Crossword answers must be words the clue actually defines. A clue that does not resolve to its answer is a defect.
+- hiddenFact must be true and checkable.`,
 
-    const { text } = await generateText({
-      model,
-      prompt,
-      temperature: 0.7,
-      abortSignal: AbortSignal.timeout(12000),
-    })
+  novel_chapter: `${BASE_SYSTEM}
+- Build a real dramatic structure: escalating complications, a midpoint reversal, a climax that pays off the premise.
+- Each chapter summary states what actually happens and what changes, not what the reader will feel.
+- Chapter titles evoke; summaries inform. Do not write the same sentence twice in different words.`,
 
-    const cleaned = text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '')
-    const parsed = JSON.parse(cleaned)
+  short_story: `${BASE_SYSTEM}
+- Deliver a complete story with a beginning, a turn and an ending. Not an excerpt or a first chapter.
+- Open in the middle of something happening. Close on a change, not a summary of the theme.`,
+}
 
-    // For word searches, build the matrix grids if not provided
-    if (parsed.type === 'word_game' && Array.isArray(parsed.wordSearches)) {
-      parsed.wordSearches = parsed.wordSearches.map((ws: any, idx: number) => {
-        const words = ws.words || ws.wordList || ['PUZZLE', 'STORY', 'BOOK', 'WORDS']
-        const { grid, placedWords } = buildWordSearchGrid(words, ws.gridSize || 12)
-        return {
-          puzzleNumber: idx + 1,
-          title: ws.title || `Word Search #${idx + 1}`,
-          theme: ws.theme || input.title,
-          gridSize: ws.gridSize || 12,
-          grid,
-          wordList: placedWords,
-          hiddenFact: ws.hiddenFact,
-        }
-      })
+function buildPrompt(input: CreateBookProjectInput): string {
+  const countLabel = input.bookType === 'novel_chapter' ? 'chapters' : 'pages/puzzles'
+  return [
+    `Title: ${input.title}`,
+    input.subtitle ? `Subtitle: ${input.subtitle}` : null,
+    `Concept the publisher gave you: ${input.promptConcept}`,
+    input.genre ? `Genre: ${input.genre}` : null,
+    `Intended reader: ${input.targetAudience || 'general audience'}`,
+    `Visual and narrative style: ${input.styleTheme || 'classic'}`,
+    input.difficultyLevel ? `Difficulty: ${input.difficultyLevel}` : null,
+    `Produce exactly ${input.pageCount ?? 8} ${countLabel}.`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/** The model supplies word lists; the letter matrix is built here, deterministically. */
+function materializeWordGame(draft: WordGameDraft): GeneratedBookContent {
+  const wordSearches: WordSearchPuzzle[] = draft.wordSearches.map((ws, idx) => {
+    const { grid, placedWords } = buildWordSearchGrid(ws.words, ws.gridSize)
+    return {
+      puzzleNumber: idx + 1,
+      title: ws.title,
+      theme: ws.theme,
+      gridSize: ws.gridSize,
+      grid,
+      wordList: placedWords,
+      hiddenFact: ws.hiddenFact,
     }
+  })
 
-    return parsed as GeneratedBookContent
-  } catch (err) {
-    console.warn('AI book generation failed or returned invalid JSON. Falling back to deterministic generator:', err)
-    return sampleBookContent(input)
-  }
+  const crosswords: CrosswordPuzzle[] | undefined = draft.crosswords?.map((cw, idx) => ({
+    ...cw,
+    puzzleNumber: idx + 1,
+  }))
+
+  return { type: 'word_game', wordSearches, crosswords }
 }
 
 /**
- * Generates an individual chapter in chapter-by-chapter mode
+ * Generates a project's content. The caller must check `source`: on 'fallback'
+ * the publisher is looking at stock sample content, not their concept.
  */
-export async function generateIndividualChapter(params: {
+export async function generateBookProjectContent(
+  input: CreateBookProjectInput,
+  credentials?: AiCredentials
+): Promise<AiResult<GeneratedBookContent>> {
+  const bookType = input.bookType
+
+  const result = await generateStructured({
+    label: `create-book:${bookType}`,
+    // Each entry validates exactly its own branch; the cast only tells the
+    // compiler that the lookup can produce any of them.
+    schema: CONTENT_SCHEMAS[bookType] as ZodType<BookContentDraft | null>,
+    system: TYPE_SYSTEM[bookType],
+    prompt: buildPrompt(input),
+    credentials,
+    temperature: 0.8,
+    // Whole-book generation is the longest call in the app; the old 12s ceiling
+    // meant almost every request quietly served the sample book instead.
+    timeoutMs: 120_000,
+    fallback: () => null,
+  })
+
+  if (result.source === 'fallback' || !result.data) {
+    return { data: sampleBookContent(input), source: 'fallback', reason: result.reason }
+  }
+
+  const draft = result.data
+  if (draft.type === 'word_game') {
+    return { data: materializeWordGame(draft), source: 'ai' }
+  }
+
+  // Outlines arrive without prose; chapters are written one at a time on demand.
+  if (draft.type === 'novel_chapter') {
+    return {
+      data: {
+        type: 'novel_chapter',
+        novel: {
+          ...draft.novel,
+          chapters: draft.novel.chapters.map((c) => ({ ...c, status: 'draft' as const, content: '', wordCount: 0 })),
+        },
+      },
+      source: 'ai',
+    }
+  }
+
+  if (draft.type === 'short_story') {
+    const wordCount = countWords(draft.story.storyText)
+    return {
+      data: {
+        type: 'short_story',
+        story: { ...draft.story, wordCount, readingTimeMinutes: Math.max(1, Math.round(wordCount / 230)) },
+      },
+      source: 'ai',
+    }
+  }
+
+  return { data: draft, source: 'ai' }
+}
+
+export function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+export interface ChapterRequest {
   bookTitle: string
   premise: string
   chapterNumber: number
@@ -406,52 +490,47 @@ export async function generateIndividualChapter(params: {
   chapterSummary: string
   previousChapterSummary?: string
   styleTheme: string
-}): Promise<{ content: string; wordCount: number }> {
-  if (!isAiConfigured()) {
-    const content = `Chapter ${params.chapterNumber}: ${params.chapterTitle}
+}
 
-The shadows in the grand hall lengthened as twilight settled over the city.
+const CHAPTER_SYSTEM = `${BASE_SYSTEM}
+- Write the chapter as it will appear in the finished book: scene, dialogue, interiority, movement.
+- 900 to 1500 words. Start in the scene, not with weather or waking up.
+- End on a turn or an unanswered question, never on a summary of what just happened.
+- Do not output the chapter number or title; the book supplies those.`
 
-Alden leaned over the mahogany drafting table, his hands steady despite the cold drafting through the tall sash windows. The parchment before him bore the faint watermark of the Venetian Cartographers Guild, three centuries old and brittle as dried cedar.
+function sampleChapter(params: ChapterRequest): string {
+  return [
+    params.chapterSummary,
+    '',
+    'The room had the particular stillness of a place where something was about to be decided.',
+    '',
+    'This chapter has not been written yet — add an AI key in Settings to draft it, or write over this text directly.',
+  ].join('\n')
+}
 
-"You understand what happens if we are discovered here," Elaria murmured, her eyes fixed on the canal below. The lantern on the prow of the passing patrol barge cast undulating ribs of amber across the vaulted ceiling.
+export async function generateIndividualChapter(
+  params: ChapterRequest,
+  credentials?: AiCredentials
+): Promise<AiResult<{ content: string; wordCount: number }>> {
+  const result = await generateStructured({
+    label: 'create-book:chapter',
+    schema: chapterProseSchema,
+    system: CHAPTER_SYSTEM,
+    prompt: [
+      `Book: ${params.bookTitle}`,
+      `Premise: ${params.premise}`,
+      `Voice and style: ${params.styleTheme}`,
+      `Chapter ${params.chapterNumber}: ${params.chapterTitle}`,
+      `What must happen in it: ${params.chapterSummary}`,
+      params.previousChapterSummary ? `Where the previous chapter left off: ${params.previousChapterSummary}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    credentials,
+    temperature: 0.85,
+    timeoutMs: 90_000,
+    fallback: () => ({ content: sampleChapter(params) }),
+  })
 
-"We have twenty minutes until the tide shifts," Alden replied without looking up. He traced the fine copper ink lines representing the subterranean conduits. "If the alchemical lock aligns with the full moon tonight, the sluice gates will open from within. There won't be a patrol left to worry about."
-
-Outside, the bells of the campanile tolled nine. With each stroke, the copper apparatus tucked inside Alden’s waistcoat gave a faint, sympathetic chime, resonating with the deep brass vibration of the city.`
-    const words = content.split(/\s+/).length
-    return { content, wordCount: words }
-  }
-
-  try {
-    const model = getProcessingModel()
-    const prompt = `You are a master fiction author. Write the full text for Chapter ${params.chapterNumber} of the book "${params.bookTitle}".
-
-Premise: ${params.premise}
-Style / Voice: ${params.styleTheme}
-Chapter Title: ${params.chapterTitle}
-Chapter Goal & Summary: ${params.chapterSummary}
-${params.previousChapterSummary ? `Context from Previous Chapter: ${params.previousChapterSummary}` : ''}
-
-Instructions:
-- Write engaging, immersive narrative prose with sensory descriptions, authentic character dialogue, and dramatic pacing.
-- Length: 800 to 1400 words.
-- Advance the scene goal and end on a natural beat or cliffhanger.
-- Do NOT include any meta commentary, notes, or chapter numbers in your output. Just write the story directly.`
-
-    const { text } = await generateText({
-      model,
-      prompt,
-      temperature: 0.7,
-      abortSignal: AbortSignal.timeout(12000),
-    })
-
-    const trimmed = text.trim()
-    const wordCount = trimmed.split(/\s+/).filter(Boolean).length
-    return { content: trimmed, wordCount }
-  } catch (err) {
-    console.warn('Failed to generate individual chapter with AI, using fallback:', err)
-    const fallback = `Chapter ${params.chapterNumber}: ${params.chapterTitle}\n\nThe cold wind carried the scent of rain as night settled in. ${params.chapterSummary}`
-    return { content: fallback, wordCount: fallback.split(/\s+/).length }
-  }
+  return { ...result, data: { content: result.data.content.trim(), wordCount: countWords(result.data.content) } }
 }

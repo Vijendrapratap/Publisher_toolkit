@@ -1,83 +1,73 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { requireCurrentPublisherId } from '@/lib/providers/auth'
+import { getPublisherSettings, savePublisherSettings, redactSettings } from '@/lib/publisher/settings'
 import { isAiConfigured } from '@/lib/providers/ai'
-import fs from 'node:fs'
-import path from 'node:path'
+
+const bodySchema = z.object({
+  apiKey: z.string().trim().min(1, 'OpenRouter API key is required'),
+  model: z.string().trim().max(120).optional(),
+  /** Verify the key against OpenRouter without storing it. */
+  testOnly: z.boolean().optional(),
+})
+
+async function verifyKey(apiKey: string): Promise<string | null> {
+  const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (res.ok) return null
+  const body = await res.json().catch(() => ({}) as { error?: { message?: string } })
+  return body?.error?.message || `OpenRouter returned HTTP ${res.status}`
+}
 
 export async function GET() {
-  const configured = isAiConfigured()
-  const rawKey = process.env.OPENROUTER_API_KEY || ''
-  const maskedKey = rawKey.length > 8 ? `${rawKey.slice(0, 7)}...${rawKey.slice(-4)}` : configured ? '••••••••' : null
-  const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-sonnet-5'
+  const publisherId = await requireCurrentPublisherId()
+  const settings = await getPublisherSettings(publisherId)
+  const { ai } = redactSettings(settings)
 
   return NextResponse.json({
-    isConfigured: configured,
-    model,
-    maskedKey,
+    ...ai,
+    // True when either the publisher's own key or the server's key will work.
+    isConfigured: isAiConfigured({ apiKey: settings.ai.openRouterKey }),
   })
 }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({}))
-  const { apiKey, model, testOnly } = body
-
-  if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
-    return NextResponse.json({ error: 'OpenRouter API key is required' }, { status: 400 })
+  const publisherId = await requireCurrentPublisherId()
+  const parsed = bodySchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request' }, { status: 400 })
   }
+  const { apiKey, model, testOnly } = parsed.data
 
-  const cleanKey = apiKey.trim()
-  const cleanModel = typeof model === 'string' && model.trim() ? model.trim() : 'anthropic/claude-sonnet-5'
-
-  // Validate the key with OpenRouter API
+  let problem: string | null
   try {
-    const checkRes = await fetch('https://openrouter.ai/api/v1/auth/key', {
-      headers: { Authorization: `Bearer ${cleanKey}` },
-    })
-    if (!checkRes.ok) {
-      const errJson = await checkRes.json().catch(() => ({}))
-      const msg = errJson?.error?.message || `OpenRouter returned HTTP ${checkRes.status}`
-      return NextResponse.json({ error: `Invalid OpenRouter Key: ${msg}` }, { status: 400 })
-    }
-  } catch (err: any) {
-    // If offline or network error, permit saving if user is deliberately configuring
-    if (testOnly) {
-      return NextResponse.json({ error: `Connection failed: ${err.message}` }, { status: 502 })
-    }
+    problem = await verifyKey(apiKey)
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Could not reach OpenRouter: ${err instanceof Error ? err.message : 'network error'}` },
+      { status: 502 }
+    )
+  }
+  if (problem) {
+    return NextResponse.json({ error: `Invalid OpenRouter key: ${problem}` }, { status: 400 })
   }
 
   if (testOnly) {
-    return NextResponse.json({ success: true, message: 'OpenRouter API key is valid and connected!' })
+    return NextResponse.json({ success: true, message: 'OpenRouter API key is valid and connected.' })
   }
 
-  // Update in-memory runtime environment
-  process.env.OPENROUTER_API_KEY = cleanKey
-  process.env.OPENROUTER_MODEL = cleanModel
+  // Stored against this publisher, not written into the server's environment:
+  // one publisher's key must not become every publisher's key.
+  const saved = await savePublisherSettings(publisherId, { ai: { openRouterKey: apiKey, model } })
+  const { ai } = redactSettings(saved)
 
-  // Update .env.local on disk to persist across server restarts
-  try {
-    const envPath = path.join(process.cwd(), '.env.local')
-    let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
+  return NextResponse.json({ success: true, isConfigured: true, ...ai })
+}
 
-    if (content.includes('OPENROUTER_API_KEY=')) {
-      content = content.replace(/OPENROUTER_API_KEY=.*/g, `OPENROUTER_API_KEY=${cleanKey}`)
-    } else {
-      content += `\nOPENROUTER_API_KEY=${cleanKey}`
-    }
-
-    if (content.includes('OPENROUTER_MODEL=')) {
-      content = content.replace(/OPENROUTER_MODEL=.*/g, `OPENROUTER_MODEL=${cleanModel}`)
-    } else {
-      content += `\nOPENROUTER_MODEL=${cleanModel}`
-    }
-
-    fs.writeFileSync(envPath, content.trim() + '\n', 'utf8')
-  } catch (fsErr) {
-    console.error('Could not write to .env.local', fsErr)
-  }
-
-  return NextResponse.json({
-    success: true,
-    isConfigured: true,
-    model: cleanModel,
-    message: 'OpenRouter API key saved successfully!',
-  })
+export async function DELETE() {
+  const publisherId = await requireCurrentPublisherId()
+  await savePublisherSettings(publisherId, { ai: { openRouterKey: undefined, model: undefined } })
+  return NextResponse.json({ success: true })
 }

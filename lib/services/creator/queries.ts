@@ -74,9 +74,11 @@ export async function updateCreatorProject(
   publisherId: string,
   id: string,
   data: Partial<BookCreatorProjectData>
-): Promise<BookCreatorProjectData> {
-  const updated = await prisma.bookCreatorProject.update({
-    where: { id },
+): Promise<BookCreatorProjectData | null> {
+  // Scoped by publisher, not just id: callers checking ownership first is a
+  // convention, and conventions are how cross-tenant writes get in.
+  const { count } = await prisma.bookCreatorProject.updateMany({
+    where: { id, publisherId },
     data: {
       title: data.title,
       subtitle: data.subtitle,
@@ -96,8 +98,9 @@ export async function updateCreatorProject(
       pageCount: data.pageCount,
     },
   })
+  if (count === 0) return null
 
-  return updated as unknown as BookCreatorProjectData
+  return getCreatorProjectForPublisher(publisherId, id)
 }
 
 export async function deleteCreatorProject(publisherId: string, id: string): Promise<boolean> {

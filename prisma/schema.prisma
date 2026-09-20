@@ -17,6 +17,9 @@ model Book {
   frontCoverUrl     String?
   backCoverUrl      String?
   sourceUrl         String?
+  price             String?
+  categories        String[]      @default([])
+  bullets           String[]      @default([])
   contentGoal       String?       @default("all")
   interiorImageUrls String[]      @default([])
   rating            Float?
@@ -98,12 +101,22 @@ model TrailerProject {
   sourceUrl         String?
   interiorImageUrls String[]           @default([])
   status            String             @default("uploaded")
-  length            String             @default("30s")
+  length            String             @default("15s")
   style             String             @default("cinematic")
   musicMood         String             @default("suspenseful")
   aspectRatios      String[]           @default(["9:16", "1:1", "16:9"])
   hookText          String?
   ctaText           String?            @default("AVAILABLE NOW • GET YOUR COPY TODAY")
+  adPreset          String             @default("trade")
+  adHeadline        String?
+  adBenefits        String[]           @default([])
+  aiScene           Boolean            @default(false)
+  showProof         Boolean            @default(true)
+  rating            Float?
+  reviewCount       Int?
+  price             String?
+  categories        String[]           @default([])
+  bullets           String[]           @default([])
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @default(now()) @updatedAt
   trailers          GeneratedTrailer[]
@@ -116,6 +129,7 @@ model GeneratedTrailer {
   projectId   String
   project     TrailerProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   aspectRatio String
+  preset      String         @default("trade")
   videoUrl    String
   posterUrl   String
   duration    Int            @default(30)

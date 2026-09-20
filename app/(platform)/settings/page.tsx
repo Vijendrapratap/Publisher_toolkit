@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getPublisherSettings } from '@/lib/publisher/settings'
+import { getPublisherSettings, redactSettings } from '@/lib/publisher/settings'
 import { SettingsForm } from '@/components/platform/SettingsForm'
 
 export const metadata: Metadata = {
@@ -10,7 +10,9 @@ export const metadata: Metadata = {
 
 export default async function SettingsPage() {
   const publisherId = await requireCurrentPublisherId()
-  const settings = await getPublisherSettings(publisherId)
+  // Redacted: this object is serialised into the client component's props,
+  // and it now carries the publisher's OpenRouter key.
+  const settings = redactSettings(await getPublisherSettings(publisherId))
 
   return <SettingsForm initial={settings} />
 }

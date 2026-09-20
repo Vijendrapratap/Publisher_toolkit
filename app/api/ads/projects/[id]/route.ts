@@ -3,7 +3,7 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { storeFile } from '@/lib/providers/storage'
 import { projectUpdateSchema } from '@/lib/services/ads/options'
-import { COVER_RULE } from '@/lib/services/ads/validation'
+import { isAllowedCoverType, storeUploadedImage, COVER_RULE } from '@/lib/services/shared/upload'
 import { prisma } from '@/lib/db'
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -47,7 +47,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (cover.size > COVER_RULE.maxBytes) {
       return NextResponse.json({ error: 'cover image exceeds the 10MB size limit' }, { status: 400 })
     }
-    if (!COVER_RULE.accept.includes(cover.type)) {
+    if (!isAllowedCoverType(cover.type, cover.name)) {
       return NextResponse.json({ error: 'cover image must be png, jpeg, or webp' }, { status: 400 })
     }
   }
@@ -55,14 +55,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'frontCover or backCover is required' }, { status: 400 })
   }
 
-  const data: { frontCoverUrl?: string; backCoverUrl?: string } = {}
-  if (frontCover) {
-    const bytes = Buffer.from(await frontCover.arrayBuffer())
-    data.frontCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-front.png`, bytes, frontCover.type)).url
-  }
-  if (backCover) {
-    const bytes = Buffer.from(await backCover.arrayBuffer())
-    data.backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, bytes, backCover.type)).url
+  const [frontCoverUrl, backCoverUrl] = await Promise.all([
+    storeUploadedImage(frontCover, 'ads', publisherId, 'front', storeFile),
+    storeUploadedImage(backCover, 'ads', publisherId, 'back', storeFile),
+  ])
+  const data = {
+    ...(frontCoverUrl ? { frontCoverUrl } : {}),
+    ...(backCoverUrl ? { backCoverUrl } : {}),
   }
 
   const updated = await prisma.book.update({ where: { id: book.id }, data })

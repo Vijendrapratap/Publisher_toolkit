@@ -26,22 +26,25 @@ describe('generateAdCopy', () => {
     } as any)
 
     const result = await generateAdCopy(book)
-    expect(result).toHaveLength(3)
-    expect(result[0].platform).toBe('META')
+    expect(result.source).toBe('ai')
+    expect(result.data).toHaveLength(3)
+    expect(result.data[0].platform).toBe('META')
   })
 
-  it('retries once and returns [] if generation keeps failing', async () => {
+  it('falls back to sample copy, flagged as such, when generation fails', async () => {
     vi.mocked(generateText).mockRejectedValue(new Error('rate limited'))
 
     const result = await generateAdCopy(book)
-    expect(result).toEqual([])
-    expect(generateText).toHaveBeenCalledTimes(2)
+    expect(result.source).toBe('fallback')
+    expect(result.reason).toBe('rate limited')
+    expect(result.data).toHaveLength(3)
   })
 
   it('uses local sample copy without calling the model when AI is not configured', async () => {
     delete process.env.OPENROUTER_API_KEY
     const result = await generateAdCopy(book)
-    expect(result).toHaveLength(3)
+    expect(result.source).toBe('fallback')
+    expect(result.data).toHaveLength(3)
     expect(generateText).not.toHaveBeenCalled()
   })
 
@@ -58,13 +61,13 @@ describe('generateAdCopy', () => {
 
     const result = await generateAdCopy(book, { tone: 'punchy', platforms: ['GOOGLE'] })
 
-    expect(result.map((r) => r.platform)).toEqual(['GOOGLE'])
+    expect(result.data.map((r) => r.platform)).toEqual(['GOOGLE'])
     expect(vi.mocked(generateText).mock.calls[0][0].prompt).toContain('Tone: punchy')
   })
 
   it('filters local sample copy to the requested platforms too', async () => {
     delete process.env.OPENROUTER_API_KEY
     const result = await generateAdCopy(book, { tone: 'bold', platforms: ['META', 'AMAZON'] })
-    expect(result.map((r) => r.platform)).toEqual(['META', 'AMAZON'])
+    expect(result.data.map((r) => r.platform)).toEqual(['META', 'AMAZON'])
   })
 })

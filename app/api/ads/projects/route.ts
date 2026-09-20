@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { storeFile } from '@/lib/providers/storage'
 import { extractBookAssets } from '@/lib/services/ads/extract'
-import { COVER_RULE, PDF_RULE } from '@/lib/services/ads/validation'
+import {
+  assetPath,
+  isAllowedCoverType,
+  normalizeImageType,
+  COVER_RULE,
+  PDF_RULE,
+} from '@/lib/services/shared/upload'
 import { prisma } from '@/lib/db'
 
 export async function POST(request: Request) {
@@ -156,7 +162,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'pdf must be a PDF file' }, { status: 400 })
     }
     const pdfBytes = Buffer.from(await pdfFile.arrayBuffer())
-    const { url: pdfUrl } = await storeFile(`ads/${publisherId}/${Date.now()}.pdf`, pdfBytes, 'application/pdf')
+    const { url: pdfUrl } = await storeFile(assetPath('ads', publisherId, 'manuscript', 'application/pdf'), pdfBytes, 'application/pdf')
 
     const extracted = await extractBookAssets(pdfBytes)
 
@@ -171,13 +177,6 @@ export async function POST(request: Request) {
     // An unselected <input type="file"> still submits as a zero-byte File — treat it as absent.
     if (manualFrontCover instanceof File && manualFrontCover.size === 0) manualFrontCover = null
     if (manualBackCover instanceof File && manualBackCover.size === 0) manualBackCover = null
-    const isAllowedCoverType = (type: string, name?: string) => {
-      const normalized = (type || '').toLowerCase()
-      if (['image/png', 'image/jpeg', 'image/jpg', 'image/pjpeg', 'image/webp'].includes(normalized)) return true
-      if (name && /\.(png|jpe?g|webp)$/i.test(name)) return true
-      return false
-    }
-
     for (const cover of [manualFrontCover, manualBackCover]) {
       if (!cover) continue
       if (cover.size > COVER_RULE.maxBytes) {
@@ -191,17 +190,19 @@ export async function POST(request: Request) {
     let frontCoverUrl: string | null = null
     if (manualFrontCover) {
       const bytes = Buffer.from(await manualFrontCover.arrayBuffer())
-      frontCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-front.png`, bytes, manualFrontCover.type)).url
+      const coverType = normalizeImageType(manualFrontCover.type, manualFrontCover.name)
+      frontCoverUrl = (await storeFile(assetPath('ads', publisherId, 'front', coverType), bytes, coverType)).url
     } else if (extracted.frontCoverPng) {
-      frontCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-front.png`, extracted.frontCoverPng, 'image/png')).url
+      frontCoverUrl = (await storeFile(assetPath('ads', publisherId, 'front', 'image/png'), extracted.frontCoverPng, 'image/png')).url
     }
 
     let backCoverUrl: string | null = null
     if (manualBackCover) {
       const bytes = Buffer.from(await manualBackCover.arrayBuffer())
-      backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, bytes, manualBackCover.type)).url
+      const coverType = normalizeImageType(manualBackCover.type, manualBackCover.name)
+      backCoverUrl = (await storeFile(assetPath('ads', publisherId, 'back', coverType), bytes, coverType)).url
     } else if (extracted.backCoverPng) {
-      backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, extracted.backCoverPng, 'image/png')).url
+      backCoverUrl = (await storeFile(assetPath('ads', publisherId, 'back', 'image/png'), extracted.backCoverPng, 'image/png')).url
     }
 
     const campaignName = form.get('campaignName')
@@ -258,13 +259,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please provide a book PDF or enter book details.' }, { status: 400 })
   }
 
-  const isAllowedCoverType = (type: string, name?: string) => {
-    const normalized = (type || '').toLowerCase()
-    if (['image/png', 'image/jpeg', 'image/jpg', 'image/pjpeg', 'image/webp'].includes(normalized)) return true
-    if (name && /\.(png|jpe?g|webp)$/i.test(name)) return true
-    return false
-  }
-
   for (const cover of [manualFrontCover, manualBackCover]) {
     if (!cover) continue
     if (cover.size > COVER_RULE.maxBytes) {
@@ -278,14 +272,15 @@ export async function POST(request: Request) {
   let frontCoverUrl: string | null = null
   if (manualFrontCover) {
     const bytes = Buffer.from(await manualFrontCover.arrayBuffer())
-    const mime = manualFrontCover.type === 'image/jpg' || !manualFrontCover.type ? 'image/jpeg' : manualFrontCover.type
-    frontCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-front.png`, bytes, mime)).url
+    const coverType = normalizeImageType(manualFrontCover.type, manualFrontCover.name)
+    frontCoverUrl = (await storeFile(assetPath('ads', publisherId, 'front', coverType), bytes, coverType)).url
   }
 
   let backCoverUrl: string | null = null
   if (manualBackCover) {
     const bytes = Buffer.from(await manualBackCover.arrayBuffer())
-    backCoverUrl = (await storeFile(`ads/${publisherId}/${Date.now()}-back.png`, bytes, manualBackCover.type)).url
+    const coverType = normalizeImageType(manualBackCover.type, manualBackCover.name)
+    backCoverUrl = (await storeFile(assetPath('ads', publisherId, 'back', coverType), bytes, coverType)).url
   }
 
   // Process 2-5 interior page images / illustrations if uploaded
@@ -295,8 +290,8 @@ export async function POST(request: Request) {
     if (item instanceof File && item.size > 0) {
       if (item.size <= COVER_RULE.maxBytes && isAllowedCoverType(item.type, item.name)) {
         const bytes = Buffer.from(await item.arrayBuffer())
-        const mime = item.type === 'image/jpg' || !item.type ? 'image/jpeg' : item.type
-        const stored = await storeFile(`ads/${publisherId}/interior/${Date.now()}-${Math.random().toString(36).slice(2)}.png`, bytes, mime)
+        const mime = normalizeImageType(item.type, item.name)
+        const stored = await storeFile(assetPath('ads/interior', publisherId, 'page', mime), bytes, mime)
         interiorImageUrls.push(stored.url)
       }
     }

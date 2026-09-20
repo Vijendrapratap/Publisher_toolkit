@@ -2,7 +2,7 @@
 import { useId, useState, type DragEvent } from 'react'
 import { FileText, ImageIcon, UploadCloud, X } from 'lucide-react'
 import { cn } from '@/components/ui/cn'
-import { formatBytes, validateFile, type FileRule } from '@/lib/services/ads/validation'
+import { formatBytes, validateFile, type FileRule } from '@/lib/services/shared/upload'
 
 export function Dropzone({
   id,

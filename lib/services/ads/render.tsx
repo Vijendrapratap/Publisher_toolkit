@@ -26,30 +26,32 @@ export async function renderCreativeImages(input: {
     ? CREATIVE_SIZES.filter((s) => input.platforms!.includes(s.platform))
     : CREATIVE_SIZES
 
-  const results: RenderedCreativeImage[] = []
-  for (const spec of sizes) {
-    const response = new ImageResponse(
-      (
-        <CreativeTemplate
-          coverImageUrl={input.coverImageUrl}
-          title={input.title}
-          author={input.author}
-          width={spec.width}
-          height={spec.height}
-          palette={palette}
-          campaignBadge={input.campaignBadge}
-          ctaText={input.ctaText}
-        />
-      ),
-      { width: spec.width, height: spec.height }
-    )
-    results.push({
-      sizeKey: spec.key,
-      platform: spec.platform,
-      width: spec.width,
-      height: spec.height,
-      pngBuffer: Buffer.from(await response.arrayBuffer()),
+  // Each size is an independent rasterisation — awaiting them one at a time
+  // made a nine-size campaign take nine times as long as it needed to.
+  return Promise.all(
+    sizes.map(async (spec) => {
+      const response = new ImageResponse(
+        (
+          <CreativeTemplate
+            coverImageUrl={input.coverImageUrl}
+            title={input.title}
+            author={input.author}
+            width={spec.width}
+            height={spec.height}
+            palette={palette}
+            campaignBadge={input.campaignBadge}
+            ctaText={input.ctaText}
+          />
+        ),
+        { width: spec.width, height: spec.height }
+      )
+      return {
+        sizeKey: spec.key,
+        platform: spec.platform,
+        width: spec.width,
+        height: spec.height,
+        pngBuffer: Buffer.from(await response.arrayBuffer()),
+      }
     })
-  }
-  return results
+  )
 }

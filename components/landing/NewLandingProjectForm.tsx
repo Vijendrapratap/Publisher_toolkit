@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input, Textarea, Field } from '@/components/ui/field'
 import { Dropzone } from '@/components/platform/Dropzone'
-import { PDF_RULE, COVER_RULE } from '@/lib/services/ads/validation'
+import { PDF_RULE, COVER_RULE } from '@/lib/services/shared/upload'
 
 export function NewLandingProjectForm() {
   const router = useRouter()

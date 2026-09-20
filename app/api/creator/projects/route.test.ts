@@ -15,6 +15,7 @@ vi.mock('@/lib/db', () => ({
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn(),
     },
     book: {
@@ -103,7 +104,7 @@ describe('Book Creator API Routes', () => {
       },
     }
 
-    vi.mocked(prisma.bookCreatorProject.findFirst).mockResolvedValueOnce(mockProject as any)
+    vi.mocked(prisma.bookCreatorProject.findFirst).mockResolvedValue(mockProject as any)
     vi.mocked(prisma.bookCreatorProject.update).mockResolvedValueOnce({
       ...mockProject,
       wordCount: 1100,
@@ -120,8 +121,13 @@ describe('Book Creator API Routes', () => {
 
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.chapter.status).toBe('completed')
-    expect(json.chapter.wordCount).toBeGreaterThan(50)
+    expect(json.chapter.content).not.toBe('')
+    expect(json.chapter.wordCount).toBeGreaterThan(0)
+
+    // No AI key is configured in tests, so this is placeholder text. It must
+    // stay a draft and say so, rather than being reported as written.
+    expect(json.source).toBe('fallback')
+    expect(json.chapter.status).toBe('draft')
   })
 
   it('POST /api/creator/projects/[id]/send-to-ads bridges book into ads studio', async () => {

@@ -55,11 +55,20 @@ export function NovelChapterViewer({
       )
       setChapters(updatedChapters)
       onChapterUpdated?.(data.chapter)
-      toast.success(`Chapter ${activeChapter.chapterNumber} written!`, {
-        description: `Generated ${data.chapter.wordCount} words.`,
+
+      if (data.source === 'fallback') {
+        toast.warning('Placeholder text inserted', {
+          description: 'AI drafting was unavailable, so the chapter stays a draft. Add an OpenRouter key in Settings to write it.',
+        })
+      } else {
+        toast.success(`Chapter ${activeChapter.chapterNumber} written!`, {
+          description: `Generated ${data.chapter.wordCount} words.`,
+        })
+      }
+    } catch (err) {
+      toast.error('Chapter generation failed', {
+        description: err instanceof Error ? err.message : undefined,
       })
-    } catch (err: any) {
-      toast.error('Chapter generation failed', { description: err.message })
     } finally {
       setGenerating(false)
     }

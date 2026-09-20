@@ -17,7 +17,7 @@ import {
   Check,
   RefreshCw,
 } from 'lucide-react'
-import type { PublisherSettings } from '@/lib/publisher/settings'
+import type { RedactedPublisherSettings } from '@/lib/publisher/settings'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,8 +38,8 @@ const AVAILABLE_GENRES = [
   'Business & Self-Help',
 ]
 
-export function SettingsForm({ initial }: { initial: PublisherSettings }) {
-  const [settings, setSettings] = useState<PublisherSettings>(initial)
+export function SettingsForm({ initial }: { initial: RedactedPublisherSettings }) {
+  const [settings, setSettings] = useState<RedactedPublisherSettings>(initial)
   const [activeTab, setActiveTab] = useState<'brand' | 'retail' | 'ai'>('brand')
   const [saving, setSaving] = useState(false)
 

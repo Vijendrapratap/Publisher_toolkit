@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Field, Input, Textarea } from '@/components/ui/field'
 import { Dropzone } from '@/components/platform/Dropzone'
-import { COVER_RULE } from '@/lib/services/ads/validation'
+import { COVER_RULE } from '@/lib/services/shared/upload'
 
 export function TrailerDetailsReview({
   projectId,

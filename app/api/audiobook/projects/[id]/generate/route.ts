@@ -8,6 +8,9 @@ import { prisma } from '@/lib/db'
 
 export const maxDuration = 300
 
+// Bounded so a long book does not fan out into a rate limit.
+const TTS_CONCURRENCY = 4
+
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const publisherId = await requireCurrentPublisherId()
@@ -26,39 +29,52 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const voicePacing = project.voicePacing || 1.0
 
   try {
-    const chapterBuffers: Buffer[] = []
-    let totalDurationSec = 0
+    // Chapters are independent. They render in parallel but in bounded batches,
+    // because a 40-chapter book firing 40 concurrent TTS requests gets rate
+    // limited, and every provider here charges per call.
+    const rendered: { id: string; buffer: Buffer; url: string; durationSec: number }[] = []
 
-    // Synthesize each chapter sequentially
-    for (const ch of project.chapters) {
-      const synthesized = await synthesizeChapterAudio({
-        text: ch.content,
-        chapterTitle: ch.title,
-        ttsProvider,
-        voiceModel,
-        voicePacing,
-        audioFormat: format,
-        sampleAudioUrl: project.sampleAudioUrl,
-      })
-
-      chapterBuffers.push(synthesized.audioBuffer)
-      totalDurationSec += synthesized.durationSec
-
-      const storedAudio = await storeFile(
-        `audiobook/${publisherId}/${project.id}/chapter-${ch.chapterNumber}.${format}`,
-        synthesized.audioBuffer,
-        synthesized.mimeType
+    for (let i = 0; i < project.chapters.length; i += TTS_CONCURRENCY) {
+      const batch = project.chapters.slice(i, i + TTS_CONCURRENCY)
+      const results = await Promise.all(
+        batch.map(async (ch) => {
+          const synthesized = await synthesizeChapterAudio({
+            text: ch.content,
+            chapterTitle: ch.title,
+            ttsProvider,
+            voiceModel,
+            voicePacing,
+            audioFormat: format,
+            sampleAudioUrl: project.sampleAudioUrl,
+          })
+          const stored = await storeFile(
+            `audiobook/${publisherId}/${project.id}/chapter-${ch.chapterNumber}.${format}`,
+            synthesized.audioBuffer,
+            synthesized.mimeType
+          )
+          return {
+            id: ch.id,
+            buffer: synthesized.audioBuffer,
+            url: stored.url,
+            durationSec: synthesized.durationSec,
+          }
+        })
       )
-
-      await prisma.audiobookChapter.update({
-        where: { id: ch.id },
-        data: {
-          audioUrl: storedAudio.url,
-          duration: synthesized.durationSec,
-          status: 'ready',
-        },
-      })
+      rendered.push(...results)
     }
+
+    // One round-trip instead of one per chapter.
+    await prisma.$transaction(
+      rendered.map((r) =>
+        prisma.audiobookChapter.update({
+          where: { id: r.id },
+          data: { audioUrl: r.url, duration: r.durationSec, status: 'ready' },
+        })
+      )
+    )
+
+    const chapterBuffers = rendered.map((r) => r.buffer)
+    const totalDurationSec = rendered.reduce((sum, r) => sum + r.durationSec, 0)
 
     // Generate combined full audiobook track
     let fullAudioUrl: string | null = null

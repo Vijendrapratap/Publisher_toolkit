@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { prisma } from '@/lib/db'
-import { getBooksForPublisher, getBookForPublisher, getLatestCreativeSetForBook, getAdCopyForPublisher } from './queries'
+import { getRecentBooksForPublisher, getBookForPublisher, getLatestCreativeSetForBook, getAdCopyForPublisher } from './queries'
 
 // Test files run in parallel workers against one shared test database, so this
 // file owns its own publisher prefix and only ever deletes its own rows. Wiping
@@ -25,7 +25,7 @@ describe('book queries', () => {
     await prisma.book.create({ data: { publisherId: pubA, pdfUrl: 'x' } })
     const bookB = await prisma.book.create({ data: { publisherId: pubB, pdfUrl: 'y' } })
 
-    expect(await getBooksForPublisher(pubA)).toHaveLength(1)
+    expect(await getRecentBooksForPublisher(pubA, 10)).toHaveLength(1)
     expect(await getBookForPublisher(pubA, bookB.id)).toBeNull()
   })
 })

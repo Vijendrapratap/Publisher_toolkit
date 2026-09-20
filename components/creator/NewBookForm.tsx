@@ -113,14 +113,24 @@ export function NewBookForm() {
         throw new Error(json.error || 'Failed to create and generate book')
       }
 
-      toast.success('Book created!', {
-        description: `"${title}" has been successfully generated.`,
-      })
+      // The API says whether this is the publisher's book or stock sample
+      // content; announcing "generated" either way is how people ended up
+      // publishing a story about a bear they never asked for.
+      if (json.source === 'fallback') {
+        toast.warning('Created with sample content', {
+          description: 'AI generation was unavailable, so this book is filled with placeholder pages. Add an OpenRouter key in Settings and regenerate.',
+        })
+      } else {
+        toast.success('Book created!', {
+          description: `"${title}" has been generated.`,
+        })
+      }
       router.push(`/create-book/${json.id}`)
       router.refresh()
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong during generation.')
-      toast.error('Generation failed', { description: err.message })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong during generation.'
+      setError(message)
+      toast.error('Generation failed', { description: message })
     } finally {
       setPending(false)
     }

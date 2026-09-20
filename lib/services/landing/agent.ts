@@ -1,6 +1,10 @@
-import { generateText, Output } from 'ai'
 import { z } from 'zod'
-import { isAiConfigured, getLandingPageModel } from '@/lib/providers/ai'
+import {
+  DEFAULT_LANDING_MODEL,
+  generateStructured,
+  type AiCredentials,
+  type AiResult,
+} from '@/lib/providers/ai'
 import type { LandingTemplateKey, LandingThemeKey } from './options'
 
 export const authorLandingAgentInputSchema = z.object({
@@ -31,7 +35,7 @@ export const authorLandingAgentOutputSchema = z.object({
   newsletterIncentive: z.string(),
   recommendedTemplate: z.enum(['bestseller', 'editorial', 'fantasy', 'minimal', 'romance']),
   recommendedTheme: z.enum(['matt', 'dark', 'light']),
-  recommendedAccent: z.string(),
+  recommendedAccent: z.string().regex(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i).describe('Hex colour, e.g. #6366f1'),
   reviews: z.array(
     z.object({
       quote: z.string(),
@@ -100,48 +104,53 @@ export function sampleAuthorLanding(input: AuthorLandingAgentInput): AuthorLandi
   }
 }
 
+const SYSTEM = `You are a book marketing strategist writing the actual copy for an author's landing page.
+
+Rules you never break:
+- Never invent an award, a bestseller list, a sales figure, a named critic or a publication. Reviews you write must read as reader-voiced praise attributed to a generic outlet, never to a real one.
+- Write about this book and this author. Copy that would fit any book is a failure.
+- No "New York Times bestselling" unless the publisher stated it in the accolades.
+- Headline earns the scroll, subtitle explains, synopsis sells the premise without spoiling the ending.
+- Pick the template and theme that fit the genre and objective, not the flashiest one.
+- recommendedAccent must be a hex colour like #6366f1.`
+
+const OBJECTIVES: Record<AuthorLandingAgentInput['primaryObjective'], string> = {
+  preorder: 'Drive retail sales and pre-orders. The buy buttons are the page.',
+  newsletter: 'Capture email signups with a reader magnet. The gift is the page.',
+  brand: 'Establish the author and their wider body of work. The author is the page.',
+  speaking: 'Win media, podcast and speaking bookings. Credibility is the page.',
+}
+
 export async function runAuthorLandingAgent(
-  input: AuthorLandingAgentInput
-): Promise<AuthorLandingAgentOutput> {
-  if (!isAiConfigured()) {
-    return sampleAuthorLanding(input)
-  }
+  input: AuthorLandingAgentInput,
+  credentials?: AiCredentials
+): Promise<AiResult<AuthorLandingAgentOutput>> {
+  const prompt = [
+    `Book title: ${input.bookTitle}`,
+    `Author: ${input.authorName}`,
+    `Objective: ${input.primaryObjective} — ${OBJECTIVES[input.primaryObjective]}`,
+    input.authorPersona ? `Author background: ${input.authorPersona}` : null,
+    input.authorVoice ? `Author voice: ${input.authorVoice}` : null,
+    input.authorQuote ? `Author's own words: ${input.authorQuote}` : null,
+    input.targetAudience ? `Readers and comparable titles: ${input.targetAudience}` : null,
+    input.readerMagnet ? `Reader magnet on offer: ${input.readerMagnet}` : null,
+    input.otherWorks ? `Other works: ${input.otherWorks}` : null,
+    input.accolades ? `Verified accolades (the only ones you may cite): ${input.accolades}` : 'No accolades supplied — cite none.',
+    input.templatePreference ? `Publisher prefers the ${input.templatePreference} template.` : null,
+    input.themePreference ? `Publisher prefers the ${input.themePreference} theme.` : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
 
-  const objectiveDescriptions = {
-    preorder: 'Maximize retail book sales and pre-orders on Amazon, Barnes & Noble, and Apple Books.',
-    newsletter: 'Build a dedicated author fanbase and capture email leads via an enticing reader magnet gift.',
-    brand: 'Establish author authority, introduce the overarching literary series universe and backlist.',
-    speaking: 'Position the author for prestigious media appearances, podcast interviews, and speaking keynotes.',
-  }
-
-  const prompt = `You are a world-class book marketing strategist and author brand architect.
-Design a cohesive, high-converting author and book landing page.
-CRITICAL: The landing page must celebrate the AUTHOR as well as the book, establishing author brand credibility, voice, and deep reader connection.
-
-CAMPAIGN DETAILS:
-Book Title: ${input.bookTitle}
-Author Name: ${input.authorName}
-Primary Objective: ${input.primaryObjective} (${objectiveDescriptions[input.primaryObjective] || ''})
-Author Background / Origin Story: ${input.authorPersona || 'Accomplished author with a unique voice'}
-Author Voice / Tone: ${input.authorVoice || 'Compelling, authoritative, emotionally resonant'}
-Author Quote or Philosophy: ${input.authorQuote || 'Reflective of their writing mission'}
-Target Readers / Comps: ${input.targetAudience || 'Discerning readers of contemporary fiction & narrative nonfiction'}
-Reader Magnet Incentive: ${input.readerMagnet || 'Free bonus chapter & author commentary'}
-Author Other Works / Series: ${input.otherWorks || 'First in series or standalone work'}
-Accolades & Achievements: ${input.accolades || 'Praise from critics and readers'}
-
-Generate tailored, publication-ready landing page copy matching this exact objective and author voice.`
-
-  try {
-    const { output } = await generateText({
-      model: getLandingPageModel(),
-      output: Output.object({ schema: authorLandingAgentOutputSchema }),
-      prompt,
-    })
-
-    return output
-  } catch (err) {
-    console.error('[Landing Page Agent] DeepSeek v4.1 generation failed, falling back to sample', err)
-    return sampleAuthorLanding(input)
-  }
+  return generateStructured({
+    label: 'landing-page',
+    schema: authorLandingAgentOutputSchema,
+    system: SYSTEM,
+    prompt,
+    credentials,
+    model: process.env.OPENROUTER_LANDING_MODEL || DEFAULT_LANDING_MODEL,
+    temperature: 0.75,
+    timeoutMs: 60_000,
+    fallback: () => sampleAuthorLanding(input),
+  })
 }

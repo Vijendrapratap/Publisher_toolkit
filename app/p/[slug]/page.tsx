@@ -19,7 +19,7 @@ export async function generateMetadata({
     openGraph: {
       title: `${project.title || 'Book'} by ${project.author || 'Author'}`,
       description: project.subtitle || project.synopsis?.slice(0, 160) || 'Official Book Website',
-      images: project.coverUrl ? [project.coverUrl] : [],
+      images: project.coverUrl ? [`/p/${slug}/cover`] : [],
     },
   }
 }
@@ -33,13 +33,17 @@ export default async function PublicBookLandingPage({
   const project = await getLandingProjectBySlug(slug)
   if (!project) notFound()
 
+  // Public visitors have no publisher cookie, so the stored cover URL is not
+  // readable to them — serve it through this page's own public cover route.
+  const coverUrl = project.coverUrl ? `/p/${slug}/cover` : null
+
   const html = renderLandingPageHtml({
     title: project.title || 'Untitled Book',
     subtitle: project.subtitle,
     author: project.author || 'Author',
     authorBio: project.authorBio,
     synopsis: project.synopsis,
-    coverUrl: project.coverUrl,
+    coverUrl,
     template: (project.template as LandingTemplateKey) || 'bestseller',
     theme: (project.theme as LandingThemeKey) || 'matt',
     accentColor: project.accentColor || '#6366f1',

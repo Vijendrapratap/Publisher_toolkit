@@ -38,9 +38,16 @@ export interface GoogleConnectorConfig {
   status: 'connected' | 'simulated' | 'disconnected'
 }
 
+export interface AiAccount {
+  /** The publisher's own OpenRouter key. Never sent to the browser. */
+  openRouterKey?: string
+  model?: string
+}
+
 export interface PublisherSettings {
   publisherId: string
   brand: PublisherBrand
+  ai: AiAccount
   retail: RetailChannels
   metaConnector: MetaConnectorConfig
   googleConnector: GoogleConnectorConfig
@@ -82,6 +89,7 @@ export function defaultPublisherSettings(publisherId: string): PublisherSettings
       mcpServerUrl: 'http://localhost:3333/mcp/google',
       status: 'simulated',
     },
+    ai: {},
     updatedAt: new Date().toISOString(),
   }
 }
@@ -96,13 +104,15 @@ export async function getPublisherSettings(publisherId: string): Promise<Publish
   try {
     const raw = await readFile(filePath, 'utf-8')
     const parsed = JSON.parse(raw)
+    const defaults = defaultPublisherSettings(publisherId)
     return {
-      ...defaultPublisherSettings(publisherId),
+      ...defaults,
       ...parsed,
-      brand: { ...defaultPublisherSettings(publisherId).brand, ...parsed.brand },
-      retail: { ...defaultPublisherSettings(publisherId).retail, ...parsed.retail },
-      metaConnector: { ...defaultPublisherSettings(publisherId).metaConnector, ...parsed.metaConnector },
-      googleConnector: { ...defaultPublisherSettings(publisherId).googleConnector, ...parsed.googleConnector },
+      brand: { ...defaults.brand, ...parsed.brand },
+      retail: { ...defaults.retail, ...parsed.retail },
+      metaConnector: { ...defaults.metaConnector, ...parsed.metaConnector },
+      googleConnector: { ...defaults.googleConnector, ...parsed.googleConnector },
+      ai: { ...parsed.ai },
       publisherId,
     }
   } catch {
@@ -126,6 +136,7 @@ export async function savePublisherSettings(
     googleConnector: updates.googleConnector
       ? { ...current.googleConnector, ...updates.googleConnector }
       : current.googleConnector,
+    ai: updates.ai ? { ...current.ai, ...updates.ai } : current.ai,
     publisherId,
     updatedAt: new Date().toISOString(),
   }
@@ -134,4 +145,33 @@ export async function savePublisherSettings(
   await mkdir(path.dirname(filePath), { recursive: true })
   await writeFile(filePath, JSON.stringify(merged, null, 2), 'utf-8')
   return merged
+}
+
+/**
+ * The publisher's key must never reach the browser, and the settings object is
+ * returned to it wholesale. Everything leaving the server goes through here.
+ */
+/** What the browser is allowed to see: the key itself never crosses. */
+export type RedactedPublisherSettings = Omit<PublisherSettings, 'ai'> & {
+  ai: { hasKey: boolean; maskedKey: string | null; model?: string }
+}
+
+export function redactSettings(settings: PublisherSettings): RedactedPublisherSettings {
+  const key = settings.ai.openRouterKey
+  return {
+    ...settings,
+    ai: {
+      model: settings.ai.model,
+      hasKey: Boolean(key),
+      maskedKey: key ? `${key.slice(0, 7)}...${key.slice(-4)}` : null,
+    },
+  }
+}
+
+/** Credentials for an AI call made on this publisher's behalf. */
+export async function getPublisherAiCredentials(
+  publisherId: string
+): Promise<{ apiKey?: string | null; model?: string | null }> {
+  const { ai } = await getPublisherSettings(publisherId)
+  return { apiKey: ai.openRouterKey ?? null, model: ai.model ?? null }
 }
