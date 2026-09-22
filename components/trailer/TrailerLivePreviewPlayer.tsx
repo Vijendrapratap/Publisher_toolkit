@@ -21,8 +21,8 @@ export interface TrailerLivePreviewPlayerProps {
 
 const SCENES = ['Hook', 'Story', 'Book', 'Call to action']
 
-/** Stage width per format, so a vertical video is not blown up to the column width. */
-const STAGE_MAX_WIDTH: Record<AdVideoSpec['format'], number> = { '9:16': 300, '1:1': 460, '16:9': 680 }
+/** Stage width per format: vertical video is capped and centred so it isn't blown up; widescreen/square fill the column. */
+const STAGE_MAX_WIDTH: Partial<Record<AdVideoSpec['format'], number>> = { '9:16': 300 }
 
 export function TrailerLivePreviewPlayer({ spec, title, author, coverUrl, interiorImageUrls, className }: TrailerLivePreviewPlayerProps) {
   const [mounted, setMounted] = useState(false)

@@ -22,5 +22,22 @@ for (const width of [1440, 1024]) {
     await expect(card).toContainText('A brand new hook line')
     await expect(card.getByRole('button', { name: 'Save' })).toBeEnabled()
     await expect(page.getByText(/remotion|hyperframe/i)).toHaveCount(0)
+
+    // Nothing in the card is clipped: every button/input's content fits its box.
+    const clipped = await card.evaluate((root) =>
+      [...root.querySelectorAll('button, input:not([type="color"]):not([type="file"]), select')]
+        .filter((el) => (el as HTMLElement).offsetParent !== null)
+        .filter((el) => el.scrollWidth > el.clientWidth + 1)
+        .map((el) => (el as HTMLElement).innerText || (el as HTMLInputElement).value)
+    )
+    expect(clipped).toEqual([])
+
+    // The two columns are balanced: the empty space under the shorter column is small.
+    const columns = card.locator('[data-column]')
+    await expect(columns).toHaveCount(2)
+    if (width >= 1024) {
+      const [a, b] = await columns.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height))
+      expect(Math.min(a, b) / Math.max(a, b)).toBeGreaterThan(0.6)
+    }
   })
 }

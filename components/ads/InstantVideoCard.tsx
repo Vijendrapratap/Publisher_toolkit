@@ -151,10 +151,73 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
         <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{problem}</p>
       )}
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-2">
-        <TrailerLivePreviewPlayer spec={spec} title={title} author={author} coverUrl={coverUrl} interiorImageUrls={interiorImageUrls} />
+      <div className="mt-5 grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div data-column="preview" className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
+          <TrailerLivePreviewPlayer spec={spec} title={title} author={author} coverUrl={coverUrl} interiorImageUrls={interiorImageUrls} />
 
-        <div className="flex min-w-0 flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className={labelClass}>Format</span>
+              <select className={inputClass} value={spec.format} onChange={(e) => setSpec((s) => ({ ...s, format: e.target.value as AdVideoSpec['format'] }))}>
+                {ASPECT_RATIO_OPTIONS.map((a) => (
+                  <option key={a.key} value={a.key}>{a.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className={labelClass}>Length</span>
+              <select className={inputClass} value={spec.length} onChange={(e) => setSpec((s) => ({ ...s, length: e.target.value as AdVideoSpec['length'] }))}>
+                {LENGTH_OPTIONS.map((l) => (
+                  <option key={l.key} value={l.key}>{l.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <fieldset>
+            <legend className={labelClass}>Colours</legend>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {STYLE_OPTIONS.map((preset) => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  onClick={() => setSpec((s) => ({ ...s, style: presetStyle(preset.key) }))}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-ink transition hover:border-instant/50"
+                >
+                  <span className="size-3 rounded-full" style={{ background: preset.palette.accent }} aria-hidden />
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {COLOR_FIELDS.map((field) => {
+                const value = spec.style.colors[field.key]
+                return (
+                  <label key={field.key} className="flex min-w-0 flex-col gap-1 text-xs text-ink-muted">
+                    {field.label}
+                    <span className="flex items-center gap-2 rounded-xl border border-line bg-surface px-2 py-1.5">
+                      <input
+                        type="color"
+                        aria-label={`${field.label} colour`}
+                        value={HEX.test(value) ? value : '#000000'}
+                        onChange={(e) => setColors({ [field.key]: e.target.value })}
+                        className="size-7 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                      />
+                      <input
+                        aria-label={`${field.label} hex`}
+                        value={value}
+                        onChange={(e) => setColors({ [field.key]: e.target.value })}
+                        className="w-full min-w-0 bg-transparent font-mono text-xs text-ink outline-none"
+                      />
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+          </fieldset>
+        </div>
+
+        <div data-column="editor" className="flex min-w-0 flex-col gap-4">
           <label className="flex flex-col gap-1.5">
             <span className={labelClass}>Hook <Counter value={spec.script.hook} max={SCRIPT_LIMITS.hook} /></span>
             <input className={inputClass} value={spec.script.hook} onChange={(e) => setScript({ hook: e.target.value })} />
@@ -202,24 +265,29 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
             <input className={inputClass} value={spec.script.cta} onChange={(e) => setScript({ cta: e.target.value })} />
           </label>
 
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1.5">
-              <span className={labelClass}>Format</span>
-              <select className={inputClass} value={spec.format} onChange={(e) => setSpec((s) => ({ ...s, format: e.target.value as AdVideoSpec['format'] }))}>
-                {ASPECT_RATIO_OPTIONS.map((a) => (
-                  <option key={a.key} value={a.key}>{a.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className={labelClass}>Length</span>
-              <select className={inputClass} value={spec.length} onChange={(e) => setSpec((s) => ({ ...s, length: e.target.value as AdVideoSpec['length'] }))}>
-                {LENGTH_OPTIONS.map((l) => (
-                  <option key={l.key} value={l.key}>{l.label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <fieldset>
+            <legend className={labelClass}>Font</legend>
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              {AD_FONTS.map((font) => {
+                const selected = spec.style.font === font.key
+                return (
+                  <button
+                    key={font.key}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setSpec((s) => ({ ...s, style: { ...s.style, font: font.key } }))}
+                    style={{ fontFamily: fontFamilies[font.key] }}
+                    className={cn(
+                      'whitespace-nowrap rounded-xl border px-2 py-2 text-sm text-ink transition',
+                      selected ? 'border-instant bg-surface ring-2 ring-instant/30' : 'border-line bg-surface/60 hover:border-instant/50'
+                    )}
+                  >
+                    {font.label}
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
 
           <fieldset>
             <legend className={labelClass}>
@@ -266,72 +334,6 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
             </div>
             <audio ref={audioRef} src={musicUrl(music) ?? undefined} onEnded={() => setPlaying(false)} preload="none" />
             <p className="mt-1.5 text-xs text-ink-muted">Bundled tracks are public domain and free to use in ads. Upload only music you have the rights to.</p>
-          </fieldset>
-
-          <fieldset>
-            <legend className={labelClass}>Font</legend>
-            <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {AD_FONTS.map((font) => {
-                const selected = spec.style.font === font.key
-                return (
-                  <button
-                    key={font.key}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => setSpec((s) => ({ ...s, style: { ...s.style, font: font.key } }))}
-                    style={{ fontFamily: fontFamilies[font.key] }}
-                    className={cn(
-                      'truncate rounded-xl border px-2 py-2 text-sm text-ink transition',
-                      selected ? 'border-instant bg-surface ring-2 ring-instant/30' : 'border-line bg-surface/60 hover:border-instant/50'
-                    )}
-                  >
-                    {font.label}
-                  </button>
-                )
-              })}
-            </div>
-          </fieldset>
-
-          <fieldset>
-            <legend className={labelClass}>Colours</legend>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {STYLE_OPTIONS.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  onClick={() => setSpec((s) => ({ ...s, style: presetStyle(preset.key) }))}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-ink transition hover:border-instant/50"
-                >
-                  <span className="size-3 rounded-full" style={{ background: preset.palette.accent }} aria-hidden />
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {COLOR_FIELDS.map((field) => {
-                const value = spec.style.colors[field.key]
-                return (
-                  <label key={field.key} className="flex min-w-0 flex-col gap-1 text-xs text-ink-muted">
-                    {field.label}
-                    <span className="flex items-center gap-2 rounded-xl border border-line bg-surface px-2 py-1.5">
-                      <input
-                        type="color"
-                        aria-label={`${field.label} colour`}
-                        value={HEX.test(value) ? value : '#000000'}
-                        onChange={(e) => setColors({ [field.key]: e.target.value })}
-                        className="size-7 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-                      />
-                      <input
-                        aria-label={`${field.label} hex`}
-                        value={value}
-                        onChange={(e) => setColors({ [field.key]: e.target.value })}
-                        className="w-full min-w-0 bg-transparent font-mono text-xs text-ink outline-none"
-                      />
-                    </span>
-                  </label>
-                )
-              })}
-            </div>
           </fieldset>
         </div>
       </div>
