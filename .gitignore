@@ -1,5 +1,6 @@
 node_modules
 .next
+.remotion-bundle/
 .env*.local
 !.env.example
 .superpowers/
