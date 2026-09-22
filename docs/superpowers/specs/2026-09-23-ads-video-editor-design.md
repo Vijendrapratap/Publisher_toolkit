@@ -1,6 +1,6 @@
 # Ads Creative: editable video script, fonts & colours, WYSIWYG export
 
-Date: 2026-09-23 · Status: awaiting review
+Date: 2026-09-23 · Status: revision 2, awaiting review
 
 ## Problem
 
@@ -14,23 +14,34 @@ In the Ads Creative flow (`/ads/[id]/configure → generate → results`):
    (fixed 10 s). The MP4 comes from a separate canvas renderer,
    `lib/services/trailer/video.ts`, which duplicates the palettes by hand and
    has its own layout — that is where the title text overlaps the cover.
-3. **No text editing before render.** The video's hook/lines/CTA are not
-   editable anywhere; banner copy is editable only after generation.
-4. **AI is the final submit.** "Generate" always calls the AI for copy.
+3. **Video text cannot be edited.** The video's hook/lines/CTA are not
+   editable anywhere, so a publisher cannot fix a line and re-export.
+4. **No AI video option.** Video is a fixed template; there is no way to ask
+   an AI for a richer, generated ad built from the same inputs.
 5. **Fonts and colours are hard-coded** (system serif/sans, 8 fixed palettes).
 
 ## Goals
 
-- Everything the video says, and how it looks, is editable before rendering,
-  with an instant live preview.
-- AI is an optional helper that fills or improves fields on request. Generate
-  renders exactly what is in the editor and makes no AI call for video text.
-- The downloaded MP4 is a pixel match of the preview.
-- The configure and results pages lay out cleanly from 1024 px up and stack on
-  narrow screens.
+The publisher adds the book (details, cover, interior pages) and receives ad
+images and a video. The results page then offers two ways to refine the video:
 
-Out of scope: Amazon import fix, image-quality work, AI image-to-video clips,
-the Trailer tool's (`/trailer`) engine. Those stay in the earlier plan.
+- **Instant Video** (light-green card): the video text, font and colours are
+  edited in place and the preview updates immediately. Export renders exactly
+  what is previewed. Fast, no AI cost.
+- **Generate with AI** (cyan button): an AI video built from the same inputs.
+  The AI writes an editable, shot-by-shot video prompt; the publisher edits it
+  directly or gives pointers for the AI to revise it, then generates the video
+  with a video model.
+
+Also:
+
+- No engine names ("Remotion", "Hyperframes") anywhere in the UI.
+- The downloaded Instant Video MP4 is a pixel match of its preview.
+- The results page lays out cleanly from 1024 px up and stacks on narrow
+  screens.
+
+Out of scope: Amazon import fix, image-quality work, the Trailer tool's
+(`/trailer`) engine, music. Those stay in the earlier plan.
 
 ## Design
 
@@ -106,48 +117,92 @@ Remotion's bundler cannot run inside a Next.js app, so:
 Licensing note: Remotion requires a company licence for organisations over
 three people; this already applies because `@remotion/player` is in use.
 
-### 5. AI as an optional helper
+### 5. Instant Video card (results page, light green)
 
-New route `POST /api/ads/projects/[id]/video-script/ai` with body
-`{ mode: 'fill' | 'improve', field?: 'hook'|'storyLine'|'benefits'|'cta', instruction?: string }`:
+`components/ads/InstantVideoCard.tsx`, light-green surface (new tokens
+`--color-instant` / `--color-instant-soft`, with dark-mode values):
 
-- `fill` writes any empty fields from the book details.
-- `improve` rewrites one field (or the whole script) following the optional
-  instruction ("make the hook punchier").
-- Returns a proposed script; the UI shows it in the fields and nothing is
-  saved until the user saves. Uses `generateStructured` with the existing
-  muted-autoplay copy rules from `lib/services/videoad/copy.ts`.
+- Left: the live player at its real aspect ratio, format toggle (9:16 / 1:1 /
+  16:9) and length select.
+- Right: "Video text" fields (hook, story line, benefits, CTA) with character
+  counters; font picker (each option rendered in its font); colour pickers
+  (native `<input type="color">` + hex) and preset chips that reset colours.
+- Every edit updates the player immediately (no network).
+- "Save & export MP4" PATCHes `videoSpec`, then calls
+  `POST /api/ads/projects/[id]/video/instant`, which renders via §4 and
+  replaces the set's `videoUrl`/`videoPosterUrl`. Button shows progress;
+  the new MP4 is downloadable when done.
+- Initial generation (Generate on the configure page) renders the Instant
+  Video from `defaultVideoSpec(book)`, so results always open with a video.
 
-Banner copy follows the same rule: a copy editor on the configure page with
-an optional "✨ Write with AI" button. On Generate, saved copy is used as-is;
-empty copy falls back to the existing non-AI template (`ads/sampleCopy.ts`),
-never to a silent AI call.
+### 6. AI Video (cyan button → panel)
 
-### 6. Configure page UI (`components/ads/ConfigureForm.tsx`)
+A cyan "Generate with AI" button on the results page opens
+`components/ads/AiVideoPanel.tsx` (cyan accents, tokens `--color-ai` /
+`--color-ai-soft`).
 
-- ≥ 1024 px: two columns — settings (left, scrolls) and a sticky preview
-  column (right, ~420 px) containing the player, a format toggle and scene
-  chips on their own rows.
-- New "Video Script & Style" card: four script fields with counters and a
-  per-field "✨ Improve" (opens a one-line instruction input), a "✨ Write with
-  AI" button for the whole script, a font picker (each option rendered in its
-  font), colour pickers (native `<input type="color">` + hex field) and
-  preset chips that reset the colours.
-- Edits update the preview immediately; saved via the existing PATCH route
-  (extended to accept `videoSpec`).
-- The final button reads "Generate creatives & video" and never calls AI for
-  the video text.
+**6a. Editable brief.** `POST /api/ads/projects/[id]/video/ai/brief` builds
+an `AiVideoBrief` with `generateStructured`:
 
-### 7. Results page UI (`components/ads/CreativeGallery.tsx`)
+```ts
+AiVideoBrief {
+  shots: {               // 2–3 shots
+    prompt: string       // camera, motion, lighting, mood; ≤ 600 chars
+    sourceImage: 'cover' | `page-${n}`   // first frame for image-to-video
+    durationSec: 4 | 5 | 6 | 8
+    caption?: string     // on-screen text burned in afterwards, ≤ 40 chars
+  }[]
+  endCard: { headline: string; cta: string }  // real cover + text, rendered by us
+}
+```
 
-- Responsive grid: `repeat(auto-fill, minmax(220px, 1fr))`; cards keep the
-  full "Download" label; wide banners span the row.
-- Video card: full-width header, player at its real aspect ratio, and an
-  "Edit script & style" link back to the configure page.
+System prompt: a book-trailer creative director. Each shot must animate the
+given source image (camera move, light, particles, depth), never redraw the
+cover or add lettering, and together the shots must build one emotional arc
+from the book's premise to the reader's payoff.
+
+The panel shows each shot as an editable card (prompt textarea, image
+picker from cover/pages, duration, caption) and the end card fields.
+A "Revise with AI" input takes free-text pointers and returns a revised
+brief (`mode: 'revise', instruction`) — nothing is saved until the user
+saves. The brief is stored on the project as `Book.aiVideoBrief Json?`.
+
+**6b. Cost before spend.** The panel shows the estimated cost from
+OpenRouter's model pricing (per video-second × total seconds) next to the
+"Generate AI video" button.
+
+**6c. Generation job.** `POST /api/ads/projects/[id]/video/ai` validates the
+brief, submits one `POST https://openrouter.ai/api/v1/videos` job per shot
+(`model` from `OPENROUTER_VIDEO_MODEL`, `frame_images: [{ frame_type:
+'first_frame', image: <source> }]`, `duration`, `aspect_ratio`,
+`resolution: '1080p'`, `generate_audio: false`) and stores the job ids and
+status on a new `AiVideoJob` row (projectId, status, shots[{jobId, status,
+clipUrl}], videoUrl, error, costUsd). It returns immediately.
+
+`GET /api/ads/projects/[id]/video/ai` polls OpenRouter for unfinished shots,
+downloads finished clips to storage, and when all are done renders the final
+MP4 with a second Remotion composition, `AiAdVideo`: the clips in order with
+short cross-dissolves, captions in the spec's font/colours, and the end card
+(real cover, headline, CTA). The panel polls every 5 s and shows per-shot
+progress; the finished video appears in the panel with Download.
+
+A failed shot marks the job failed with OpenRouter's message; clips that
+finished are kept so a retry only regenerates the failed shot.
+
+### 7. Configure and results page layout
+
+- Configure page: the video preview panel and all "Remotion"/"Hyperframes"
+  labels are removed; it keeps format, length and mood as plain settings.
+- Results page (`CreativeGallery.tsx`): responsive image grid
+  (`repeat(auto-fill, minmax(220px, 1fr))`, wide banners span the row, full
+  "Download" labels); the video area holds the Instant Video card and the
+  cyan "Generate with AI" button / AI Video panel below it.
 
 ## Error handling
 
-- AI helper failures leave the user's text untouched and show a toast.
+- AI brief/revise failures leave the user's brief untouched and show a toast.
+- No OpenRouter key → the cyan button explains that AI video needs a key in
+  Settings; Instant Video keeps working.
 - Invalid spec from the client → 400 with the zod message.
 - Missing `.remotion-bundle/` → 500 "Video bundle missing — run
   `npm run remotion:bundle`", images still delivered.
@@ -156,11 +211,14 @@ never to a silent AI call.
 ## Testing
 
 - `videoSpec.test.ts`: schema limits, `defaultVideoSpec` from legacy fields.
-- AI route test with `generateStructured` mocked: fill only touches empty
-  fields; improve returns only the requested field.
-- Generate route test: saved spec and copy are passed through unchanged, no
-  AI call when copy is present; renderer mocked.
+- Brief route test with `generateStructured` mocked: shots reference only
+  existing images; revise keeps unedited shots.
+- AI video job tests with `fetch` mocked: submit builds the documented request
+  per shot; poll handles pending → completed → stitched, and a failed shot
+  keeps finished clips.
+- Instant export route test: saved spec is passed to the renderer unchanged.
 - `renderVideo` smoke test (skipped when Chrome is unavailable): renders a
   2-second spec and checks an MP4 header and duration.
-- Playwright: configure page at 1440 and 1024 px — no horizontal overflow in
-  the preview column; editing the hook updates the preview text.
+- Playwright at 1440 and 1024 px: results page has no horizontal overflow;
+  editing the hook in the green card changes the preview text; the cyan
+  button opens the AI panel with editable shot cards.
