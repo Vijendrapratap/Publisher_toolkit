@@ -152,10 +152,23 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
       )}
 
       <div className="mt-5 grid gap-6 lg:grid-cols-2 lg:items-start">
-        <div data-column="preview" className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
-          <TrailerLivePreviewPlayer spec={spec} title={title} author={author} coverUrl={coverUrl} interiorImageUrls={interiorImageUrls} />
+        {/*
+          `contents` below `lg` lets these children join the parent grid's own flow, so `order-*`
+          (below) can interleave them with the editor column's children into the brief's mobile
+          stacking order; `lg:flex lg:flex-col` restores this as a real sticky column at `lg`, where
+          the same order values (ascending within each column) reproduce today's lg layout unchanged.
+        */}
+        <div data-column="preview" className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4 lg:sticky lg:top-24 lg:self-start">
+          <TrailerLivePreviewPlayer
+            spec={spec}
+            title={title}
+            author={author}
+            coverUrl={coverUrl}
+            interiorImageUrls={interiorImageUrls}
+            className="order-1"
+          />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="order-5 grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1.5">
               <span className={labelClass}>Format</span>
               <select className={inputClass} value={spec.format} onChange={(e) => setSpec((s) => ({ ...s, format: e.target.value as AdVideoSpec['format'] }))}>
@@ -174,7 +187,7 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
             </label>
           </div>
 
-          <fieldset>
+          <fieldset className="order-6">
             <legend className={labelClass}>Colours</legend>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {STYLE_OPTIONS.map((preset) => (
@@ -217,18 +230,18 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
           </fieldset>
         </div>
 
-        <div data-column="editor" className="flex min-w-0 flex-col gap-4">
-          <label className="flex flex-col gap-1.5">
+        <div data-column="editor" className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+          <label className="order-2 flex flex-col gap-1.5">
             <span className={labelClass}>Hook <Counter value={spec.script.hook} max={SCRIPT_LIMITS.hook} /></span>
             <input className={inputClass} value={spec.script.hook} onChange={(e) => setScript({ hook: e.target.value })} />
           </label>
 
-          <label className="flex flex-col gap-1.5">
+          <label className="order-2 flex flex-col gap-1.5">
             <span className={labelClass}>Story line <Counter value={spec.script.storyLine} max={SCRIPT_LIMITS.storyLine} /></span>
             <textarea rows={2} className={inputClass} value={spec.script.storyLine} onChange={(e) => setScript({ storyLine: e.target.value })} />
           </label>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="order-2 flex flex-col gap-1.5">
             <span className={labelClass}>Benefits <span className="font-normal normal-case">up to {SCRIPT_LIMITS.benefits}</span></span>
             {spec.script.benefits.map((benefit, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -260,12 +273,12 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
             )}
           </div>
 
-          <label className="flex flex-col gap-1.5">
+          <label className="order-2 flex flex-col gap-1.5">
             <span className={labelClass}>Call to action <Counter value={spec.script.cta} max={SCRIPT_LIMITS.cta} /></span>
             <input className={inputClass} value={spec.script.cta} onChange={(e) => setScript({ cta: e.target.value })} />
           </label>
 
-          <fieldset>
+          <fieldset className="order-3">
             <legend className={labelClass}>Font</legend>
             <div className="mt-1.5 grid grid-cols-2 gap-2">
               {AD_FONTS.map((font) => {
@@ -289,14 +302,17 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
             </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset className="order-4">
             <legend className={labelClass}>
               <span className="inline-flex items-center gap-1.5"><Music className="size-3.5" aria-hidden /> Music</span>
             </legend>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {/* The select gets its own full-width row: sharing a row with the play/upload buttons
+                left too little width for a track name to render without the browser clipping it
+                (native <select> text rendering isn't caught by a scrollWidth check). */}
+            <div className="mt-1.5 flex flex-col gap-2">
               <select
                 aria-label="Music track"
-                className={cn(inputClass, 'flex-1')}
+                className={cn(inputClass, 'w-full')}
                 value={musicValue}
                 onChange={(e) => {
                   const value = e.target.value
@@ -307,30 +323,35 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
                 <option value="none">No music</option>
                 {MUSIC_TRACKS.map((t) => (
                   <option key={t.key} value={t.key}>
-                    {t.label} — {t.composer} ({t.key})
+                    {t.label} · {t.composer}
                   </option>
                 ))}
                 {music.kind === 'upload' && <option value="upload">Your upload: {music.name}</option>}
               </select>
-              {musicUrl(music) && (
-                <button type="button" onClick={togglePreview} aria-label={playing ? 'Pause music preview' : 'Play music preview'} className="grid size-9 place-items-center rounded-xl border border-line bg-surface text-ink transition hover:border-instant/50">
-                  {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
-                </button>
-              )}
-              <label className={cn(buttonClasses({ variant: 'secondary', size: 'sm' }), 'cursor-pointer')}>
-                <Upload className="size-3.5" aria-hidden /> {uploading ? 'Uploading…' : 'Upload your own'}
-                <input
-                  type="file"
-                  accept="audio/mpeg,audio/wav,audio/mp4,.mp3,.wav,.m4a"
-                  className="sr-only"
-                  disabled={uploading}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) void uploadMusic(file)
-                    e.target.value = ''
-                  }}
-                />
-              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                {musicUrl(music) && (
+                  <button type="button" onClick={togglePreview} aria-label={playing ? 'Pause music preview' : 'Play music preview'} className="grid size-9 place-items-center rounded-xl border border-line bg-surface text-ink transition hover:border-instant/50">
+                    {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+                  </button>
+                )}
+                <label className={cn(buttonClasses({ variant: 'secondary', size: 'sm' }), 'cursor-pointer')}>
+                  <Upload className="size-3.5" aria-hidden /> {uploading ? 'Uploading…' : 'Upload your own'}
+                  <input
+                    type="file"
+                    accept="audio/mpeg,audio/wav,audio/mp4,.mp3,.wav,.m4a"
+                    className="sr-only"
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) void uploadMusic(file)
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+                {music.kind === 'library' && (
+                  <span className="text-xs text-ink-muted">Mood: {music.track}</span>
+                )}
+              </div>
             </div>
             <audio ref={audioRef} src={musicUrl(music) ?? undefined} onEnded={() => setPlaying(false)} preload="none" />
             <p className="mt-1.5 text-xs text-ink-muted">Bundled tracks are public domain and free to use in ads. Upload only music you have the rights to.</p>
