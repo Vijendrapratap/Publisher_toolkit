@@ -8,7 +8,7 @@ import {
   BookTrailerComposition,
   type BookTrailerCompositionProps,
 } from './remotion/BookTrailerComposition'
-import { FPS, videoDimensions, videoDurationInFrames, type AdVideoSpec } from '@/lib/services/ads/videoSpec'
+import { FPS, musicUrl, resolveMusic, videoDimensions, videoDurationInFrames, type AdVideoSpec } from '@/lib/services/ads/videoSpec'
 
 export interface TrailerLivePreviewPlayerProps {
   spec: AdVideoSpec
@@ -32,7 +32,7 @@ export function TrailerLivePreviewPlayer({ spec, title, author, coverUrl, interi
   const { width, height } = videoDimensions(spec.format)
   const durationInFrames = videoDurationInFrames(spec)
   const sceneFrames = Math.floor(durationInFrames / SCENES.length)
-  const inputProps: BookTrailerCompositionProps = { spec, title, author, coverUrl, interiorImageUrls }
+  const inputProps: BookTrailerCompositionProps = { spec, title, author, coverUrl, interiorImageUrls, musicSrc: musicUrl(resolveMusic(spec)) }
 
   const seek = (frame: number) => {
     playerRef.current?.seekTo(frame)

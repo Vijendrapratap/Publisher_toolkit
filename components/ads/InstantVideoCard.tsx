@@ -1,17 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Download, Plus, Save, X, Zap } from 'lucide-react'
+import { Download, Music, Pause, Play, Plus, Save, Upload, X, Zap } from 'lucide-react'
 import { Button, buttonClasses } from '@/components/ui/button'
 import { cn } from '@/components/ui/cn'
 import { TrailerLivePreviewPlayer } from '@/components/trailer/TrailerLivePreviewPlayer'
 import { adFontFamily } from '@/components/trailer/remotion/fonts'
 import {
   AD_FONTS,
+  MUSIC_TRACKS,
   SCRIPT_LIMITS,
   adVideoSpecSchema,
+  musicUrl,
   presetStyle,
+  resolveMusic,
   type AdFontKey,
   type AdVideoSpec,
 } from '@/lib/services/ads/videoSpec'
@@ -52,11 +55,43 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
   const [saved, setSaved] = useState(initialSpec)
   const [saving, setSaving] = useState(false)
   const [fontFamilies, setFontFamilies] = useState<Partial<Record<AdFontKey, string>>>({})
+  const [uploading, setUploading] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const music = resolveMusic(spec)
+  const musicValue = music.kind === 'library' ? music.track : music.kind
+  const setMusic = (next: NonNullable<AdVideoSpec['music']>) => {
+    audioRef.current?.pause()
+    setPlaying(false)
+    setSpec((s) => ({ ...s, music: next }))
+  }
 
   // Loaded after mount: the font loader needs `document`.
   useEffect(() => {
     setFontFamilies(Object.fromEntries(AD_FONTS.map((f) => [f.key, adFontFamily(f.key)])))
   }, [])
+
+  async function uploadMusic(file: File) {
+    setUploading(true)
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`/api/ads/projects/${projectId}/music`, { method: 'POST', body: form })
+    const body = await res.json().catch(() => ({}))
+    setUploading(false)
+    if (!res.ok) {
+      toast.error(body.error ?? 'We couldn’t upload that file.')
+      return
+    }
+    setMusic({ kind: 'upload', url: body.url, name: body.name })
+  }
+
+  function togglePreview() {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) audio.pause()
+    else void audio.play()
+    setPlaying(!playing)
+  }
 
   const dirty = JSON.stringify(spec) !== JSON.stringify(saved)
   const check = adVideoSpecSchema.safeParse(spec)
@@ -185,6 +220,53 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
               </select>
             </label>
           </div>
+
+          <fieldset>
+            <legend className={labelClass}>
+              <span className="inline-flex items-center gap-1.5"><Music className="size-3.5" aria-hidden /> Music</span>
+            </legend>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Music track"
+                className={cn(inputClass, 'flex-1')}
+                value={musicValue}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (value === 'none') setMusic({ kind: 'none' })
+                  else if (value !== 'upload') setMusic({ kind: 'library', track: value as (typeof MUSIC_TRACKS)[number]['key'] })
+                }}
+              >
+                <option value="none">No music</option>
+                {MUSIC_TRACKS.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.label} — {t.composer} ({t.key})
+                  </option>
+                ))}
+                {music.kind === 'upload' && <option value="upload">Your upload: {music.name}</option>}
+              </select>
+              {musicUrl(music) && (
+                <button type="button" onClick={togglePreview} aria-label={playing ? 'Pause music preview' : 'Play music preview'} className="grid size-9 place-items-center rounded-xl border border-line bg-surface text-ink transition hover:border-instant/50">
+                  {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+                </button>
+              )}
+              <label className={cn(buttonClasses({ variant: 'secondary', size: 'sm' }), 'cursor-pointer')}>
+                <Upload className="size-3.5" aria-hidden /> {uploading ? 'Uploading…' : 'Upload your own'}
+                <input
+                  type="file"
+                  accept="audio/mpeg,audio/wav,audio/mp4,.mp3,.wav,.m4a"
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void uploadMusic(file)
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
+            <audio ref={audioRef} src={musicUrl(music) ?? undefined} onEnded={() => setPlaying(false)} preload="none" />
+            <p className="mt-1.5 text-xs text-ink-muted">Bundled tracks are public domain and free to use in ads. Upload only music you have the rights to.</p>
+          </fieldset>
 
           <fieldset>
             <legend className={labelClass}>Font</legend>

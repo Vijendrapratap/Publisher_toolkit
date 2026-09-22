@@ -32,6 +32,24 @@ const FONT_KEYS = AD_FONTS.map((f) => f.key) as [AdFontKey, ...AdFontKey[]]
 const STYLE_KEYS = STYLE_OPTIONS.map((s) => s.key) as [TrailerStyle, ...TrailerStyle[]]
 const hex = z.string().regex(/^#[0-9a-f]{6}$/i, 'Use a colour like #1a2b3c')
 
+/** Bundled public-domain/CC0 tracks, one per mood; credits in public/music/CREDITS.md. */
+export const MUSIC_TRACKS = [
+  { key: 'suspenseful', label: 'In the Hall of the Mountain King', composer: 'Grieg' },
+  { key: 'epic', label: 'Ride of the Valkyries', composer: 'Wagner' },
+  { key: 'ambient', label: 'Gymnopédie No. 1', composer: 'Satie' },
+  { key: 'upbeat', label: 'The Entertainer', composer: 'Joplin' },
+  { key: 'emotional', label: 'Gymnopédie No. 2', composer: 'Satie' },
+] as const
+export type MusicTrackKey = (typeof MUSIC_TRACKS)[number]['key']
+const TRACK_KEYS = MUSIC_TRACKS.map((t) => t.key) as [MusicTrackKey, ...MusicTrackKey[]]
+
+export const musicSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }),
+  z.object({ kind: z.literal('library'), track: z.enum(TRACK_KEYS) }),
+  // Only our own stored files: the URL is later fetched on the server.
+  z.object({ kind: z.literal('upload'), url: z.string().startsWith('/api/files/'), name: z.string().trim().min(1).max(120) }),
+])
+
 export const adVideoSpecSchema = z.object({
   script: z.object({
     hook: z.string().trim().min(1, 'Add a hook').max(SCRIPT_LIMITS.hook, `Keep the hook under ${SCRIPT_LIMITS.hook} characters`),
@@ -49,6 +67,8 @@ export const adVideoSpecSchema = z.object({
   format: z.enum(['9:16', '1:1', '16:9']),
   length: z.enum(['6s', '15s', '20s', '30s']),
   mood: z.enum(['suspenseful', 'epic', 'ambient', 'upbeat', 'emotional']),
+  // Optional so specs saved before music existed still validate.
+  music: musicSchema.optional(),
 })
 export type AdVideoSpec = z.infer<typeof adVideoSpecSchema>
 
@@ -115,6 +135,16 @@ export function defaultVideoSpec(source: VideoSpecSource): AdVideoSpec {
 export function readVideoSpec(stored: unknown, source: VideoSpecSource): AdVideoSpec {
   const parsed = adVideoSpecSchema.safeParse(stored)
   return parsed.success ? parsed.data : defaultVideoSpec(source)
+}
+
+/** The saved music choice, or the bundled track that matches the mood. */
+export function resolveMusic(spec: Pick<AdVideoSpec, 'music' | 'mood'>): NonNullable<AdVideoSpec['music']> {
+  return spec.music ?? { kind: 'library', track: spec.mood }
+}
+
+export function musicUrl(music: NonNullable<AdVideoSpec['music']>): string | null {
+  if (music.kind === 'none') return null
+  return music.kind === 'library' ? `/music/${music.track}.mp3` : music.url
 }
 
 export function bookVideoSource(book: {

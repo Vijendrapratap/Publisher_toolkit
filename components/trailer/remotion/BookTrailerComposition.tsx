@@ -2,6 +2,7 @@
 import React from 'react'
 import {
   AbsoluteFill,
+  Audio,
   Img,
   Sequence,
   interpolate,
@@ -22,6 +23,7 @@ export interface BookTrailerCompositionProps {
   author: string
   coverUrl?: string | null
   interiorImageUrls?: string[]
+  musicSrc?: string | null
 }
 
 interface Palette {
@@ -850,7 +852,7 @@ function LightSweep({ scale, sceneFrames }: { scale: number; sceneFrames: number
   )
 }
 
-export function BookTrailerComposition({ spec, title, author, coverUrl, interiorImageUrls }: BookTrailerCompositionProps) {
+export function BookTrailerComposition({ spec, title, author, coverUrl, interiorImageUrls, musicSrc }: BookTrailerCompositionProps) {
   const { durationInFrames, width, height } = useVideoConfig()
   const palette = paletteFromSpec(spec)
   const scale = Math.min(width, height) / 1080
@@ -861,6 +863,18 @@ export function BookTrailerComposition({ spec, title, author, coverUrl, interior
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      {musicSrc && (
+        <Audio
+          src={musicSrc}
+          loop
+          volume={(f) =>
+            interpolate(f, [0, 15, durationInFrames - 30, durationInFrames], [0, 0.8, 0.8, 0], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+            })
+          }
+        />
+      )}
       <AnimatedBackground palette={palette} style={spec.style.preset as TrailerStyle} scale={scale} />
       <LightSweep scale={scale} sceneFrames={sceneFrames} />
 

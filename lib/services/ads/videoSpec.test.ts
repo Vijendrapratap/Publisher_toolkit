@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
+  MUSIC_TRACKS,
   SCRIPT_LIMITS,
   adVideoSpecSchema,
   bookVideoSource,
   clip,
   defaultVideoSpec,
+  musicUrl,
   presetStyle,
   readVideoSpec,
+  resolveMusic,
   videoDimensions,
   videoDurationInFrames,
 } from './videoSpec'
@@ -89,5 +92,27 @@ describe('timing and size', () => {
     expect(videoDurationInFrames({ length: '15s' })).toBe(450)
     expect(videoDimensions('9:16')).toEqual({ width: 1080, height: 1920 })
     expect(videoDimensions('16:9')).toEqual({ width: 1920, height: 1080 })
+  })
+})
+
+describe('music', () => {
+  const base = defaultVideoSpec({ title: 'T', mood: 'epic' })
+
+  it('defaults to the library track for the mood, and specs saved before music still validate', () => {
+    expect(base.music).toBeUndefined()
+    expect(resolveMusic(base)).toEqual({ kind: 'library', track: 'epic' })
+    expect(adVideoSpecSchema.safeParse(base).success).toBe(true)
+  })
+
+  it('maps each choice to a browser URL', () => {
+    expect(musicUrl({ kind: 'library', track: 'ambient' })).toBe('/music/ambient.mp3')
+    expect(musicUrl({ kind: 'upload', url: '/api/files/ads/pub_1/music/x-track.mp3', name: 'x.mp3' })).toBe('/api/files/ads/pub_1/music/x-track.mp3')
+    expect(musicUrl({ kind: 'none' })).toBeNull()
+  })
+
+  it('offers one track per mood and rejects uploads from other sites', () => {
+    expect(MUSIC_TRACKS.map((t) => t.key)).toEqual(['suspenseful', 'epic', 'ambient', 'upbeat', 'emotional'])
+    const bad = { ...base, music: { kind: 'upload', url: 'http://evil.example/x.mp3', name: 'x' } }
+    expect(adVideoSpecSchema.safeParse(bad).success).toBe(false)
   })
 })
