@@ -168,6 +168,8 @@ export async function illustrateProject(
     content: GeneratedBookContent
     /** Skip pages that already have art, so a retry only fills the gaps. */
     regenerate?: boolean
+    /** Kept on a gap-filling run instead of being paid for again. */
+    existingCoverUrl?: string | null
   },
   credentials?: AiCredentials
 ): Promise<IllustrationResult> {
@@ -192,6 +194,23 @@ export async function illustrateProject(
     return url
   }
 
+  // The cover goes first: it is what the dashboard, preview and PDF lead
+  // with, and a long book can hit the time limit before its last page.
+  const keepCover = Boolean(input.existingCoverUrl) && !input.regenerate
+  let coverImageUrl: string | null = keepCover ? input.existingCoverUrl! : null
+  if (!keepCover) {
+    try {
+      const cover = await generateWithRetry(
+        coverPromptFor(content, input.title, input.styleTheme),
+        credentials
+      )
+      if (cover) coverImageUrl = await store('cover', cover.buffer, cover.contentType)
+      else failures.push('cover: the image model returned nothing')
+    } catch (err) {
+      failures.push(`cover: ${err instanceof Error ? err.message : 'failed'}`)
+    }
+  }
+
   for (let i = 0; i < prompts.length; i += CONCURRENCY) {
     const batch = prompts.slice(i, i + CONCURRENCY)
     await Promise.all(
@@ -211,24 +230,11 @@ export async function illustrateProject(
     )
   }
 
-  // The cover is worth its own attempt even when pages failed.
-  let coverImageUrl: string | null = null
-  try {
-    const cover = await generateWithRetry(
-      coverPromptFor(content, input.title, input.styleTheme),
-      credentials
-    )
-    if (cover) coverImageUrl = await store('cover', cover.buffer, cover.contentType)
-    else failures.push('cover: the image model returned nothing')
-  } catch (err) {
-    failures.push(`cover: ${err instanceof Error ? err.message : 'failed'}`)
-  }
-
   return {
     content,
     coverImageUrl,
-    requested: prompts.length + 1,
-    succeeded: succeeded + (coverImageUrl ? 1 : 0),
+    requested: prompts.length + (keepCover ? 0 : 1),
+    succeeded: succeeded + (!keepCover && coverImageUrl ? 1 : 0),
     failures,
   }
 }

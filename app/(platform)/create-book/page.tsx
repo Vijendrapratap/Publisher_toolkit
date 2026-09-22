@@ -120,7 +120,16 @@ export default async function BookCreatorDashboard() {
                   href={`/create-book/${p.id}`}
                   className="group flex flex-col justify-between rounded-2xl border border-line bg-surface p-5 shadow-subtle transition hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-card"
                 >
-                  <div>
+                  <div className="flex gap-4">
+                    <div className="grid aspect-[3/4] w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-line bg-surface-2">
+                      {p.coverImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.coverImageUrl} alt="" className="size-full object-cover" />
+                      ) : (
+                        <BookOpen className="size-5 text-ink-muted/40" aria-hidden />
+                      )}
+                    </div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent">
                         {p.bookType.replace('_', ' ')}
@@ -135,6 +144,7 @@ export default async function BookCreatorDashboard() {
                     <p className="mt-2 line-clamp-2 text-xs text-ink-muted/90 leading-relaxed">
                       {p.promptConcept}
                     </p>
+                  </div>
                   </div>
 
                   <div className="mt-4 flex items-center justify-between border-t border-line/50 pt-3 text-xs text-ink-muted">

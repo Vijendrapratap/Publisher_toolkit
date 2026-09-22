@@ -68,7 +68,8 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
       const res = await fetch(`/api/creator/projects/${project.id}/illustrate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        // Nothing missing means the publisher asked to redraw everything.
+        body: JSON.stringify({ regenerate: missingArt === 0 }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to generate illustrations')
@@ -185,6 +186,22 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
     <div className="flex flex-col gap-6">
       {/* Top Header Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            aria-label="Open book preview"
+            className="grid aspect-[3/4] w-20 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-surface-2 shadow-subtle transition hover:-translate-y-0.5 hover:shadow-card sm:w-24"
+          >
+            {project.coverImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={project.coverImageUrl} alt="Book cover" className="size-full object-cover" />
+            ) : illustrating ? (
+              <Loader2 className="size-5 animate-spin text-accent" aria-label="Drawing cover" />
+            ) : (
+              <ImageIcon className="size-5 text-ink-muted/50" aria-label="No cover yet" />
+            )}
+          </button>
         <div>
           <div className="flex items-center gap-2">
             <Link
@@ -208,6 +225,7 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
             {project.title || 'Untitled Book'}
           </h1>
           {project.subtitle && <p className="text-sm text-ink-muted">{project.subtitle}</p>}
+        </div>
         </div>
 
         {/* Global Studio Actions */}

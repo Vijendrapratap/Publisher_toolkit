@@ -43,6 +43,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         styleTheme: project.styleTheme || 'watercolor storybook',
         content: project.content,
         regenerate,
+        existingCoverUrl: project.coverImageUrl,
       },
       credentials
     )

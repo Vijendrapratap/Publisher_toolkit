@@ -125,8 +125,9 @@ export function NewBookForm() {
           description: `"${title}" has been generated.`,
         })
       }
-      // Sample content means no AI key, so image generation would only fail.
-      router.push(`/create-book/${json.id}${json.source === 'fallback' ? '' : '?illustrate=1'}`)
+      // Sample text can come from a timed-out text model with a working key,
+      // so still draw the images; the illustrate route reports a missing key.
+      router.push(`/create-book/${json.id}?illustrate=1`)
       router.refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong during generation.'

@@ -28,7 +28,7 @@ const childrenBook = (): GeneratedBookContent => ({
 })
 
 const image = { buffer: Buffer.from('png'), contentType: 'image/png', dataUri: 'data:' }
-const run = (content: GeneratedBookContent, regenerate = false) =>
+const run = (content: GeneratedBookContent, regenerate = false, existingCoverUrl: string | null = null) =>
   illustrateProject({
     projectId: 'proj_1',
     publisherId: 'pub_1',
@@ -36,7 +36,11 @@ const run = (content: GeneratedBookContent, regenerate = false) =>
     styleTheme: 'soft watercolour',
     content,
     regenerate,
+    existingCoverUrl,
   })
+
+const pagePrompts = () =>
+  vi.mocked(generateAiImage).mock.calls.map(([prompt]) => prompt).filter((p) => !p.startsWith('Front cover'))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -73,9 +77,9 @@ describe('illustrateProject', () => {
 
   it('carries the style bible into every page prompt', async () => {
     await run(childrenBook())
-    const prompts = vi.mocked(generateAiImage).mock.calls.map(([prompt]) => prompt)
+    const prompts = pagePrompts()
 
-    // The first two are pages; each must restate the cast and the style.
+    // Each page must restate the cast and the style.
     expect(prompts[0]).toContain('soft watercolour')
     expect(prompts[1]).toContain('Barnaby')
   })
@@ -101,7 +105,7 @@ describe('illustrateProject', () => {
       ],
     })
 
-    const [pagePrompt] = vi.mocked(generateAiImage).mock.calls[0]
+    const [pagePrompt] = pagePrompts()
     expect(pagePrompt).toContain('Pure black outlines')
     expect(pagePrompt).toMatch(/no shading/i)
   })
@@ -124,7 +128,8 @@ describe('illustrateProject', () => {
     expect(generateAiImage).toHaveBeenCalledTimes(3)
   })
 
-  it('keeps the pages that worked when some fail', async () => {
+  it('keeps the images that worked when some fail', async () => {
+    // Cover succeeds; every page fails.
     vi.mocked(generateAiImage)
       .mockResolvedValueOnce(image)
       .mockResolvedValue(null)
@@ -133,7 +138,28 @@ describe('illustrateProject', () => {
 
     expect(result.succeeded).toBe(1)
     expect(result.failures.length).toBeGreaterThan(0)
-    expect(result.coverImageUrl).toBeNull()
+    expect(result.coverImageUrl).toContain('cover')
+  })
+
+  it('draws the cover before any page, so a slow run still ends with a cover', async () => {
+    await run(childrenBook())
+    const [firstPrompt] = vi.mocked(generateAiImage).mock.calls[0]
+    expect(firstPrompt).toMatch(/^Front cover/)
+  })
+
+  it('keeps an existing cover on a gap-filling run', async () => {
+    const result = await run(childrenBook(), false, '/existing/cover.png')
+
+    expect(generateAiImage).toHaveBeenCalledTimes(2)
+    expect(result.coverImageUrl).toBe('/existing/cover.png')
+    expect(result.requested).toBe(2)
+  })
+
+  it('redraws the cover when the publisher asks for everything again', async () => {
+    const result = await run(childrenBook(), true, '/existing/cover.png')
+
+    expect(generateAiImage).toHaveBeenCalledTimes(3)
+    expect(result.coverImageUrl).not.toBe('/existing/cover.png')
   })
 
   it('never mutates the caller\'s content', async () => {
