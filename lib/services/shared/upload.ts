@@ -75,7 +75,10 @@ export function assetPath(
 ): string {
   const ext = EXTENSIONS[contentType.toLowerCase()] ?? 'bin'
   const unique = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
-  return `${prefix}/${publisherId}/${unique}-${name}.${ext}`
+  // The file route authorises on the second segment, so a nested prefix like
+  // `creator/<projectId>` must become `creator/<publisherId>/<projectId>`.
+  const [area, ...rest] = prefix.split('/')
+  return [area, publisherId, ...rest, `${unique}-${name}.${ext}`].join('/')
 }
 
 /** Validates and stores one uploaded image, or returns null when none was sent. */

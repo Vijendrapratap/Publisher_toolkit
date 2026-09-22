@@ -56,4 +56,9 @@ describe('assetPath', () => {
   it('keeps every asset under its publisher prefix', () => {
     expect(assetPath('ads', 'pub_1', 'front', 'image/png').split('/')[1]).toBe('pub_1')
   })
+
+  it('keeps the publisher second for nested prefixes, which the file route checks', () => {
+    const path = assetPath('creator/proj_9', 'pub_1', 'cover', 'image/png')
+    expect(path).toMatch(/^creator\/pub_1\/proj_9\/.+-cover\.png$/)
+  })
 })
