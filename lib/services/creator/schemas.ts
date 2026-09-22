@@ -55,6 +55,7 @@ const wordSearchDraftSchema = z.object({
     .min(5)
     .max(14),
   hiddenFact: z.string().max(200).optional().describe('A true, checkable fact about the theme'),
+  illustrationPrompt: z.string().max(600).optional().describe('Illustration prompt for the puzzle theme artwork'),
 })
 
 const crosswordSchema = z.object({
@@ -124,6 +125,7 @@ export const shortStoryContentSchema = z.object({
     synopsis: z.string().min(1).max(800),
     theme: z.string().min(1).max(200),
     storyText: z.string().min(1).describe('The complete story, paragraphs separated by blank lines'),
+    illustrationPrompt: z.string().max(600).optional().describe('Illustration prompt for the key story scene artwork'),
   }),
 })
 

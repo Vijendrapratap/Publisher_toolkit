@@ -4,7 +4,7 @@ import { NewBookForm } from '@/components/creator/NewBookForm'
 
 export const metadata = {
   title: 'Create Your Book | Publisher Toolkit',
-  description: 'Generate children storybooks, coloring books, word game puzzles, or novels chapter by chapter.',
+  description: 'Generate children books, coloring books, story books, and puzzle games with AI images.',
 }
 
 export default function NewBookPage() {
@@ -27,7 +27,7 @@ export default function NewBookPage() {
           Create Your Book
         </h1>
         <p className="mt-2 text-sm text-ink-muted max-w-2xl">
-          Configure your book type, narrative or visual style, target reader audience, and prompt concept to generate complete spreads or full chapter outlines.
+          Configure your book type (children picture book, coloring book, story book, or games), visual style, target reader audience, and prompt concept to generate complete spreads and artwork.
         </p>
       </div>
 

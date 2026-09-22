@@ -205,6 +205,7 @@ export function sampleBookContent(input: CreateBookProjectInput): GeneratedBookC
         grid: p1.grid,
         wordList: p1.placedWords,
         hiddenFact: 'Hedgehogs have between 5,000 and 7,000 quills on their backs!',
+        illustrationPrompt: 'Charming storybook animals in a sunlit mossy woodland meadow, friendly woodland creature scene, soft warm lighting',
       },
       {
         puzzleNumber: 2,
@@ -214,6 +215,7 @@ export function sampleBookContent(input: CreateBookProjectInput): GeneratedBookC
         grid: p2.grid,
         wordList: p2.placedWords,
         hiddenFact: 'A ray of starlight from the nearest star takes over 4 years to reach Earth.',
+        illustrationPrompt: 'Deep space cosmic nebula with twinkling star clusters and glowing celestial planets, vibrant whimsical astronomy illustration',
       },
     ]
 
@@ -315,6 +317,7 @@ She placed a heavy velvet pouch onto the counter between them. Inside, something
     theme: 'Hope, memory, and the enduring guidance of light',
     wordCount: 1450,
     readingTimeMinutes: 6,
+    illustrationPrompt: 'A lone lighthouse on a rocky coastal cliff at twilight, glowing amber lantern light illuminating sea foam and rolling Atlantic waves, atmospheric cinematic storybook art',
     storyText: `The sea never forgot what it swallowed, but old Silas had begun to forget his own name.
 
 Every evening at quarter past six, his boots scraped against the spiral granite steps of the Cape Fortune beacon. One hundred and eighty-four steps. Forty-two brass rivets along the banister. These were the things that did not change when the world beyond the tide grew strange.
@@ -405,6 +408,7 @@ function materializeWordGame(draft: WordGameDraft): GeneratedBookContent {
       grid,
       wordList: placedWords,
       hiddenFact: ws.hiddenFact,
+      illustrationPrompt: ws.illustrationPrompt || `Whimsical activity book illustration themed around ${ws.theme}, clean joyful children book style`,
     }
   })
 

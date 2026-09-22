@@ -1,27 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft,
   BookOpen,
   Download,
-  ExternalLink,
-  Layers,
+  FileDown,
+  Eye,
   Loader2,
   ImageIcon,
   Megaphone,
-  Share2,
   Sparkles,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonClasses } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ChildrenBookViewer } from './ChildrenBookViewer'
 import { ColoringBookViewer } from './ColoringBookViewer'
 import { WordGameViewer } from './WordGameViewer'
+import { StoryBookViewer } from './StoryBookViewer'
 import { NovelChapterViewer } from './NovelChapterViewer'
+import { BookPreviewModal } from './BookPreviewModal'
 import type { BookCreatorProjectData } from '@/lib/services/creator/types'
 
 export function BookProjectStudio({ initialProject }: { initialProject: BookCreatorProjectData }) {
@@ -29,19 +30,39 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
   const [project, setProject] = useState<BookCreatorProjectData>(initialProject)
   const [sendingToAds, setSendingToAds] = useState(false)
   const [illustrating, setIllustrating] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const searchParams = useSearchParams()
+  const autoIllustrated = useRef(false)
 
-  const illustratable = project.content?.type === 'children' || project.content?.type === 'coloring'
-  const pageCount = illustratable && project.content ? ('pages' in project.content ? project.content.pages.length : 0) : 0
-  const missingArt =
-    illustratable && project.content && 'pages' in project.content
-      ? project.content.pages.filter((p) => !p.generatedImageUrl).length
-      : 0
+  const illustratable = Boolean(project.content)
+
+  // Compute missing illustrations
+  let missingArt = 0
+  let totalArtItems = 0
+  if (project.content) {
+    if (project.content.type === 'children' || project.content.type === 'coloring') {
+      totalArtItems = project.content.pages.length
+      missingArt = project.content.pages.filter((p) => !p.generatedImageUrl).length
+    } else if (project.content.type === 'word_game') {
+      totalArtItems = project.content.wordSearches.length
+      missingArt = project.content.wordSearches.filter((ws) => !ws.illustrationUrl).length
+    } else if (project.content.type === 'short_story') {
+      totalArtItems = 1
+      missingArt = project.content.story.illustrationUrl ? 0 : 1
+    } else if (project.content.type === 'novel_chapter') {
+      totalArtItems = Math.min(project.content.novel.chapters.length, 5)
+      missingArt = project.content.novel.chapters.slice(0, 5).filter((c) => !c.illustrationUrl).length
+    }
+  }
+  if (!project.coverImageUrl) {
+    missingArt += 1
+    totalArtItems += 1
+  }
 
   async function handleIllustrate() {
     setIllustrating(true)
-    // A long, paid job: say what it will cost before it starts, not after.
-    const toastId = toast.loading(`Illustrating ${missingArt || pageCount} pages…`, {
-      description: 'Each page is drawn separately. This can take a few minutes.',
+    const toastId = toast.loading(`Generating illustrations with AI image model…`, {
+      description: 'Using configured image model to illustrate covers and content pages.',
     })
     try {
       const res = await fetch(`/api/creator/projects/${project.id}/illustrate`, {
@@ -58,12 +79,12 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
       if (data.failures?.length) {
         toast.warning(`Illustrated ${data.succeeded} of ${data.requested}`, {
           id: toastId,
-          description: `${data.failures.length} did not render. Run it again to fill the gaps.`,
+          description: `${data.failures.length} did not render. Run again to fill remaining gaps.`,
         })
       } else {
-        toast.success(`Illustrated ${data.succeeded} images`, {
+        toast.success(`Generated ${data.succeeded} illustrations!`, {
           id: toastId,
-          description: 'Your book now has artwork on every page.',
+          description: 'Your book now has artwork on all pages and front cover.',
         })
       }
     } catch (err) {
@@ -75,6 +96,16 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
       setIllustrating(false)
     }
   }
+
+  // Arriving from "Generate Book Project": draw the images straight away
+  // instead of making the publisher find the button.
+  useEffect(() => {
+    if (autoIllustrated.current || searchParams.get('illustrate') !== '1') return
+    autoIllustrated.current = true
+    router.replace(`/create-book/${project.id}`)
+    if (missingArt > 0) void handleIllustrate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleSendToAds() {
     setSendingToAds(true)
@@ -109,13 +140,15 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
         project.content.pages.forEach((p) => {
           contentString += `## Page ${p.pageNumber}: ${p.spreadHeading || ''}\n\n`
           contentString += `${p.storyText}\n\n`
-          contentString += `> Illustration Prompt: ${p.illustrationPrompt}\n\n---\n\n`
+          if (p.generatedImageUrl) contentString += `![Page ${p.pageNumber}](${p.generatedImageUrl})\n\n`
+          contentString += `---\n\n`
         })
       } else if (project.content.type === 'coloring') {
         project.content.pages.forEach((p) => {
           contentString += `## Page ${p.pageNumber}: ${p.title}\n\n`
           contentString += `${p.sceneDescription}\n\n`
-          contentString += `> Line Art Prompt: ${p.lineArtPrompt}\n\n---\n\n`
+          if (p.generatedImageUrl) contentString += `![Page ${p.pageNumber}](${p.generatedImageUrl})\n\n`
+          contentString += `---\n\n`
         })
       } else if (project.content.type === 'novel_chapter') {
         contentString += `Premise: ${project.content.novel.premise}\n\n`
@@ -156,7 +189,7 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
           <div className="flex items-center gap-2">
             <Link
               href="/create-book"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-ink-muted hover:text-ink"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-ink-muted hover:text-ink transition-colors"
             >
               <ArrowLeft className="size-3.5" /> Book Creator Studio
             </Link>
@@ -164,6 +197,11 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
             <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-accent">
               {project.bookType.replace('_', ' ')}
             </span>
+            {project.coverImageUrl && (
+              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                Cover Art Ready
+              </span>
+            )}
           </div>
 
           <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
@@ -174,15 +212,36 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
 
         {/* Global Studio Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* 1. PREVIEW BOOK BUTTON */}
           <Button
             type="button"
             variant="secondary"
             size="sm"
-            onClick={handleDownloadManuscript}
+            onClick={() => setPreviewOpen(true)}
           >
-            <Download className="size-4" /> Download Manuscript
+            <Eye className="size-4 text-accent" /> Preview Book
           </Button>
 
+          {/* 2. DOWNLOAD PDF BUTTON */}
+          <a
+            href={`/api/creator/projects/${project.id}/pdf`}
+            download
+            className={buttonClasses({ variant: 'secondary', size: 'sm' })}
+          >
+            <FileDown className="size-4" /> Download PDF
+          </a>
+
+          {/* 3. DOWNLOAD MANUSCRIPT */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleDownloadManuscript}
+          >
+            <Download className="size-3.5" /> Manuscript (.md)
+          </Button>
+
+          {/* 4. ILLUSTRATE / GENERATE IMAGES WITH IMAGE MODEL */}
           {illustratable && (
             <Button
               type="button"
@@ -192,10 +251,11 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
               onClick={handleIllustrate}
             >
               <ImageIcon className="size-4" />
-              {missingArt > 0 ? `Illustrate ${missingArt} pages` : 'Redraw illustrations'}
+              {missingArt > 0 ? `Illustrate Book (${missingArt} images)` : 'Redraw with AI'}
             </Button>
           )}
 
+          {/* 5. CREATE AMAZON ADS */}
           <Button
             type="button"
             variant="primary"
@@ -211,7 +271,7 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
             ) : (
               <>
                 <Megaphone className="size-4" />
-                Create Amazon Ads & A+ Content
+                Amazon Ads & A+
               </>
             )}
           </Button>
@@ -229,6 +289,8 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
             wordSearches={project.content.wordSearches}
             crosswords={project.content.crosswords}
           />
+        ) : project.content.type === 'short_story' ? (
+          <StoryBookViewer story={project.content.story} />
         ) : project.content.type === 'novel_chapter' ? (
           <NovelChapterViewer
             projectId={project.id}
@@ -252,19 +314,19 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
               }
             }}
           />
-        ) : project.content.type === 'short_story' ? (
-          <Card className="p-8 font-serif leading-relaxed text-lg sm:text-xl text-ink whitespace-pre-wrap">
-            <h2 className="font-display text-2xl font-bold mb-4 not-italic">
-              {project.content.story.title}
-            </h2>
-            {project.content.story.storyText}
-          </Card>
         ) : null
       ) : (
         <Card className="p-8 text-center text-ink-muted">
           No content generated yet for this project.
         </Card>
       )}
+
+      {/* Interactive Book Preview Modal */}
+      <BookPreviewModal
+        project={project}
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+      />
     </div>
   )
 }

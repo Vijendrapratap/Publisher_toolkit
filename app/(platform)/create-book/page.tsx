@@ -43,7 +43,7 @@ export default async function BookCreatorDashboard() {
             Create Your Book
           </h1>
           <p className="mt-2 text-base text-ink-muted max-w-2xl">
-            Generate full books chapter-by-chapter, illustrated children storybooks, coloring book spreads, or word search and crossword puzzle activity books.
+            Generate illustrated children storybooks, coloring book spreads, story books, or word search and puzzle games.
           </p>
         </div>
 
@@ -57,7 +57,7 @@ export default async function BookCreatorDashboard() {
 
       {/* Category Cards Showcase */}
       <section aria-label="Book Categories" className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {BOOK_TYPES.slice(0, 4).map((bt) => {
+        {BOOK_TYPES.map((bt) => {
           const Icon = ICON_MAP[bt.icon] || BookOpen
           return (
             <Link
@@ -102,7 +102,7 @@ export default async function BookCreatorDashboard() {
             </div>
             <h3 className="mt-4 font-semibold text-base">No books generated yet</h3>
             <p className="mt-1 text-sm text-ink-muted max-w-sm">
-              Start by choosing whether you want to write a children's story, coloring book, word puzzle, or novel.
+              Start by choosing whether you want to create a children's book, coloring book, story book, or puzzle games.
             </p>
             <Link
               href="/create-book/new"

@@ -1,15 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, ChevronLeft, ChevronRight, Copy, Check, Sparkles, Image as ImageIcon } from 'lucide-react'
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Image as ImageIcon,
+} from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/components/ui/cn'
 import type { StoryPage } from '@/lib/services/creator/types'
 
-export function ChildrenBookViewer({ pages }: { pages: StoryPage[] }) {
+export function ChildrenBookViewer({
+  pages,
+}: {
+  pages: StoryPage[]
+}) {
   const [currentPage, setCurrentPage] = useState(0)
-  const [copiedPrompt, setCopiedPrompt] = useState(false)
 
   if (!pages || pages.length === 0) {
     return (
@@ -20,13 +29,6 @@ export function ChildrenBookViewer({ pages }: { pages: StoryPage[] }) {
   }
 
   const page = pages[currentPage]
-
-  function handleCopyPrompt() {
-    if (!page) return
-    navigator.clipboard.writeText(page.illustrationPrompt)
-    setCopiedPrompt(true)
-    setTimeout(() => setCopiedPrompt(false), 2000)
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,8 +71,8 @@ export function ChildrenBookViewer({ pages }: { pages: StoryPage[] }) {
 
       {/* Two-Column Story Spread */}
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* Left Column: Story Prose (7 cols) */}
-        <Card className="flex flex-col justify-between p-6 sm:p-8 lg:col-span-7">
+        {/* Left Column: Story Prose (6 cols) */}
+        <Card className="flex flex-col justify-between p-6 sm:p-8 lg:col-span-6">
           <div>
             <div className="flex items-center justify-between">
               <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold uppercase tracking-wider text-accent">
@@ -95,80 +97,110 @@ export function ChildrenBookViewer({ pages }: { pages: StoryPage[] }) {
           </div>
 
           <div className="mt-8 border-t border-line/60 pt-4 text-xs text-ink-muted">
-            Tip: Use this narrative directly for Kindle Kids KDP text frames or audio narration.
+            Ready for print layout & Kindle Kids picture book format.
           </div>
         </Card>
 
-        {/* Right Column: Illustration Prompt & Art Concept (5 cols) */}
-        <Card className="flex flex-col justify-between p-6 bg-surface-2/40 lg:col-span-5">
+        {/* Right Column: Generated Illustration Artwork (6 cols) */}
+        <Card className="flex flex-col justify-between p-6 bg-surface-2/40 lg:col-span-6">
           <div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-accent">
-                <Sparkles className="size-3.5" /> AI Illustration Prompt
+                <Sparkles className="size-3.5" /> Page {page.pageNumber} Artwork
               </span>
-              <button
-                type="button"
-                onClick={handleCopyPrompt}
-                className="inline-flex items-center gap-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-muted hover:border-accent hover:text-ink"
-              >
-                {copiedPrompt ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
-                {copiedPrompt ? 'Copied' : 'Copy'}
-              </button>
+              <span className="rounded-full bg-surface px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted border border-line">
+                AI Image Model
+              </span>
             </div>
 
             {page.generatedImageUrl ? (
-              <div className="mt-4 overflow-hidden rounded-xl border border-line bg-surface shadow">
+              <div className="group relative mt-4 overflow-hidden rounded-2xl border border-line bg-surface shadow-subtle">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={page.generatedImageUrl} alt="" className="size-full object-cover" />
+                <img
+                  src={page.generatedImageUrl}
+                  alt={`Illustration for Page ${page.pageNumber}`}
+                  className="aspect-[4/3] w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                />
               </div>
             ) : (
-              <div className="mt-4 flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-surface p-4 text-center">
-                <ImageIcon className="size-8 text-ink-muted/60" />
-                <p className="text-xs font-semibold text-ink">Ready for Illustration</p>
-                <p className="text-[11px] text-ink-muted">Use Midjourney, DALL-E 3, or Nano-Banana with prompt below</p>
+              <div className="mt-4 flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-line bg-surface p-6 text-center">
+                <div className="grid size-12 place-items-center rounded-2xl bg-accent-soft text-accent">
+                  <ImageIcon className="size-6" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-ink">Image Pending</p>
+                  <p className="mt-1 text-xs text-ink-muted max-w-xs">
+                    Use the "Illustrate Book" button in the header to generate illustrations for all pages with the image model.
+                  </p>
+                </div>
               </div>
             )}
-
-            <div className="mt-4 rounded-xl border border-line/70 bg-surface p-3.5 text-xs font-mono leading-relaxed text-ink-muted">
-              {page.illustrationPrompt}
-            </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-4">
-            <span className="text-[11px] text-ink-muted">Compatible with Midjourney & Ideogram</span>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleCopyPrompt}
-            >
-              <Copy className="size-3.5" /> Copy Prompt
-            </Button>
+          <div className="mt-6 flex items-center justify-between border-t border-line/60 pt-4 text-xs text-ink-muted">
+            <span>High-resolution 4:3 picture book spread</span>
+            <span>KDP Print Ready</span>
           </div>
         </Card>
       </div>
 
-      {/* Thumbnail Strip */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {pages.map((p, idx) => (
-          <button
-            key={p.pageNumber}
-            type="button"
-            onClick={() => setCurrentPage(idx)}
-            className={cn(
-              'flex shrink-0 flex-col items-start rounded-xl border p-2.5 text-left transition-all w-32',
-              currentPage === idx
-                ? 'border-accent bg-accent-soft/80 shadow-inset ring-2 ring-accent/30'
-                : 'border-line bg-surface hover:border-accent/40'
-            )}
-          >
-            <span className="text-[10px] font-bold uppercase text-accent">Page {p.pageNumber}</span>
-            <span className="mt-1 truncate text-xs font-semibold text-ink">
-              {p.spreadHeading || `Spread ${p.pageNumber}`}
-            </span>
-            <p className="mt-0.5 line-clamp-1 text-[10px] text-ink-muted">{p.storyText}</p>
-          </button>
-        ))}
+      {/* Bottom Thumbnail Strip - FIXED: text never lurks out of box */}
+      <div className="rounded-2xl border border-line/70 bg-surface-2/40 p-3 shadow-subtle">
+        <div className="mb-2.5 flex items-center justify-between px-1">
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+            Page Spreads ({pages.length})
+          </span>
+          <span className="text-[11px] text-ink-muted">
+            Click to view spread
+          </span>
+        </div>
+
+        <div className="flex gap-2.5 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
+          {pages.map((p, idx) => {
+            const isSelected = currentPage === idx
+            return (
+              <button
+                key={p.pageNumber}
+                type="button"
+                onClick={() => setCurrentPage(idx)}
+                className={cn(
+                  'group flex w-36 sm:w-40 shrink-0 min-w-0 flex-col items-start rounded-xl border p-2 text-left transition-all overflow-hidden',
+                  isSelected
+                    ? 'border-accent bg-accent-soft/80 shadow-sm ring-2 ring-accent/30'
+                    : 'border-line bg-surface hover:border-accent/40 hover:bg-surface-2'
+                )}
+              >
+                {/* Mini Image Preview */}
+                <div className="relative mb-2 h-14 w-full overflow-hidden rounded-lg border border-line/60 bg-surface-2">
+                  {p.generatedImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.generatedImageUrl}
+                      alt=""
+                      className="size-full object-cover transition-transform group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="grid size-full place-items-center text-ink-muted/40">
+                      <ImageIcon className="size-4" />
+                    </div>
+                  )}
+                  <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                    P. {p.pageNumber}
+                  </span>
+                </div>
+
+                <div className="w-full min-w-0">
+                  <span className="block w-full min-w-0 truncate text-xs font-semibold text-ink">
+                    {p.spreadHeading || `Spread ${p.pageNumber}`}
+                  </span>
+                  <p className="mt-0.5 block w-full min-w-0 truncate text-[10px] text-ink-muted">
+                    {p.storyText}
+                  </p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

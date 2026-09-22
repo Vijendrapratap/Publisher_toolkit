@@ -1,7 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Eye, EyeOff, Lightbulb, Puzzle, Sparkles } from 'lucide-react'
+import {
+  Check,
+  Eye,
+  EyeOff,
+  Lightbulb,
+  Puzzle,
+  Sparkles,
+  Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/components/ui/cn'
@@ -29,48 +39,78 @@ export function WordGameViewer({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Selector between Word Searches */}
+      {/* Header & Puzzle Navigation */}
       {wordSearches.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {wordSearches.map((ws, idx) => (
-            <button
-              key={ws.puzzleNumber}
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-line/70 bg-surface p-3.5 shadow-subtle">
+          <div className="flex items-center gap-2 min-w-0">
+            <Puzzle className="size-4 text-accent shrink-0" />
+            <span className="text-sm font-semibold text-ink truncate">
+              Puzzle {activeSearchIdx + 1} of {wordSearches.length}: {puzzle?.title}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              disabled={activeSearchIdx === 0}
               onClick={() => {
-                setActiveSearchIdx(idx)
+                setActiveSearchIdx((i) => Math.max(0, i - 1))
                 setFoundWords({})
               }}
-              className={cn(
-                'rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all',
-                activeSearchIdx === idx
-                  ? 'border-accent bg-accent text-on-accent shadow-subtle'
-                  : 'border-line bg-surface text-ink hover:border-accent/40'
-              )}
             >
-              Puzzle #{ws.puzzleNumber}: {ws.title}
-            </button>
-          ))}
+              <ChevronLeft className="size-4" /> Prev
+            </Button>
+            <span className="font-mono text-xs text-ink-muted">
+              {activeSearchIdx + 1} / {wordSearches.length}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={activeSearchIdx === wordSearches.length - 1}
+              onClick={() => {
+                setActiveSearchIdx((i) => Math.min(wordSearches.length - 1, i + 1))
+                setFoundWords({})
+              }}
+            >
+              Next <ChevronRight className="size-4" />
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Main Word Search Layout */}
       {puzzle && (
         <div className="grid gap-6 lg:grid-cols-12">
-          {/* Left: The Letter Grid (7 cols) */}
+          {/* Left: The Letter Grid & Header Artwork (7 cols) */}
           <Card className="p-6 lg:col-span-7">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="min-w-0">
                 <span className="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent">
                   Word Search #{puzzle.puzzleNumber}
                 </span>
-                <h3 className="mt-2 text-lg font-bold text-ink">{puzzle.title}</h3>
+                <h3 className="mt-2 text-lg font-bold text-ink truncate">{puzzle.title}</h3>
                 <p className="text-xs text-ink-muted">Theme: {puzzle.theme}</p>
               </div>
 
-              <span className="font-mono text-xs font-medium text-ink-muted">
+              <span className="font-mono text-xs font-medium text-ink-muted shrink-0">
                 {puzzle.gridSize}×{puzzle.gridSize} Grid
               </span>
             </div>
+
+            {/* Themed Puzzle Illustration if available */}
+            {puzzle.illustrationUrl && (
+              <div className="mt-4 overflow-hidden rounded-xl border border-line bg-surface shadow-subtle">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={puzzle.illustrationUrl}
+                  alt={puzzle.theme}
+                  className="h-40 w-full object-cover"
+                />
+              </div>
+            )}
 
             {/* Matrix Render */}
             <div className="mt-6 flex justify-center overflow-x-auto py-2">
@@ -146,6 +186,67 @@ export function WordGameViewer({
               Ready for export into Amazon KDP Activity Books (6×9" or 8.5×11").
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* Bottom Puzzle Strip - FIXED: properly truncated */}
+      {wordSearches.length > 1 && (
+        <div className="rounded-2xl border border-line/70 bg-surface-2/40 p-3 shadow-subtle">
+          <div className="mb-2.5 flex items-center justify-between px-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+              Puzzles ({wordSearches.length})
+            </span>
+            <span className="text-[11px] text-ink-muted">Click to select puzzle</span>
+          </div>
+
+          <div className="flex gap-2.5 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
+            {wordSearches.map((ws, idx) => {
+              const isSelected = activeSearchIdx === idx
+              return (
+                <button
+                  key={ws.puzzleNumber}
+                  type="button"
+                  onClick={() => {
+                    setActiveSearchIdx(idx)
+                    setFoundWords({})
+                  }}
+                  className={cn(
+                    'group flex w-36 sm:w-40 shrink-0 min-w-0 flex-col items-start rounded-xl border p-2 text-left transition-all overflow-hidden',
+                    isSelected
+                      ? 'border-accent bg-accent-soft/80 shadow-sm ring-2 ring-accent/30'
+                      : 'border-line bg-surface hover:border-accent/40 hover:bg-surface-2'
+                  )}
+                >
+                  <div className="relative mb-2 h-14 w-full overflow-hidden rounded-lg border border-line/60 bg-surface-2 flex items-center justify-center">
+                    {ws.illustrationUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={ws.illustrationUrl}
+                        alt=""
+                        className="size-full object-cover transition-transform group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="grid size-full place-items-center text-ink-muted/40 font-mono text-xs font-bold">
+                        {ws.gridSize}×{ws.gridSize}
+                      </div>
+                    )}
+                    <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      #{ws.puzzleNumber}
+                    </span>
+                  </div>
+
+                  <div className="w-full min-w-0">
+                    <span className="block w-full min-w-0 truncate text-xs font-semibold text-ink">
+                      {ws.title}
+                    </span>
+                    <p className="mt-0.5 block w-full min-w-0 truncate text-[10px] text-ink-muted">
+                      {ws.theme}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 

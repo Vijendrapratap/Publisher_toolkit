@@ -27,6 +27,8 @@ export interface WordSearchPuzzle {
   grid: string[][]
   wordList: string[]
   hiddenFact?: string
+  illustrationPrompt?: string
+  illustrationUrl?: string
 }
 
 export interface CrosswordClue {
@@ -40,6 +42,7 @@ export interface CrosswordPuzzle {
   title: string
   across: CrosswordClue[]
   down: CrosswordClue[]
+  illustrationUrl?: string
 }
 
 export interface ChapterItem {
@@ -52,6 +55,7 @@ export interface ChapterItem {
   status: 'draft' | 'generating' | 'completed'
   content: string
   wordCount: number
+  illustrationUrl?: string
 }
 
 export interface NovelContent {
@@ -70,6 +74,8 @@ export interface ShortStoryContent {
   storyText: string
   wordCount: number
   readingTimeMinutes: number
+  illustrationPrompt?: string
+  illustrationUrl?: string
 }
 
 export type GeneratedBookContent =

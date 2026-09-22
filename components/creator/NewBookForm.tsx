@@ -125,7 +125,8 @@ export function NewBookForm() {
           description: `"${title}" has been generated.`,
         })
       }
-      router.push(`/create-book/${json.id}`)
+      // Sample content means no AI key, so image generation would only fail.
+      router.push(`/create-book/${json.id}${json.source === 'fallback' ? '' : '?illustrate=1'}`)
       router.refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong during generation.'
@@ -171,10 +172,10 @@ export function NewBookForm() {
             <h2 className="font-display text-lg font-semibold">1. Choose What Kind of Book to Create</h2>
           </div>
           <p className="mt-1 text-sm text-ink-muted">
-            Select from illustrated children books, coloring books, word search games, or chapter-by-chapter novels.
+            Select from illustrated children books, coloring books, story books, or word search and puzzle games.
           </p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {BOOK_TYPES.map((bt) => {
               const isSelected = bookType === bt.key
               const Icon = ICONS_MAP[bt.icon] || BookOpen
@@ -332,20 +333,20 @@ export function NewBookForm() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="pageCount" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                {bookType === 'novel_chapter' ? 'Target Chapters in Outline' : 'Target Spreads / Pages'}
+                Target Spreads / Pages
               </label>
               <div className="mt-1.5 flex items-center gap-3">
                 <input
                   id="pageCount"
                   type="range"
-                  min={bookType === 'short_story' ? 1 : 4}
-                  max={bookType === 'novel_chapter' ? 20 : 15}
+                  min={bookType === 'short_story' ? 2 : 4}
+                  max={20}
                   value={pageCount}
                   onChange={(e) => setPageCount(Number(e.target.value))}
                   className="flex-1 accent-accent"
                 />
-                <span className="w-12 text-right font-mono text-sm font-semibold text-ink">
-                  {pageCount} {bookType === 'novel_chapter' ? 'chs' : 'pgs'}
+                <span className="min-w-16 text-right font-mono text-sm font-semibold text-ink">
+                  {pageCount} pgs
                 </span>
               </div>
             </div>
@@ -378,7 +379,7 @@ export function NewBookForm() {
 
         <div className="flex flex-col-reverse items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2 text-xs text-ink-muted">
-            <CheckCircle2 className="size-4 text-accent" aria-hidden /> Generates full structured spreads, artwork prompts, or outline.
+            <CheckCircle2 className="size-4 text-accent" aria-hidden /> Writes the book, then draws every page and the cover with the image model.
           </p>
           <Button type="submit" size="lg" loading={pending} disabled={pending || !title.trim() || !promptConcept.trim()}>
             {pending ? (

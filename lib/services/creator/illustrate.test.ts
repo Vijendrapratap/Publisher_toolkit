@@ -143,14 +143,35 @@ describe('illustrateProject', () => {
     expect(pages.every((p) => p.generatedImageUrl === undefined)).toBe(true)
   })
 
-  it('illustrates only the cover for text-only book types', async () => {
+  it('illustrates scene artwork and cover for story books', async () => {
     const result = await run({
       type: 'short_story',
       story: { title: 'X', synopsis: 'Y', theme: 'Z', storyText: 'W', wordCount: 1, readingTimeMinutes: 1 },
     })
 
-    expect(generateAiImage).toHaveBeenCalledTimes(1)
-    expect(result.requested).toBe(1)
+    expect(generateAiImage).toHaveBeenCalledTimes(2)
+    expect(result.requested).toBe(2)
+    expect(result.succeeded).toBe(2)
+  })
+
+  it('illustrates puzzle artwork and cover for word games', async () => {
+    const result = await run({
+      type: 'word_game',
+      wordSearches: [
+        {
+          puzzleNumber: 1,
+          title: 'Ocean',
+          theme: 'Fish',
+          gridSize: 10,
+          grid: [['A']],
+          wordList: ['FISH'],
+        },
+      ],
+    })
+
+    expect(generateAiImage).toHaveBeenCalledTimes(2)
+    expect(result.requested).toBe(2)
+    expect(result.succeeded).toBe(2)
   })
 })
 
@@ -159,12 +180,24 @@ describe('countIllustrations', () => {
     expect(countIllustrations(childrenBook())).toBe(3)
   })
 
-  it('counts a single cover for text-only books', () => {
+  it('counts story scene plus cover for story books', () => {
     expect(
       countIllustrations({
-        type: 'novel_chapter',
-        novel: { premise: '', logline: '', protagonist: '', antagonistOrConflict: '', chapters: [] },
+        type: 'short_story',
+        story: { title: 'X', synopsis: 'Y', theme: 'Z', storyText: 'W', wordCount: 1, readingTimeMinutes: 1 },
       })
-    ).toBe(1)
+    ).toBe(2)
+  })
+
+  it('counts puzzle themes plus cover for word game books', () => {
+    expect(
+      countIllustrations({
+        type: 'word_game',
+        wordSearches: [
+          { puzzleNumber: 1, title: 'A', theme: 'T', gridSize: 10, grid: [], wordList: [] },
+          { puzzleNumber: 2, title: 'B', theme: 'T', gridSize: 10, grid: [], wordList: [] },
+        ],
+      })
+    ).toBe(3)
   })
 })

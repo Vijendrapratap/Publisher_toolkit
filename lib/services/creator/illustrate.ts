@@ -104,8 +104,50 @@ function collectPrompts(
     }))
   }
 
-  // Novels, short stories and word games are text products; only the cover is
-  // illustrated, and that is handled separately.
+  if (content.type === 'word_game') {
+    return content.wordSearches.map((ws) => ({
+      key: `puzzle-${ws.puzzleNumber}`,
+      prompt: [
+        ws.illustrationPrompt || `Charming children book illustration of ${ws.theme}.`,
+        bible,
+        'Activity book puzzle theme artwork. No text, letters, grids or numbers.',
+      ].join(' '),
+      apply: (url) => {
+        ws.illustrationUrl = url
+      },
+    }))
+  }
+
+  if (content.type === 'short_story') {
+    return [
+      {
+        key: 'story-scene-1',
+        prompt: [
+          content.story.illustrationPrompt || `Atmospheric story illustration for "${content.story.title}".`,
+          bible,
+          'Evocative narrative artwork. No text, letters, or title in the image.',
+        ].join(' '),
+        apply: (url) => {
+          content.story.illustrationUrl = url
+        },
+      },
+    ]
+  }
+
+  if (content.type === 'novel_chapter') {
+    return content.novel.chapters.slice(0, 5).map((ch) => ({
+      key: `chapter-${ch.chapterNumber}`,
+      prompt: [
+        `Chapter illustration for "${ch.title}": ${ch.summary}.`,
+        bible,
+        'No text, no letters.',
+      ].join(' '),
+      apply: (url) => {
+        ch.illustrationUrl = url
+      },
+    }))
+  }
+
   return []
 }
 
@@ -192,9 +234,20 @@ export async function illustrateProject(
 }
 
 function hasImage(content: GeneratedBookContent, key: string): boolean {
-  const pageNumber = Number(key.replace('page-', ''))
   if (content.type === 'children' || content.type === 'coloring') {
+    const pageNumber = Number(key.replace('page-', ''))
     return Boolean(content.pages.find((p) => p.pageNumber === pageNumber)?.generatedImageUrl)
+  }
+  if (content.type === 'word_game') {
+    const puzzleNumber = Number(key.replace('puzzle-', ''))
+    return Boolean(content.wordSearches.find((ws) => ws.puzzleNumber === puzzleNumber)?.illustrationUrl)
+  }
+  if (content.type === 'short_story') {
+    return Boolean(content.story.illustrationUrl)
+  }
+  if (content.type === 'novel_chapter') {
+    const chapterNumber = Number(key.replace('chapter-', ''))
+    return Boolean(content.novel.chapters.find((ch) => ch.chapterNumber === chapterNumber)?.illustrationUrl)
   }
   return false
 }
@@ -202,5 +255,8 @@ function hasImage(content: GeneratedBookContent, key: string): boolean {
 /** How many image calls a project will make, so the UI can warn before spending. */
 export function countIllustrations(content: GeneratedBookContent): number {
   if (content.type === 'children' || content.type === 'coloring') return content.pages.length + 1
+  if (content.type === 'word_game') return content.wordSearches.length + 1
+  if (content.type === 'short_story') return 2
+  if (content.type === 'novel_chapter') return Math.min(content.novel.chapters.length, 5) + 1
   return 1
 }

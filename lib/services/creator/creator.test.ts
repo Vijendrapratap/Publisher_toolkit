@@ -10,14 +10,22 @@ import {
 } from './generator'
 
 describe('Book Creator options & schema', () => {
-  it('defines all five book types with badges and default pages', () => {
+  it('defines the four book types with badges and default pages', () => {
     expect(BOOK_TYPES.map((b) => b.key)).toEqual([
       'children',
       'coloring',
-      'word_game',
-      'novel_chapter',
       'short_story',
+      'word_game',
     ])
+  })
+
+  it('rejects new novel projects', () => {
+    const result = createBookProjectSchema.safeParse({
+      title: 'A Novel',
+      bookType: 'novel_chapter',
+      promptConcept: 'A long novel concept that is no longer offered.',
+    })
+    expect(result.success).toBe(false)
   })
 
   it('provides distinct style options for each book type', () => {
