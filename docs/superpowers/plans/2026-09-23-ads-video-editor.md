@@ -2940,8 +2940,10 @@ describe('buildStitchArgs', () => {
   })
   const graph = args[args.indexOf('-filter_complex') + 1]
 
-  it('fits every clip to the frame and overlays captions', () => {
-    expect(graph).toContain('[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080')
+  it('keeps each whole clip inside the frame over a blurred fill, and overlays captions', () => {
+    expect(graph).toContain('[0:v]split[bg0][fg0]')
+    expect(graph).toContain('[bg0]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,boxblur=24:2')
+    expect(graph).toContain('[fg0]scale=1920:1080:force_original_aspect_ratio=decrease')
     expect(graph).toContain('[s0][1:v]overlay=0:0')
   })
   it('cross-fades clips into the end card at the right offsets', () => {
@@ -3022,6 +3024,13 @@ const FADE_SEC = 0.5
 export function buildStitchArgs(input: StitchInput): string[] {
   const { width: w, height: h } = input
   const fit = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=30,setsar=1,format=yuv420p`
+  // AI clips keep their source image's shape (a portrait cover stays portrait),
+  // so they sit whole inside the frame over a blurred fill of themselves.
+  const fitOverBlur = (label: string, out: string) =>
+    `${label}split[bg${out}][fg${out}];` +
+    `[bg${out}]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=24:2[bgb${out}];` +
+    `[fg${out}]scale=${w}:${h}:force_original_aspect_ratio=decrease[fgs${out}];` +
+    `[bgb${out}][fgs${out}]overlay=(W-w)/2:(H-h)/2,fps=30,setsar=1,format=yuv420p`
   const args: string[] = ['-y']
   const filters: string[] = []
   const segments: { label: string; durationSec: number }[] = []
@@ -3030,7 +3039,7 @@ export function buildStitchArgs(input: StitchInput): string[] {
   input.clips.forEach((clip, i) => {
     args.push('-i', clip.path)
     const video = next++
-    filters.push(`[${video}:v]${fit},trim=duration=${clip.durationSec},setpts=PTS-STARTPTS[s${i}]`)
+    filters.push(`${fitOverBlur(`[${video}:v]`, String(i))},trim=duration=${clip.durationSec},setpts=PTS-STARTPTS[s${i}]`)
     if (clip.captionPath) {
       args.push('-i', clip.captionPath)
       const caption = next++
@@ -3441,7 +3450,7 @@ describe('advanceAiVideoJob', () => {
   })
 
   it('downloads finished clips and stitches once all are done', async () => {
-    vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed' })
+    vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed', costUsd: 0.42 })
     vi.mocked(downloadVideoJob).mockResolvedValue(Buffer.from('mp4'))
     const job = await advanceAiVideoJob(
       running([
@@ -3450,7 +3459,9 @@ describe('advanceAiVideoJob', () => {
       ]),
       book, 'sk', 'pub_1'
     )
-    expect(prisma.aiVideoJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'job_1', status: 'running' } }))
+    expect(prisma.aiVideoJob.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'job_1', status: 'running' }, data: expect.objectContaining({ costUsd: 0.84 }) })
+    )
     expect(stitchAiVideo).toHaveBeenCalledWith(
       expect.objectContaining({ width: 1920, height: 1080, endCardSec: 3, musicPath: '/app/public/music/epic.mp3' })
     )
@@ -3509,6 +3520,8 @@ export type ShotState = {
   status: 'pending' | 'in_progress' | 'completed' | 'failed'
   clipUrl: string | null
   error?: string
+  /** What OpenRouter actually billed; can exceed duration × price (minimum billed length). */
+  costUsd?: number
 }
 
 export interface AiVideoJobSummary {
@@ -3586,6 +3599,7 @@ export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: str
     shots.map(async (shot, i) => {
       if (shot.status === 'completed' || shot.status === 'failed') return
       const remote = await getVideoJob(apiKey, shot.jobId)
+      if (remote.costUsd !== undefined) shot.costUsd = remote.costUsd
       if (remote.status === 'completed') {
         const clip = await downloadVideoJob(apiKey, shot.jobId)
         shot.clipUrl = (await storeFile(`${dir}/shot-${i + 1}.mp4`, clip, 'video/mp4')).url
@@ -3606,9 +3620,16 @@ export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: str
   if (!shots.every((s) => s.status === 'completed')) {
     return prisma.aiVideoJob.update({ where: { id: job.id }, data: { shots: json(shots) } })
   }
+  // Every shot is billed now: replace the estimate with the real total.
+  const billed = shots.every((s) => s.costUsd !== undefined)
+    ? Math.round(shots.reduce((t, s) => t + (s.costUsd ?? 0), 0) * 100) / 100
+    : job.costUsd
 
   // Claim the stitch so two polls arriving together do not both render it.
-  const claim = await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'running' }, data: { shots: json(shots), status: 'stitching' } })
+  const claim = await prisma.aiVideoJob.updateMany({
+    where: { id: job.id, status: 'running' },
+    data: { shots: json(shots), status: 'stitching', costUsd: billed },
+  })
   if (claim.count === 0) return (await prisma.aiVideoJob.findUnique({ where: { id: job.id } })) ?? job
 
   try {
@@ -3880,7 +3901,7 @@ test('the cyan button opens an editable AI video prompt', async ({ page }) => {
 
   await firstPrompt.fill('Slow push-in on the cover while golden light sweeps across it')
   await expect(panel.getByRole('button', { name: 'Generate AI video' })).toBeEnabled()
-  await expect(panel.getByText(/≈ \$\d+\.\d\d/)).toBeVisible()
+  await expect(panel.getByText(/Estimated ≈ \$\d+\.\d\d/)).toBeVisible()
 })
 ```
 
@@ -4040,9 +4061,12 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
           {job.status === 'completed' && job.videoUrl ? (
             <div className="flex flex-col gap-3">
               <video controls playsInline poster={job.posterUrl ?? undefined} src={job.videoUrl} className="max-h-[70vh] w-full rounded-xl bg-black object-contain" />
-              <a href={job.videoUrl} download="ai-video-ad.mp4" className={cn(buttonClasses({ size: 'sm' }), 'self-start bg-ai text-canvas hover:bg-ai/90')}>
-                <Download className="size-3.5" aria-hidden /> Download AI video
-              </a>
+              <div className="flex flex-wrap items-center gap-3">
+                <a href={job.videoUrl} download="ai-video-ad.mp4" className={cn(buttonClasses({ size: 'sm' }), 'bg-ai text-canvas hover:bg-ai/90')}>
+                  <Download className="size-3.5" aria-hidden /> Download AI video
+                </a>
+                {job.costUsd !== null && <span className="text-sm text-ink-muted">Cost: ${job.costUsd.toFixed(2)}</span>}
+              </div>
             </div>
           ) : job.status === 'failed' ? (
             <p role="alert" className="text-sm text-danger">The AI video didn’t finish: {job.error}. Edit the prompt and generate again.</p>
@@ -4157,7 +4181,7 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ai/20 pt-4">
             <p className="text-sm text-ink-muted">
-              {estimate !== null ? `≈ $${estimate.toFixed(2)} · ${seconds} seconds of AI video` : `${seconds} seconds of AI video`}
+              {estimate !== null ? `Estimated ≈ $${estimate.toFixed(2)} · ${seconds} seconds of AI video` : `${seconds} seconds of AI video`}
               {model ? ` · ${model.id}` : ''}
             </p>
             <Button type="button" onClick={generate} loading={starting} disabled={starting || busy || Boolean(problem) || !aiConfigured} className="bg-ai text-canvas hover:bg-ai/90">
