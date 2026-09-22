@@ -6,7 +6,7 @@ import { generateAdCopy, type AdPlatform } from '@/lib/services/ads/copy'
 import { renderCreativeImages } from '@/lib/services/ads/render'
 import { readStoredFile, storeFile, toDataUri } from '@/lib/providers/storage'
 import { getCampaignObjective, type CopyTone } from '@/lib/services/ads/options'
-import { renderAdVideo } from '@/lib/services/ads/renderVideo'
+import { describeRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
 import { adVideoImages, inlineMusic } from '@/lib/services/ads/videoAssets'
 import { bookVideoSource, readVideoSpec, resolveMusic } from '@/lib/services/ads/videoSpec'
 import { prisma } from '@/lib/db'
@@ -100,12 +100,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
         videoUrl = videoUpload.url
         videoPosterUrl = posterUpload.url
-        videoDuration = video.durationSec
+        videoDuration = Math.round(video.durationSec)
       } catch (err) {
         // The images are the deliverable; a failed trailer must not discard
         // them — but it must not be silent either.
-        videoError = err instanceof Error ? err.message : 'Video rendering failed'
-        console.warn('ads generation: trailer skipped —', videoError)
+        console.warn('ads generation: trailer skipped —', err)
+        videoError = describeRenderError(err)
       }
     }
 

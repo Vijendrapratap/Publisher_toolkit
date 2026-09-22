@@ -62,11 +62,22 @@ describe('POST /api/ads/projects/:id/video/instant', () => {
     expect((await POST(req(), ctx)).status).toBe(400)
   })
 
-  it('passes a render problem through as a readable 500', async () => {
+  it('turns a missing-bundle error into a plain, engine-free message', async () => {
     vi.mocked(renderAdVideo).mockRejectedValue(new AdVideoRenderError('The video bundle is missing. Run `npm run remotion:bundle` and try again.'))
     const res = await POST(req(), ctx)
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/remotion:bundle/)
+    const { error } = await res.json()
+    expect(error).toBe("Video export isn't set up on this server yet. Please contact support.")
+    expect(error).not.toMatch(/remotion/i)
+  })
+
+  it('turns any other render error into a generic readable 500', async () => {
+    vi.mocked(renderAdVideo).mockRejectedValue(new Error('headless Chrome crashed'))
+    const res = await POST(req(), ctx)
+    expect(res.status).toBe(500)
+    const { error } = await res.json()
+    expect(error).toBe('We couldn’t export the video. Please try again.')
+    expect(error).not.toMatch(/remotion/i)
   })
 
   it('returns 404 for another publisher’s project', async () => {

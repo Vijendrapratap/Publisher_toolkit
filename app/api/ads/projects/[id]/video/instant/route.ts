@@ -3,7 +3,7 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher, getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
 import { bookVideoSource, readVideoSpec, resolveMusic } from '@/lib/services/ads/videoSpec'
 import { adVideoImages, inlineMusic } from '@/lib/services/ads/videoAssets'
-import { AdVideoRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
+import { describeRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
 import { storeFile } from '@/lib/providers/storage'
 import { prisma } from '@/lib/db'
 
@@ -43,7 +43,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ videoUrl: mp4.url, videoPosterUrl: poster.url, videoDuration })
   } catch (err) {
     console.error('instant video export failed', err)
-    const message = err instanceof AdVideoRenderError ? err.message : 'We couldn’t export the video. Please try again.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: describeRenderError(err) }, { status: 500 })
   }
 }

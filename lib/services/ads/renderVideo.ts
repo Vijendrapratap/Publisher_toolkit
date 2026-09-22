@@ -38,6 +38,18 @@ function asRenderError(err: unknown): AdVideoRenderError {
   return new AdVideoRenderError(err instanceof Error ? err.message : 'Video rendering failed')
 }
 
+/**
+ * A message safe to show a publisher: never the engine's own wording (a
+ * missing-bundle error, an internal renderer message, a file path). Callers
+ * must still log the raw `err` themselves for diagnosis.
+ */
+export function describeRenderError(err: unknown): string {
+  if (err instanceof AdVideoRenderError && /bundle/i.test(err.message)) {
+    return "Video export isn't set up on this server yet. Please contact support."
+  }
+  return 'We couldn’t export the video. Please try again.'
+}
+
 /** Renders a composition from the prebuilt bundle — the same component the browser preview plays. */
 export async function renderAdVideo(inputProps: Record<string, unknown>, compositionId = 'AdVideo'): Promise<RenderedAdVideo> {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'ad-video-'))

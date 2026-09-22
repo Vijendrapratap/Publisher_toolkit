@@ -109,35 +109,46 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
       return false
     }
     setSaving(true)
-    const res = await fetch(`/api/ads/projects/${projectId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoSpec: check.data }),
-    })
-    setSaving(false)
-    if (!res.ok) {
-      toast.error((await res.json().catch(() => ({}))).error ?? 'We couldn’t save your video.')
+    try {
+      const res = await fetch(`/api/ads/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoSpec: check.data }),
+      })
+      if (!res.ok) {
+        toast.error((await res.json().catch(() => ({}))).error ?? 'We couldn’t save your video.')
+        return false
+      }
+      setSaved(check.data)
+      setSpec(check.data)
+      toast.success('Video saved')
+      return true
+    } catch {
+      toast.error('We couldn’t save your video.', { description: 'Check your connection and try again.' })
       return false
+    } finally {
+      setSaving(false)
     }
-    setSaved(check.data)
-    setSpec(check.data)
-    toast.success('Video saved')
-    return true
   }
 
   async function exportVideo() {
     if (dirty && !(await save())) return
     setExporting(true)
     const toastId = toast.loading('Rendering your video…', { description: 'This usually takes under a minute.' })
-    const res = await fetch(`/api/ads/projects/${projectId}/video/instant`, { method: 'POST' })
-    const json = await res.json().catch(() => ({}))
-    setExporting(false)
-    if (!res.ok) {
-      toast.error('Export failed', { id: toastId, description: json.error })
-      return
+    try {
+      const res = await fetch(`/api/ads/projects/${projectId}/video/instant`, { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error('Export failed', { id: toastId, description: json.error })
+        return
+      }
+      setCurrent(json)
+      toast.success('Your video is ready', { id: toastId, description: 'Download it below the title.' })
+    } catch {
+      toast.error('Export failed', { id: toastId, description: 'Check your connection and try again.' })
+    } finally {
+      setExporting(false)
     }
-    setCurrent(json)
-    toast.success('Your video is ready', { id: toastId, description: 'Download it below the title.' })
   }
 
   return (
