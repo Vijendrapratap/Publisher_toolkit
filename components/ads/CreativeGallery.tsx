@@ -1,17 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import {
-  Check,
-  Download,
-  Expand,
-  Film,
-  Layers,
-  ShoppingBag,
-  Sparkles,
-  Tv,
-  X,
-} from 'lucide-react'
+import { Download, Expand, Layers, ShoppingBag, X } from 'lucide-react'
 import { buttonClasses } from '@/components/ui/button'
 import { cn } from '@/components/ui/cn'
 
@@ -26,11 +16,6 @@ export type GalleryImage = {
 export interface CreativeGalleryProps {
   images: GalleryImage[]
   platformLabel: string
-  video?: {
-    videoUrl?: string | null
-    videoPosterUrl?: string | null
-    videoDuration?: number | null
-  } | null
 }
 
 function getFormatMetadata(sizeKey: string, width: number, height: number) {
@@ -85,11 +70,10 @@ function getFormatMetadata(sizeKey: string, width: number, height: number) {
 export function CreativeGallery({
   images,
   platformLabel,
-  video,
 }: CreativeGalleryProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [active, setActive] = useState<GalleryImage | null>(null)
-  const [filter, setFilter] = useState<'all' | 'aplus' | 'sponsored' | 'video'>('all')
+  const [filter, setFilter] = useState<'all' | 'aplus' | 'sponsored'>('all')
 
   useEffect(() => {
     if (active) dialogRef.current?.showModal()
@@ -102,16 +86,8 @@ export function CreativeGallery({
 
   const aplusImages = images.filter((img) => getFormatMetadata(img.sizeKey, img.width, img.height).category === 'aplus')
   const sponsoredImages = images.filter((img) => getFormatMetadata(img.sizeKey, img.width, img.height).category === 'sponsored')
-  const hasVideo = Boolean(video?.videoUrl)
 
-  const displayedImages =
-    filter === 'aplus'
-      ? aplusImages
-      : filter === 'sponsored'
-        ? sponsoredImages
-        : filter === 'video'
-          ? []
-          : images
+  const displayedImages = filter === 'aplus' ? aplusImages : filter === 'sponsored' ? sponsoredImages : images
 
   return (
     <div className="flex flex-col gap-6">
@@ -127,7 +103,7 @@ export function CreativeGallery({
               : 'bg-surface text-ink hover:bg-surface-2'
           )}
         >
-          All Assets ({images.length + (hasVideo ? 1 : 0)})
+          All Assets ({images.length})
         </button>
 
         <button
@@ -157,81 +133,11 @@ export function CreativeGallery({
           <ShoppingBag className="size-3.5" />
           <span>Sponsored Ads ({sponsoredImages.length})</span>
         </button>
-
-        {hasVideo && (
-          <button
-            type="button"
-            onClick={() => setFilter('video')}
-            className={cn(
-              'flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-colors',
-              filter === 'video'
-                ? 'bg-accent text-on-accent shadow-subtle'
-                : 'bg-surface text-ink hover:bg-surface-2'
-            )}
-          >
-            <Film className="size-3.5" />
-            <span>Video Trailer (1)</span>
-          </button>
-        )}
       </div>
-
-      {/* Video Trailer Card (when in 'all' or 'video' mode) */}
-      {hasVideo && (filter === 'all' || filter === 'video') && (
-        <div className="flex flex-col overflow-hidden rounded-2xl border border-accent/30 bg-surface shadow-card ring-1 ring-accent/20">
-          <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between border-b border-line/60">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="grid size-7 place-items-center rounded-lg bg-accent/20 text-accent">
-                  <Film className="size-4" />
-                </span>
-                <h4 className="font-display text-base font-semibold text-ink">
-                  Amazon Sponsored Brands Video Trailer
-                </h4>
-              </div>
-              <p className="mt-1 text-xs text-ink-muted">
-                1080p video ad with animated text and your cover.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {video?.videoPosterUrl && (
-                <a
-                  href={video.videoPosterUrl}
-                  download="amazon-video-poster.png"
-                  className={buttonClasses({ variant: 'ghost', size: 'sm' })}
-                >
-                  <Download className="size-3.5" /> Poster (.png)
-                </a>
-              )}
-              {video?.videoUrl && (
-                <a
-                  href={video.videoUrl}
-                  download="amazon-sponsored-brands-trailer.mp4"
-                  className={buttonClasses({ variant: 'primary', size: 'sm' })}
-                >
-                  <Download className="size-3.5" /> Download MP4 ({video.videoDuration || 15}s)
-                </a>
-              )}
-            </div>
-          </div>
-
-          <div className="grid place-items-center bg-black/90 p-4 sm:p-6">
-            <div className="w-full max-w-4xl overflow-hidden rounded-xl shadow-lift">
-              <video
-                controls
-                playsInline
-                poster={video?.videoPosterUrl || undefined}
-                src={video?.videoUrl || undefined}
-                className="aspect-video w-full rounded-xl bg-black object-contain"
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Image Creatives Grid */}
       {displayedImages.length > 0 && (
-        <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(15rem,1fr))]">
           {displayedImages.map((img) => {
             const meta = getFormatMetadata(img.sizeKey, img.width, img.height)
             const isWide = img.width / img.height >= 2.0
@@ -241,7 +147,7 @@ export function CreativeGallery({
                 key={img.id}
                 className={cn(
                   'group flex flex-col overflow-hidden rounded-2xl bg-surface shadow-card transition-all hover:shadow-lift',
-                  isWide ? 'sm:col-span-2 xl:col-span-3' : ''
+                  isWide ? 'col-span-full' : ''
                 )}
               >
                 <button

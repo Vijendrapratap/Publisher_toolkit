@@ -10,6 +10,8 @@ import { Card } from '@/components/ui/card'
 import { CreativeGallery } from '@/components/ads/CreativeGallery'
 import { CopyEditor } from '@/components/ads/CopyEditor'
 import { AmazonPackagePanel } from '@/components/ads/AmazonPackagePanel'
+import { InstantVideoCard } from '@/components/ads/InstantVideoCard'
+import { bookVideoSource, readVideoSpec } from '@/lib/services/ads/videoSpec'
 
 export default async function ResultsStepPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params
@@ -29,6 +31,7 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
   // A trailer was asked for and none was stored: say so rather than quietly
   // shipping a package that is missing a piece the publisher configured.
   const trailerMissing = book.includeVideo !== false && !set.videoUrl
+  const videoSpec = readVideoSpec(book.videoSpec, bookVideoSource(book))
 
   return (
     <div className="flex flex-col gap-6">
@@ -64,6 +67,18 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
         </Card>
       )}
 
+      {book.includeVideo !== false && (
+        <InstantVideoCard
+          projectId={book.id}
+          title={book.title ?? 'Untitled book'}
+          author={book.author ?? ''}
+          coverUrl={book.frontCoverUrl}
+          interiorImageUrls={book.interiorImageUrls}
+          initialSpec={videoSpec}
+          video={{ videoUrl: set.videoUrl, videoPosterUrl: set.videoPosterUrl, videoDuration: set.videoDuration }}
+        />
+      )}
+
       <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
         <div className="flex flex-col gap-6">
           {sections.map((s) => (
@@ -72,15 +87,7 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
                 <h3 className="font-display text-xl font-semibold">{s.label}</h3>
                 <p className="text-sm text-ink-muted">{s.description}</p>
               </div>
-              <CreativeGallery
-                images={s.images}
-                platformLabel={s.label}
-                video={{
-                  videoUrl: set.videoUrl,
-                  videoPosterUrl: set.videoPosterUrl,
-                  videoDuration: set.videoDuration,
-                }}
-              />
+              <CreativeGallery images={s.images} platformLabel={s.label} />
               {s.copy && (
                 <div className="rounded-2xl bg-surface p-5 shadow-subtle">
                   <h4 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ink-muted">Amazon Ad & Product Copy</h4>
