@@ -13,6 +13,7 @@ import { PATCH } from './route'
 import { prisma } from '@/lib/db'
 import { storeFile } from '@/lib/providers/storage'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
+import { defaultVideoSpec } from '@/lib/services/ads/videoSpec'
 
 function ctx(id: string) {
   return { params: Promise.resolve({ id }) }
@@ -130,5 +131,25 @@ describe('PATCH /api/ads/projects/:id', () => {
       body: '{not json',
     })
     expect((await PATCH(req, ctx('book_1'))).status).toBe(400)
+  })
+
+  it('saves an edited video spec', async () => {
+    const spec = defaultVideoSpec({ title: 'T' })
+    const res = await PATCH(jsonRequest({ videoSpec: spec }), ctx('book_1'))
+    expect(res.status).toBe(200)
+    expect(prisma.book.update).toHaveBeenCalledWith({ where: { id: 'book_1' }, data: { videoSpec: spec } })
+  })
+
+  it('rejects a video spec with an invalid colour', async () => {
+    const spec = defaultVideoSpec({ title: 'T' })
+    spec.style.colors.accent = 'red'
+    const res = await PATCH(jsonRequest({ videoSpec: spec }), ctx('book_1'))
+    expect(res.status).toBe(400)
+    expect(prisma.book.update).not.toHaveBeenCalled()
+  })
+
+  it('accepts every length the configure form offers', async () => {
+    const res = await PATCH(jsonRequest({ videoLength: '20s' }), ctx('book_1'))
+    expect(res.status).toBe(200)
   })
 })

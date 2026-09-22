@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { AdPlatform } from './copy'
+import { adVideoSpecSchema } from './videoSpec'
 
 export const PLATFORMS: { key: AdPlatform; label: string; description: string }[] = [
   { key: 'AMAZON', label: 'Amazon Ads & A+ Content', description: 'Sponsored display, KDP A+ content modules & video trailers' },
@@ -242,7 +243,8 @@ export const projectUpdateSchema = z
     videoFormat: z.enum(['16:9', '1:1', '9:16']).optional(),
     videoStyle: z.enum(['cinematic', 'fantasy', 'thriller', 'scifi', 'romance', 'minimal', 'dramatic', 'energetic']).optional(),
     videoMood: z.enum(['suspenseful', 'epic', 'ambient', 'upbeat', 'emotional']).optional(),
-    videoLength: z.enum(['15s', '30s', '60s']).optional(),
+    videoLength: z.enum(['6s', '15s', '20s', '30s']).optional(),
+    videoSpec: adVideoSpecSchema.optional(),
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, 'Nothing to update')

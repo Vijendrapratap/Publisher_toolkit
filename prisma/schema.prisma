@@ -38,6 +38,7 @@ model Book {
   videoStyle        String?       @default("cinematic")
   videoMood         String?       @default("suspenseful")
   videoLength       String?       @default("30s")
+  videoSpec         Json?
   parentBookId      String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @default(now()) @updatedAt
