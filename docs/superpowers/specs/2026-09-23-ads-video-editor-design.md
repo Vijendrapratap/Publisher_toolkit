@@ -77,12 +77,12 @@ counters in the UI; they are sized so text fits the frame at every format.
 
 ### 2. Fonts
 
-Eight curated fonts, bundled as `@fontsource` packages (OFL-licensed, no
-network at render time): Inter, Montserrat, Bebas Neue, Playfair Display,
-Lora, Cinzel, Merriweather, Caveat. `lib/services/ads/fonts.ts` maps
-`AdFontKey → { family, cssImport, weights }`. The composition loads the chosen
-font with Remotion's font loading so a frame never renders before the font is
-ready; the same files are used by the browser preview and the server render.
+Eight curated Google fonts: Inter, Montserrat, Bebas Neue, Playfair Display,
+Lora, Cinzel, Merriweather, Caveat. They are loaded with
+`@remotion/google-fonts` (`components/trailer/remotion/fonts.ts`), which makes
+Remotion wait for the font before rendering a frame in both the browser
+preview and the server render. The server therefore needs internet access at
+render time, which it already has for OpenRouter.
 
 ### 3. Composition changes (`BookTrailerComposition`)
 
@@ -164,8 +164,8 @@ from the book's premise to the reader's payoff.
 The panel shows each shot as an editable card (prompt textarea, image
 picker from cover/pages, duration, caption) and the end card fields.
 A "Revise with AI" input takes free-text pointers and returns a revised
-brief (`mode: 'revise', instruction`) — nothing is saved until the user
-saves. The brief is stored on the project as `Book.aiVideoBrief Json?`.
+brief — nothing is saved until the publisher generates; the brief used for
+the last generation is stored as `Book.aiVideoBrief Json?` and reloaded.
 
 **6b. Cost before spend.** The panel shows the estimated cost from
 OpenRouter's model pricing (per video-second × total seconds) next to the
@@ -181,13 +181,20 @@ clipUrl}], videoUrl, error, costUsd). It returns immediately.
 
 `GET /api/ads/projects/[id]/video/ai` polls OpenRouter for unfinished shots,
 downloads finished clips to storage, and when all are done renders the final
-MP4 with a second Remotion composition, `AiAdVideo`: the clips in order with
-short cross-dissolves, captions in the spec's font/colours, and the end card
-(real cover, headline, CTA). The panel polls every 5 s and shows per-shot
+MP4: Remotion renders each caption as a transparent PNG (`AiCaption` still)
+and the end card as a 3-second clip (`AiEndCard`: real cover, headline, CTA,
+in the spec's font and colours); ffmpeg scales the AI clips to the frame,
+overlays the captions and cross-fades everything into one MP4 with a silent
+audio track. Headless Chrome cannot fetch clips behind the app's session, so
+the clips never go through Remotion. The panel polls every 5 s and shows per-shot
 progress; the finished video appears in the panel with Download.
 
-A failed shot marks the job failed with OpenRouter's message; clips that
-finished are kept so a retry only regenerates the failed shot.
+A failed shot marks the job failed with OpenRouter's message; generating
+again starts a fresh job. The default model is `kwaivgi/kling-v3.0-std`
+(image-to-video, 16:9 / 9:16 / 1:1, 3–15 s, $0.084 per second as of
+2026-09-23), overridable with `OPENROUTER_VIDEO_MODEL`. Durations, formats
+and price are read from `GET /api/v1/videos/models` at runtime; a format the
+model cannot make is refused with a message naming the formats it can.
 
 ### 7. Configure and results page layout
 
