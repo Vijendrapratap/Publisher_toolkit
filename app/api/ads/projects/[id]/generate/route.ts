@@ -6,12 +6,9 @@ import { generateAdCopy, type AdPlatform } from '@/lib/services/ads/copy'
 import { renderCreativeImages } from '@/lib/services/ads/render'
 import { readStoredFile, storeFile, toDataUri } from '@/lib/providers/storage'
 import { getCampaignObjective, type CopyTone } from '@/lib/services/ads/options'
-import {
-  toTrailerAspectRatio,
-  toTrailerLength,
-  toTrailerMusicMood,
-  toTrailerStyle,
-} from '@/lib/services/trailer/options'
+import { renderAdVideo } from '@/lib/services/ads/renderVideo'
+import { adVideoImages, inlineMusic } from '@/lib/services/ads/videoAssets'
+import { bookVideoSource, readVideoSpec, resolveMusic } from '@/lib/services/ads/videoSpec'
 import { prisma } from '@/lib/db'
 
 export const maxDuration = 300
@@ -87,18 +84,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     if (book.includeVideo !== false) {
       try {
-        const { renderTrailerVideoAndPoster } = await import('@/lib/services/trailer/video')
-        const video = await renderTrailerVideoAndPoster({
+        const spec = readVideoSpec(book.videoSpec, bookVideoSource(book))
+        const video = await renderAdVideo({
+          spec,
           title: details.title,
           author: details.author,
-          blurb: details.blurb,
-          length: toTrailerLength(book.videoLength, '15s'),
-          style: toTrailerStyle(book.videoStyle ?? book.templateKey),
-          musicMood: toTrailerMusicMood(book.videoMood, 'epic'),
-          aspectRatio: toTrailerAspectRatio(book.videoFormat),
-          coverPngBuffer: coverFile.data,
-          hookText: book.customHook ?? undefined,
-          ctaText,
+          musicSrc: await inlineMusic(resolveMusic(spec)),
+          ...(await adVideoImages(book)),
         })
 
         const [videoUpload, posterUpload] = await Promise.all([

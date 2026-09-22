@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Download, Music, Pause, Play, Plus, Save, Upload, X, Zap } from 'lucide-react'
+import { Download, Film, Music, Pause, Play, Plus, Save, Upload, X, Zap } from 'lucide-react'
 import { Button, buttonClasses } from '@/components/ui/button'
 import { cn } from '@/components/ui/cn'
 import { TrailerLivePreviewPlayer } from '@/components/trailer/TrailerLivePreviewPlayer'
@@ -54,6 +54,8 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
   const [spec, setSpec] = useState(initialSpec)
   const [saved, setSaved] = useState(initialSpec)
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [current, setCurrent] = useState(video)
   const [fontFamilies, setFontFamilies] = useState<Partial<Record<AdFontKey, string>>>({})
   const [uploading, setUploading] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -123,6 +125,21 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
     return true
   }
 
+  async function exportVideo() {
+    if (dirty && !(await save())) return
+    setExporting(true)
+    const toastId = toast.loading('Rendering your video…', { description: 'This usually takes under a minute.' })
+    const res = await fetch(`/api/ads/projects/${projectId}/video/instant`, { method: 'POST' })
+    const json = await res.json().catch(() => ({}))
+    setExporting(false)
+    if (!res.ok) {
+      toast.error('Export failed', { id: toastId, description: json.error })
+      return
+    }
+    setCurrent(json)
+    toast.success('Your video is ready', { id: toastId, description: 'Download it below the title.' })
+  }
+
   return (
     <section aria-labelledby="instant-video-title" className="rounded-3xl border border-instant/30 bg-instant-soft p-5 shadow-card sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -136,13 +153,16 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {video.videoUrl && (
-            <a href={video.videoUrl} download="video-ad.mp4" className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
-              <Download className="size-3.5" aria-hidden /> Download MP4
+          {current.videoUrl && (
+            <a href={current.videoUrl} download="video-ad.mp4" className={buttonClasses({ variant: 'secondary', size: 'sm' })}>
+              <Download className="size-3.5" aria-hidden /> Download MP4{current.videoDuration ? ` (${current.videoDuration}s)` : ''}
             </a>
           )}
-          <Button type="button" size="sm" onClick={save} loading={saving} disabled={!dirty || saving} className="bg-instant text-canvas hover:bg-instant/90">
+          <Button type="button" size="sm" onClick={save} loading={saving} disabled={!dirty || saving} variant="secondary">
             <Save className="size-3.5" aria-hidden /> Save
+          </Button>
+          <Button type="button" size="sm" onClick={exportVideo} loading={exporting} disabled={exporting || Boolean(problem)} className="bg-instant text-canvas hover:bg-instant/90">
+            <Film className="size-3.5" aria-hidden /> Save &amp; export MP4
           </Button>
         </div>
       </header>
