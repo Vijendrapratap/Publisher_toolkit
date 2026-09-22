@@ -41,7 +41,7 @@ Also:
   screens.
 
 Out of scope: Amazon import fix, image-quality work, the Trailer tool's
-(`/trailer`) engine, music. Those stay in the earlier plan.
+(`/trailer`) engine, AI-generated music. Those stay in the earlier plan.
 
 ## Design
 
@@ -195,6 +195,20 @@ again starts a fresh job. The default model is `kwaivgi/kling-v3.0-std`
 2026-09-23), overridable with `OPENROUTER_VIDEO_MODEL`. Durations, formats
 and price are read from `GET /api/v1/videos/models` at runtime; a format the
 model cannot make is refused with a message naming the formats it can.
+
+### 6b. Music
+
+Five public-domain/CC0 recordings ship in `public/music/` (credits in
+`public/music/CREDITS.md`), one per mood: Grieg's *In the Hall of the
+Mountain King* (suspenseful), Wagner's *Ride of the Valkyries* (epic),
+Satie's *Gymnopédie No. 1* (ambient), Joplin's *The Entertainer* (upbeat) and
+Satie's *Gymnopédie No. 2* (emotional), each trimmed to 60 s and
+loudness-normalised. `AdVideoSpec.music` (optional) is `none`, a library
+track, or an uploaded MP3/WAV/M4A (≤ 15 MB, `POST …/music`); unset means the
+track for the spec's mood. The Instant Video card has a picker with a
+play-preview and "Upload your own". The composition plays the track with
+fades; the server render receives it as a data URI; the AI video stitch loops
+it under the whole video with fades instead of a silent track.
 
 ### 7. Configure and results page layout
 

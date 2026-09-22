@@ -18,6 +18,7 @@
 - AI brief limits: 1–3 shots, prompt 10–600 chars, duration 3–10 s, caption ≤ 40; end card headline ≤ 48, CTA ≤ 28.
 - All `@remotion/*` packages pinned to exactly `4.0.525` (same as `remotion`).
 - Generate never makes an AI call for video text; AI is only called from the explicit AI buttons (banner ad copy generation is unchanged).
+- Music: five bundled public-domain/CC0 tracks (one per mood) in `public/music/`, credited in `public/music/CREDITS.md`; the publisher can pick one, pick none, or upload their own MP3/WAV/M4A (≤ 15 MB). No AI music.
 - Default video model `kwaivgi/kling-v3.0-std`; `OPENROUTER_VIDEO_MODEL` overrides it; the publisher's text-model setting never selects the video model.
 - Images passed to headless Chrome or OpenRouter are data URIs (no session cookie is available to them).
 - Commit identity: `git config user.name "Vijendrapratap"`, `git config user.email "44225657+Vijendrapratap@users.noreply.github.com"`. Commit messages end with `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`.
@@ -1249,6 +1250,372 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 ---
 
+### Task 4b: Music — bundled library, picker, upload, and playback
+
+**Files:**
+- Create: `public/music/{suspenseful,epic,ambient,upbeat,emotional}.mp3`, `public/music/CREDITS.md`
+- Modify: `lib/services/ads/videoSpec.ts`, `lib/services/ads/videoSpec.test.ts`, `lib/services/shared/upload.ts:38-47`
+- Modify: `components/trailer/remotion/BookTrailerComposition.tsx`, `components/trailer/TrailerLivePreviewPlayer.tsx`, `components/ads/InstantVideoCard.tsx`
+- Create: `app/api/ads/projects/[id]/music/route.ts`, `app/api/ads/projects/[id]/music/route.test.ts`
+
+**Interfaces:**
+- Consumes: Task 1–4 exports; `storeFile`; `assetPath`.
+- Produces:
+  - `MUSIC_TRACKS` (`{ key, label, composer, file }[]`, keys equal the mood keys), `type MusicTrackKey`
+  - `musicSchema` and `AdVideoSpec['music']` (optional): `{ kind: 'none' } | { kind: 'library'; track: MusicTrackKey } | { kind: 'upload'; url: string; name: string }`
+  - `resolveMusic(spec): NonNullable<AdVideoSpec['music']>` — the saved choice, or the library track for `spec.mood`
+  - `musicUrl(music): string | null` — browser URL (`/music/<key>.mp3` or the upload URL)
+  - `BookTrailerCompositionProps.musicSrc?: string | null`
+  - `POST /api/ads/projects/:id/music` (multipart field `file`) → `201 { url, name }` | `400 { error }` | `404`
+
+- [ ] **Step 1: Add the tracks**
+
+All five are on Wikimedia Commons with machine-readable licences (checked 2026-09-23). Download, trim to 60 s, fade and loudness-match them:
+
+```bash
+mkdir -p public/music && cd public/music
+ua='PublisherToolkit/1.0 (music bundle)'
+get() { curl -sL -A "$ua" -o "src-$1" "$2"; }
+get suspenseful.ogg 'https://upload.wikimedia.org/wikipedia/commons/b/bb/Musopen_-_In_the_Hall_Of_The_Mountain_King.ogg'
+get epic.ogg 'https://upload.wikimedia.org/wikipedia/commons/2/29/Richard_Wagner_-_Ride_of_the_Valkyries.ogg'
+get ambient.ogg 'https://upload.wikimedia.org/wikipedia/commons/b/b7/Gymnopedie_No._1..ogg'
+get upbeat.mp3 'https://upload.wikimedia.org/wikipedia/commons/6/6d/Scott_Joplin_-_04_-_The_Entertainer_1902_piano_roll.mp3'
+get emotional.flac 'https://upload.wikimedia.org/wikipedia/commons/3/3d/Satie_Gymnopedie_No_2_performed_by_Michael_Laucke.flac'
+for f in src-*; do
+  key="${f#src-}"; key="${key%.*}"
+  ffmpeg -y -loglevel error -i "$f" -t 60 -ac 2 -ar 44100 \
+    -af "loudnorm=I=-16:TP=-1.5:LRA=11,afade=t=in:d=0.5,afade=t=out:st=57:d=3" -b:a 128k "$key.mp3"
+done
+rm src-*; ls -la; cd ../..
+```
+
+Expected: five `.mp3` files of roughly 1 MB. Listen to the first seconds of each (`ffplay -autoexit -t 8 public/music/epic.mp3`) — if a track opens in silence, re-run that one with `-ss <seconds>` before `-i` to start at the first strong phrase.
+
+`public/music/CREDITS.md`:
+
+```markdown
+# Bundled music
+
+All tracks are public domain or CC0 and may be used commercially without attribution.
+Each was trimmed to 60 seconds, loudness-normalised and faded for use under video ads.
+
+| File | Work | Performer | Licence | Source |
+|---|---|---|---|---|
+| suspenseful.mp3 | Grieg — In the Hall of the Mountain King | Musopen Symphony Orchestra | Public domain | https://commons.wikimedia.org/wiki/File:Musopen_-_In_the_Hall_Of_The_Mountain_King.ogg |
+| epic.mp3 | Wagner — Ride of the Valkyries | Historic recording, U.S. National Park Service (Edison NHP) collection | Public domain | https://commons.wikimedia.org/wiki/File:Richard_Wagner_-_Ride_of_the_Valkyries.ogg |
+| ambient.mp3 | Satie — Gymnopédie No. 1 | Teknopazzo | CC0 | https://commons.wikimedia.org/wiki/File:Gymnopedie_No._1..ogg |
+| upbeat.mp3 | Joplin — The Entertainer (1902 piano roll) | Scott Joplin | Public domain | https://commons.wikimedia.org/wiki/File:Scott_Joplin_-_04_-_The_Entertainer_1902_piano_roll.mp3 |
+| emotional.mp3 | Satie — Gymnopédie No. 2 | Michael Laucke | Public domain | https://commons.wikimedia.org/wiki/File:Satie_Gymnopedie_No_2_performed_by_Michael_Laucke.flac |
+```
+
+- [ ] **Step 2: Write the failing spec tests** — append to `lib/services/ads/videoSpec.test.ts` (and add `MUSIC_TRACKS, musicUrl, resolveMusic` to its import):
+
+```ts
+describe('music', () => {
+  const base = defaultVideoSpec({ title: 'T', mood: 'epic' })
+
+  it('defaults to the library track for the mood, and specs saved before music still validate', () => {
+    expect(base.music).toBeUndefined()
+    expect(resolveMusic(base)).toEqual({ kind: 'library', track: 'epic' })
+    expect(adVideoSpecSchema.safeParse(base).success).toBe(true)
+  })
+
+  it('maps each choice to a browser URL', () => {
+    expect(musicUrl({ kind: 'library', track: 'ambient' })).toBe('/music/ambient.mp3')
+    expect(musicUrl({ kind: 'upload', url: '/api/files/ads/pub_1/music/x-track.mp3', name: 'x.mp3' })).toBe('/api/files/ads/pub_1/music/x-track.mp3')
+    expect(musicUrl({ kind: 'none' })).toBeNull()
+  })
+
+  it('offers one track per mood and rejects uploads from other sites', () => {
+    expect(MUSIC_TRACKS.map((t) => t.key)).toEqual(['suspenseful', 'epic', 'ambient', 'upbeat', 'emotional'])
+    const bad = { ...base, music: { kind: 'upload', url: 'http://evil.example/x.mp3', name: 'x' } }
+    expect(adVideoSpecSchema.safeParse(bad).success).toBe(false)
+  })
+})
+```
+
+Run: `npx vitest run lib/services/ads/videoSpec.test.ts`
+Expected: FAIL — `resolveMusic` is not exported.
+
+- [ ] **Step 3: Implement in `videoSpec.ts`**
+
+Add above `adVideoSpecSchema`:
+
+```ts
+/** Bundled public-domain/CC0 tracks, one per mood; credits in public/music/CREDITS.md. */
+export const MUSIC_TRACKS = [
+  { key: 'suspenseful', label: 'In the Hall of the Mountain King', composer: 'Grieg' },
+  { key: 'epic', label: 'Ride of the Valkyries', composer: 'Wagner' },
+  { key: 'ambient', label: 'Gymnopédie No. 1', composer: 'Satie' },
+  { key: 'upbeat', label: 'The Entertainer', composer: 'Joplin' },
+  { key: 'emotional', label: 'Gymnopédie No. 2', composer: 'Satie' },
+] as const
+export type MusicTrackKey = (typeof MUSIC_TRACKS)[number]['key']
+const TRACK_KEYS = MUSIC_TRACKS.map((t) => t.key) as [MusicTrackKey, ...MusicTrackKey[]]
+
+export const musicSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }),
+  z.object({ kind: z.literal('library'), track: z.enum(TRACK_KEYS) }),
+  // Only our own stored files: the URL is later fetched on the server.
+  z.object({ kind: z.literal('upload'), url: z.string().startsWith('/api/files/'), name: z.string().trim().min(1).max(120) }),
+])
+```
+
+Add to the `adVideoSpecSchema` object, after `mood`:
+
+```ts
+  // Optional so specs saved before music existed still validate.
+  music: musicSchema.optional(),
+```
+
+Add after `readVideoSpec`:
+
+```ts
+/** The saved music choice, or the bundled track that matches the mood. */
+export function resolveMusic(spec: Pick<AdVideoSpec, 'music' | 'mood'>): NonNullable<AdVideoSpec['music']> {
+  return spec.music ?? { kind: 'library', track: spec.mood }
+}
+
+export function musicUrl(music: NonNullable<AdVideoSpec['music']>): string | null {
+  if (music.kind === 'none') return null
+  return music.kind === 'library' ? `/music/${music.track}.mp3` : music.url
+}
+```
+
+(The mood keys and track keys are the same five words, so `track: spec.mood` type-checks.)
+
+If Blob storage is configured, `storeFile` returns `https://` URLs; in that case relax the upload rule to `z.string().regex(/^(\/api\/files\/|https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\/)/)` — check which one `storeFile` returns in this environment (`isBlobConfigured()`) and keep only what it produces.
+
+In `lib/services/shared/upload.ts` add `'audio/mp4': 'm4a',` to `EXTENSIONS`.
+
+Run: `npx vitest run lib/services/ads/videoSpec.test.ts`
+Expected: PASS.
+
+- [ ] **Step 4: Play the music in the composition and the preview**
+
+`BookTrailerComposition.tsx`: add `Audio` to the `remotion` import; add `musicSrc?: string | null` to `BookTrailerCompositionProps`; destructure `musicSrc` in `BookTrailerComposition`; and as the first child of the root `<AbsoluteFill>` add:
+
+```tsx
+      {musicSrc && (
+        <Audio
+          src={musicSrc}
+          loop
+          volume={(f) =>
+            interpolate(f, [0, 15, durationInFrames - 30, durationInFrames], [0, 0.8, 0.8, 0], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+            })
+          }
+        />
+      )}
+```
+
+`TrailerLivePreviewPlayer.tsx`: import `musicUrl, resolveMusic` and set `const inputProps: BookTrailerCompositionProps = { spec, title, author, coverUrl, interiorImageUrls, musicSrc: musicUrl(resolveMusic(spec)) }`.
+
+- [ ] **Step 5: Write the failing upload-route test**
+
+```ts
+// app/api/ads/projects/[id]/music/route.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
+vi.mock('@/lib/services/ads/queries', () => ({ getBookForPublisher: vi.fn() }))
+vi.mock('@/lib/providers/storage', () => ({ storeFile: vi.fn(async (p: string) => ({ url: `/api/files/${p}` })) }))
+
+import { POST } from './route'
+import { getBookForPublisher } from '@/lib/services/ads/queries'
+import { storeFile } from '@/lib/providers/storage'
+
+const ctx = { params: Promise.resolve({ id: 'book_1' }) }
+const upload = (file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return new Request('http://localhost', { method: 'POST', body: form })
+}
+
+describe('POST /api/ads/projects/:id/music', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getBookForPublisher).mockResolvedValue({ id: 'book_1' } as any)
+  })
+
+  it('stores an MP3 under the publisher and returns its URL and name', async () => {
+    const res = await POST(upload(new File([Buffer.from('ID3')], 'Theme Song.mp3', { type: 'audio/mpeg' })), ctx)
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.name).toBe('Theme Song.mp3')
+    expect(body.url).toMatch(/^\/api\/files\/ads\/pub_1\/music\/.+-track\.mp3$/)
+    expect(storeFile).toHaveBeenCalledWith(expect.stringMatching(/^ads\/pub_1\/music\//), expect.any(Buffer), 'audio/mpeg')
+  })
+
+  it('rejects files that are not audio', async () => {
+    const res = await POST(upload(new File(['x'], 'notes.txt', { type: 'text/plain' })), ctx)
+    expect(res.status).toBe(400)
+    expect(storeFile).not.toHaveBeenCalled()
+  })
+
+  it('rejects files over 15 MB', async () => {
+    const big = new File([new Uint8Array(15 * 1024 * 1024 + 1)], 'long.mp3', { type: 'audio/mpeg' })
+    expect((await POST(upload(big), ctx)).status).toBe(400)
+  })
+})
+```
+
+Run: `npx vitest run "app/api/ads/projects/[id]/music"`
+Expected: FAIL — cannot resolve `./route`.
+
+- [ ] **Step 6: Implement the upload route**
+
+```ts
+// app/api/ads/projects/[id]/music/route.ts
+import { NextResponse } from 'next/server'
+import { requireCurrentPublisherId } from '@/lib/providers/auth'
+import { getBookForPublisher } from '@/lib/services/ads/queries'
+import { storeFile } from '@/lib/providers/storage'
+import { assetPath } from '@/lib/services/shared/upload'
+
+const MAX_BYTES = 15 * 1024 * 1024
+// Browsers report the same formats under several names.
+const AUDIO_TYPES: Record<string, string> = {
+  'audio/mpeg': 'audio/mpeg',
+  'audio/mp3': 'audio/mpeg',
+  'audio/wav': 'audio/wav',
+  'audio/x-wav': 'audio/wav',
+  'audio/wave': 'audio/wav',
+  'audio/mp4': 'audio/mp4',
+  'audio/x-m4a': 'audio/mp4',
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const publisherId = await requireCurrentPublisherId()
+  const book = await getBookForPublisher(publisherId, id)
+  if (!book) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+  const file = (await request.formData().catch(() => null))?.get('file')
+  if (!(file instanceof File) || file.size === 0) {
+    return NextResponse.json({ error: 'Choose an audio file to upload.' }, { status: 400 })
+  }
+  const type = AUDIO_TYPES[file.type]
+  if (!type) return NextResponse.json({ error: 'Use an MP3, WAV or M4A file.' }, { status: 400 })
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: 'Music files can be up to 15 MB.' }, { status: 400 })
+
+  const { url } = await storeFile(assetPath('ads/music', publisherId, 'track', type), Buffer.from(await file.arrayBuffer()), type)
+  return NextResponse.json({ url, name: file.name.slice(0, 120) }, { status: 201 })
+}
+```
+
+Run: `npx vitest run "app/api/ads/projects/[id]/music"`
+Expected: PASS (3 tests).
+
+- [ ] **Step 7: Music picker in the Instant Video card**
+
+In `components/ads/InstantVideoCard.tsx`: add `Music, Pause, Play, Upload` to the lucide import; add `MUSIC_TRACKS, musicUrl, resolveMusic` to the videoSpec import; add `useRef` to the React import. Add state and helpers after the existing state:
+
+```tsx
+  const [uploading, setUploading] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const music = resolveMusic(spec)
+  const musicValue = music.kind === 'library' ? music.track : music.kind
+  const setMusic = (next: NonNullable<AdVideoSpec['music']>) => {
+    audioRef.current?.pause()
+    setPlaying(false)
+    setSpec((s) => ({ ...s, music: next }))
+  }
+
+  async function uploadMusic(file: File) {
+    setUploading(true)
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`/api/ads/projects/${projectId}/music`, { method: 'POST', body: form })
+    const body = await res.json().catch(() => ({}))
+    setUploading(false)
+    if (!res.ok) {
+      toast.error(body.error ?? 'We couldn’t upload that file.')
+      return
+    }
+    setMusic({ kind: 'upload', url: body.url, name: body.name })
+  }
+
+  function togglePreview() {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) audio.pause()
+    else void audio.play()
+    setPlaying(!playing)
+  }
+```
+
+Add this fieldset after the Length/Format grid:
+
+```tsx
+          <fieldset>
+            <legend className={labelClass}>
+              <span className="inline-flex items-center gap-1.5"><Music className="size-3.5" aria-hidden /> Music</span>
+            </legend>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Music track"
+                className={cn(inputClass, 'flex-1')}
+                value={musicValue}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (value === 'none') setMusic({ kind: 'none' })
+                  else if (value !== 'upload') setMusic({ kind: 'library', track: value as (typeof MUSIC_TRACKS)[number]['key'] })
+                }}
+              >
+                <option value="none">No music</option>
+                {MUSIC_TRACKS.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.label} — {t.composer} ({t.key})
+                  </option>
+                ))}
+                {music.kind === 'upload' && <option value="upload">Your upload: {music.name}</option>}
+              </select>
+              {musicUrl(music) && (
+                <button type="button" onClick={togglePreview} aria-label={playing ? 'Pause music preview' : 'Play music preview'} className="grid size-9 place-items-center rounded-xl border border-line bg-surface text-ink transition hover:border-instant/50">
+                  {playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+                </button>
+              )}
+              <label className={cn(buttonClasses({ variant: 'secondary', size: 'sm' }), 'cursor-pointer')}>
+                <Upload className="size-3.5" aria-hidden /> {uploading ? 'Uploading…' : 'Upload your own'}
+                <input
+                  type="file"
+                  accept="audio/mpeg,audio/wav,audio/mp4,.mp3,.wav,.m4a"
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void uploadMusic(file)
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
+            <audio ref={audioRef} src={musicUrl(music) ?? undefined} onEnded={() => setPlaying(false)} preload="none" />
+            <p className="mt-1.5 text-xs text-ink-muted">Bundled tracks are public domain and free to use in ads. Upload only music you have the rights to.</p>
+          </fieldset>
+```
+
+- [ ] **Step 8: Verify**
+
+Run: `npx tsc --noEmit && npx vitest run lib/services/ads/videoSpec.test.ts "app/api/ads/projects/[id]/music"`
+Expected: tsc prints nothing; PASS.
+
+In the browser: results page → play the preview → music fades in; switch track → the preview plays the new track; "No music" → silent; upload an MP3 → it appears as "Your upload: …" and plays; **Save** → reload → the choice is kept.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add public/music lib/services/ads/videoSpec.ts lib/services/ads/videoSpec.test.ts lib/services/shared/upload.ts components/trailer components/ads/InstantVideoCard.tsx "app/api/ads/projects/[id]/music"
+git commit -m "feat(ads): music for video ads — five public-domain tracks, picker and upload
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
 ## Phase B — Export matches the preview
 
 ### Task 5: Remotion server bundle
@@ -1380,6 +1747,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Produces:
   - `inlineImage(url: string | null | undefined): Promise<string | null>`
   - `adVideoImages(book: { frontCoverUrl: string | null; interiorImageUrls: string[] }): Promise<{ coverUrl: string | null; interiorImageUrls: string[] }>`
+  - `inlineMusic(music): Promise<string | null>` (data URI) and `musicFile(music, dir): Promise<string | null>` (path for ffmpeg) — music types from Task 4b
   - `class AdVideoRenderError extends Error`
   - `bundleDir(): string`
   - `renderAdVideo(inputProps: Record<string, unknown>, compositionId?: string): Promise<RenderedAdVideo>` where `RenderedAdVideo = { videoBuffer: Buffer; posterBuffer: Buffer; durationSec: number; width: number; height: number }`
@@ -1432,13 +1800,39 @@ Expected: FAIL — cannot resolve `./renderVideo`.
 
 ```ts
 // lib/services/ads/videoAssets.ts
+import path from 'node:path'
+import { readFile, writeFile } from 'node:fs/promises'
 import { readStoredFile, toDataUri } from '@/lib/providers/storage'
+import type { AdVideoSpec } from './videoSpec'
 
 /** Headless Chrome and OpenRouter have no session cookie, so stored images travel inline. */
 export async function inlineImage(url: string | null | undefined): Promise<string | null> {
   if (!url) return null
   try {
     return toDataUri(await readStoredFile(url))
+  } catch {
+    return null
+  }
+}
+
+/** The chosen music as a data URI for the server render; bundled tracks are read from public/. */
+export async function inlineMusic(music: NonNullable<AdVideoSpec['music']>): Promise<string | null> {
+  if (music.kind === 'none') return null
+  if (music.kind === 'library') {
+    const data = await readFile(path.join(process.cwd(), 'public', 'music', `${music.track}.mp3`))
+    return `data:audio/mpeg;base64,${data.toString('base64')}`
+  }
+  return inlineImage(music.url)
+}
+
+/** Path of a bundled track on disk, or the upload copied to `dir`; for ffmpeg. */
+export async function musicFile(music: NonNullable<AdVideoSpec['music']>, dir: string): Promise<string | null> {
+  if (music.kind === 'none') return null
+  if (music.kind === 'library') return path.join(process.cwd(), 'public', 'music', `${music.track}.mp3`)
+  try {
+    const target = path.join(dir, 'music-upload')
+    await writeFile(target, (await readStoredFile(music.url)).data)
+    return target
   } catch {
     return null
   }
@@ -1583,6 +1977,7 @@ vi.mock('@/lib/services/ads/queries', () => ({
 }))
 vi.mock('@/lib/services/ads/videoAssets', () => ({
   adVideoImages: vi.fn().mockResolvedValue({ coverUrl: 'data:cover', interiorImageUrls: [] }),
+  inlineMusic: vi.fn().mockResolvedValue('data:audio/mpeg;base64,AA'),
 }))
 vi.mock('@/lib/services/ads/renderVideo', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/services/ads/renderVideo')>()),
@@ -1614,7 +2009,9 @@ describe('POST /api/ads/projects/:id/video/instant', () => {
   it('renders the saved spec and replaces the set video', async () => {
     const res = await POST(req(), ctx)
     expect(res.status).toBe(200)
-    expect(renderAdVideo).toHaveBeenCalledWith(expect.objectContaining({ spec: savedSpec, coverUrl: 'data:cover', title: 'T' }))
+    expect(renderAdVideo).toHaveBeenCalledWith(
+      expect.objectContaining({ spec: savedSpec, coverUrl: 'data:cover', title: 'T', musicSrc: 'data:audio/mpeg;base64,AA' })
+    )
     const json = await res.json()
     expect(json.videoUrl).toMatch(/creatives\/set_1\/video-.+\.mp4$/)
     expect(prisma.creativeSet.update).toHaveBeenCalledWith({
@@ -1652,8 +2049,8 @@ Expected: FAIL — cannot resolve `./route`.
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher, getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
-import { bookVideoSource, readVideoSpec } from '@/lib/services/ads/videoSpec'
-import { adVideoImages } from '@/lib/services/ads/videoAssets'
+import { bookVideoSource, readVideoSpec, resolveMusic } from '@/lib/services/ads/videoSpec'
+import { adVideoImages, inlineMusic } from '@/lib/services/ads/videoAssets'
 import { AdVideoRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
 import { storeFile } from '@/lib/providers/storage'
 import { prisma } from '@/lib/db'
@@ -1671,7 +2068,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const spec = readVideoSpec(book.videoSpec, bookVideoSource(book))
   try {
-    const video = await renderAdVideo({ spec, title: book.title ?? 'Untitled book', author: book.author ?? '', ...(await adVideoImages(book)) })
+    const video = await renderAdVideo({
+      spec,
+      title: book.title ?? 'Untitled book',
+      author: book.author ?? '',
+      musicSrc: await inlineMusic(resolveMusic(spec)),
+      ...(await adVideoImages(book)),
+    })
 
     // A new name per export, so the browser never plays a cached older cut.
     const stamp = Date.now().toString(36)
@@ -1705,15 +2108,21 @@ In `app/api/ads/projects/[id]/generate/route.ts`:
 
 ```ts
 import { renderAdVideo } from '@/lib/services/ads/renderVideo'
-import { adVideoImages } from '@/lib/services/ads/videoAssets'
-import { bookVideoSource, readVideoSpec } from '@/lib/services/ads/videoSpec'
+import { adVideoImages, inlineMusic } from '@/lib/services/ads/videoAssets'
+import { bookVideoSource, readVideoSpec, resolveMusic } from '@/lib/services/ads/videoSpec'
 ```
 
 - replace the two statements starting `const { renderTrailerVideoAndPoster } = await import(…)` and `const video = await renderTrailerVideoAndPoster({ … })` with:
 
 ```ts
         const spec = readVideoSpec(book.videoSpec, bookVideoSource(book))
-        const video = await renderAdVideo({ spec, title: details.title, author: details.author, ...(await adVideoImages(book)) })
+        const video = await renderAdVideo({
+          spec,
+          title: details.title,
+          author: details.author,
+          musicSrc: await inlineMusic(resolveMusic(spec)),
+          ...(await adVideoImages(book)),
+        })
 ```
 
 In `app/api/ads/projects/[id]/generate/route.test.ts` replace the `vi.mock('@/lib/services/trailer/video', …)` block with:
@@ -1726,6 +2135,7 @@ vi.mock('@/lib/services/ads/renderVideo', () => ({
 }))
 vi.mock('@/lib/services/ads/videoAssets', () => ({
   adVideoImages: vi.fn().mockResolvedValue({ coverUrl: 'data:cover', interiorImageUrls: [] }),
+  inlineMusic: vi.fn().mockResolvedValue(null),
 }))
 ```
 
@@ -1797,7 +2207,7 @@ In the browser (or Playwright): results page → change the hook → **Save & ex
 ffprobe -v error -show_entries format=duration:stream=codec_type,width,height -of compact <downloaded>.mp4
 ```
 
-Expected: one video stream at the spec's size, one audio stream, duration equal to the spec's length. Open a frame (`ffmpeg -ss 1 -i <file> -frames:v 1 frame.png`) and confirm the new hook text is drawn in the chosen font.
+Expected: one video stream at the spec's size, one audio stream (the chosen music — play the file and listen), duration equal to the spec's length. Open a frame (`ffmpeg -ss 1 -i <file> -frames:v 1 frame.png`) and confirm the new hook text is drawn in the chosen font.
 
 - [ ] **Step 6: Commit**
 
@@ -2538,6 +2948,18 @@ describe('buildStitchArgs', () => {
     expect(graph).toContain('xfade=transition=fade:duration=0.5:offset=4.50')
     expect(graph).toContain('xfade=transition=fade:duration=0.5:offset=9.00[vout]')
   })
+  it('loops the music under the whole video with fades', () => {
+    const withMusic = buildStitchArgs({
+      clips: [{ path: 'a.mp4', durationSec: 5, captionPath: null }],
+      endCardPath: 'end.mp4', endCardSec: 3, width: 1080, height: 1080, outputPath: 'o.mp4', musicPath: 'epic.mp3',
+    })
+    expect(withMusic.join(' ')).toContain('-stream_loop -1 -i epic.mp3')
+    const g = withMusic[withMusic.indexOf('-filter_complex') + 1]
+    expect(g).toContain('atrim=duration=7.50,afade=t=in:d=0.5,afade=t=out:st=6.00:d=1.5')
+    expect(withMusic).toContain('[aout]')
+    expect(withMusic.join(' ')).not.toContain('anullsrc')
+  })
+
   it('maps the video and a silent audio track to the output', () => {
     expect(args).toContain('[vout]')
     expect(args.at(-1)).toBe('out.mp4')
@@ -2590,6 +3012,8 @@ export interface StitchInput {
   width: number
   height: number
   outputPath: string
+  /** Looped under the whole video; silence when null. */
+  musicPath?: string | null
 }
 
 const FADE_SEC = 0.5
@@ -2631,11 +3055,17 @@ export function buildStitchArgs(input: StitchInput): string[] {
     current = out
   }
 
-  args.push(
+  if (input.musicPath) {
+    args.push('-stream_loop', '-1', '-i', input.musicPath)
+    const fadeOutAt = Math.max(0, elapsed - 1.5).toFixed(2)
+    filters.push(`[${next}:a]atrim=duration=${elapsed.toFixed(2)},afade=t=in:d=0.5,afade=t=out:st=${fadeOutAt}:d=1.5,volume=0.8[aout]`)
+  } else {
     // Several ad placements reject a file with no audio stream.
-    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100')
+  }
+  args.push(
     '-filter_complex', filters.join(';'),
-    '-map', '[vout]', '-map', `${next}:a`, '-shortest',
+    '-map', '[vout]', '-map', input.musicPath ? '[aout]' : `${next}:a`, '-shortest',
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-movflags', '+faststart',
     input.outputPath
@@ -2667,7 +3097,7 @@ export async function probeDuration(file: string): Promise<number> {
 ```
 
 Run: `npx vitest run lib/services/ads/aiVideoStitch.test.ts`
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 
 - [ ] **Step 3: Add the caption and end-card compositions**
 
@@ -2940,7 +3370,10 @@ vi.mock('@/lib/providers/storage', () => ({
   storeFile: vi.fn(async (p: string) => ({ url: `/api/files/${p}` })),
   readStoredFile: vi.fn(async () => ({ data: Buffer.from('clip'), contentType: 'video/mp4' })),
 }))
-vi.mock('./videoAssets', () => ({ inlineImage: vi.fn(async (u: string | null) => (u ? `data:${u}` : null)) }))
+vi.mock('./videoAssets', () => ({
+  inlineImage: vi.fn(async (u: string | null) => (u ? `data:${u}` : null)),
+  musicFile: vi.fn(async () => '/app/public/music/epic.mp3'),
+}))
 vi.mock('./renderVideo', () => ({
   renderStillPng: vi.fn(async () => Buffer.from('png')),
   renderAdVideo: vi.fn(async () => ({ videoBuffer: Buffer.from('end'), posterBuffer: Buffer.from('poster'), durationSec: 3, width: 1920, height: 1080 })),
@@ -3018,7 +3451,9 @@ describe('advanceAiVideoJob', () => {
       book, 'sk', 'pub_1'
     )
     expect(prisma.aiVideoJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'job_1', status: 'running' } }))
-    expect(stitchAiVideo).toHaveBeenCalledWith(expect.objectContaining({ width: 1920, height: 1080, endCardSec: 3 }))
+    expect(stitchAiVideo).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 1920, height: 1080, endCardSec: 3, musicPath: '/app/public/music/epic.mp3' })
+    )
     expect(job.status).toBe('completed')
     expect(job.videoUrl).toMatch(/ai-video\/job_1\/ai-video\.mp4$/)
   })
@@ -3063,8 +3498,8 @@ import {
   submitVideoJob,
 } from '@/lib/providers/aiVideo'
 import type { AiVideoBrief } from './aiVideoBriefSchema'
-import { bookVideoSource, readVideoSpec, videoDimensions, type AdVideoSpec } from './videoSpec'
-import { inlineImage } from './videoAssets'
+import { bookVideoSource, readVideoSpec, resolveMusic, videoDimensions, type AdVideoSpec } from './videoSpec'
+import { inlineImage, musicFile } from './videoAssets'
 import { renderAdVideo, renderStillPng } from './renderVideo'
 import { probeDuration, stitchAiVideo } from './aiVideoStitch'
 
@@ -3216,7 +3651,15 @@ async function stitchJob(job: AiVideoJob, shots: ShotState[], book: Book, dir: s
     await writeFile(endCardPath, endCard.videoBuffer)
 
     const outputPath = path.join(tmp, 'final.mp4')
-    await stitchAiVideo({ clips, endCardPath, endCardSec: endCard.durationSec, width, height, outputPath })
+    await stitchAiVideo({
+      clips,
+      endCardPath,
+      endCardSec: endCard.durationSec,
+      width,
+      height,
+      outputPath,
+      musicPath: await musicFile(resolveMusic(spec), tmp),
+    })
 
     const [video, poster] = await Promise.all([
       storeFile(`${dir}/ai-video.mp4`, await readFile(outputPath), 'video/mp4'),
