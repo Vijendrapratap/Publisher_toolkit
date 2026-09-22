@@ -277,7 +277,7 @@ export function SettingsForm({ initial }: { initial: RedactedPublisherSettings }
             {/* Brand Colors */}
             <div>
               <label className="text-sm font-medium text-ink">Brand Palette</label>
-              <p className="text-xs text-ink-muted">Used automatically for ad banners, cover layouts, and landing pages.</p>
+              <p className="text-xs text-ink-muted">Used automatically for ad banners, cover layouts, and book illustrations.</p>
               <div className="mt-3 flex flex-wrap gap-4">
                 <div className="flex items-center gap-2 rounded-xl bg-surface-2 p-2 shadow-inset">
                   <input

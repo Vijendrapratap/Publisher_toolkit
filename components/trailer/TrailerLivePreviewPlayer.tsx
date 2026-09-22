@@ -155,9 +155,6 @@ export function TrailerLivePreviewPlayer({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm">Interactive Trailer Live Preview</span>
-              <span className="rounded-full bg-accent/20 px-2 py-0.5 font-mono text-[10px] font-medium text-accent">
-                Remotion 30fps
-              </span>
             </div>
             <p className="text-xs text-ink-muted">
               Live interactive render showing real-time text & style updates
@@ -199,7 +196,7 @@ export function TrailerLivePreviewPlayer({
         {!mounted ? (
           <div className="flex h-[360px] w-full max-w-[240px] animate-pulse flex-col items-center justify-center rounded-2xl border border-line/30 bg-surface-2/20 text-ink-muted">
             <Film className="size-8 opacity-40" />
-            <span className="mt-2 text-xs">Loading Remotion player...</span>
+            <span className="mt-2 text-xs">Loading preview…</span>
           </div>
         ) : (
           <div

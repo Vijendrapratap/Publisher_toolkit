@@ -59,7 +59,7 @@ export const CONTENT_GOALS = [
     key: 'all' as ContentGoalKey,
     title: 'Full Amazon Launch Bundle',
     badge: 'All-In-One',
-    description: 'A+ Content Modules, Remotion HD Video Trailer, Sponsored Ads & high-converting ad copy.',
+    description: 'A+ Content modules, HD video ad, Sponsored Ads & high-converting ad copy.',
     tags: ['A+ Content', 'Video Trailer', 'Sponsored Ads', 'Ad Copy'],
     icon: Sparkles,
   },
@@ -74,9 +74,9 @@ export const CONTENT_GOALS = [
   {
     key: 'video' as ContentGoalKey,
     title: 'Amazon Video Trailer',
-    badge: 'Remotion HD',
-    description: 'Cinematic video trailers for product pages (16:9) and social feeds (9:16) with dynamic motion & hyperframes.',
-    tags: ['16:9 Product Video', '9:16 Reels / Shorts', 'Remotion HD'],
+    badge: 'HD Video',
+    description: 'Video ads for product pages (16:9) and social feeds (9:16).',
+    tags: ['16:9 Product Video', '9:16 Reels / Shorts', 'HD Video'],
     icon: Film,
   },
   {
@@ -649,7 +649,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
                     files={interiorImages}
                     onFilesChange={setInteriorImages}
                     label="Optional: Add 2–5 Interior Page Images or Illustrations"
-                    description="Upload maps, chapter openers, or character art to display in A+ feature modules and Remotion trailer scenes."
+                    description="Upload maps, chapter openers, or character art to display in A+ feature modules and video scenes."
                   />
                 </div>
               </div>

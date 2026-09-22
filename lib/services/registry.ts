@@ -17,9 +17,9 @@ export const SERVICES: ServiceDefinition[] = [
   {
     key: 'create-book',
     name: 'Create Your Book',
-    tagline: 'Generate children books, coloring books, word games & novels.',
+    tagline: 'Generate children books, coloring books, story books & games.',
     description:
-      'Write complete books chapter-by-chapter, generate illustrated children stories, create coloring books with clean vector outlines, or build word game puzzles in any aesthetic style.',
+      'Generate illustrated children stories, coloring books with clean line art, story books, or word game puzzles, with AI artwork and PDF export.',
     href: '/create-book',
     icon: 'book-open',
     tintClass: 'bg-tint-create-book',
@@ -28,7 +28,7 @@ export const SERVICES: ServiceDefinition[] = [
       "Children's illustrated storybook spreads",
       'Coloring book line-art pages & themes',
       'Playable word searches & crossword puzzles',
-      'Chapter-by-chapter novel & outline generator',
+      'AI illustrations, book preview & PDF download',
       '1-click export to Amazon Ads & A+ Content',
     ],
   },
@@ -37,13 +37,18 @@ export const SERVICES: ServiceDefinition[] = [
     name: 'Ads Creative',
     tagline: 'Scroll-stopping ads & A+ content in minutes.',
     description:
-      'Upload your book and get ready-to-run ad images, Amazon KDP A+ Content modules, and Remotion HD video trailers.',
+      'Upload your book and get ready-to-run ad images, Amazon KDP A+ Content modules, and HD video ads.',
     href: '/ads',
     icon: 'megaphone',
     tintClass: 'bg-tint-ads',
     availability: 'live',
-    highlights: ['Cover and internal pages pulled or uploaded', 'Amazon A+ modules (970×600, 970×300, 300×300)', 'Remotion HD video trailers included'],
+    highlights: ['Cover and internal pages pulled or uploaded', 'Amazon A+ modules (970×600, 970×300, 300×300)', 'HD video ads included'],
   },
+]
+
+/** Not shown in the nav or home page, but their routes still resolve. */
+export const ALL_SERVICES: ServiceDefinition[] = [
+  ...SERVICES,
   {
     key: 'landing',
     name: 'Landing Page & Website',
@@ -66,10 +71,6 @@ export const SERVICES: ServiceDefinition[] = [
     availability: 'coming-soon',
     highlights: ['Automatic chapter detection', 'Fish Audio & Qwen TTS neural voices', 'Multi-speaker character voiceover coming soon'],
   },
-]
-
-export const ALL_SERVICES: ServiceDefinition[] = [
-  ...SERVICES,
   {
     key: 'trailer',
     name: 'Trailer Video',

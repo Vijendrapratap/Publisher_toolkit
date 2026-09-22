@@ -193,7 +193,7 @@ export function ConfigureForm({
                   ? 'Optimized for 16:9 product page video & 9:16 social shorts'
                   : book.contentGoal === 'sponsored'
                     ? 'Optimized for 300×250 display & 1200×628 headline search banners'
-                    : 'A+ Modules + Remotion Video + Sponsored Banners + Copy'}
+                    : 'A+ Modules + Video + Sponsored Banners + Copy'}
             </span>
           </div>
         </div>
@@ -449,7 +449,7 @@ export function ConfigureForm({
             <div>
               <h3 className="font-display text-lg font-semibold">Amazon Sponsored Brands Video Trailer</h3>
               <p className="text-sm text-ink-muted">
-                Render a Remotion video trailer with dynamic 3D depth, specular catchlights, kinetic typography, and motion sweeps.
+                A short video ad of your book with animated text and cover.
               </p>
             </div>
           </div>
@@ -556,14 +556,11 @@ export function ConfigureForm({
                 </div>
               </div>
 
-              {/* Remotion Live Preview */}
+              {/* Live preview */}
               <div className="flex flex-col gap-2 rounded-2xl bg-surface-2 p-4 shadow-inset">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                    Remotion Live Preview
-                  </span>
-                  <span className="rounded-md bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
-                    Hyperframes Engine
+                    Live Preview
                   </span>
                 </div>
                 <div className="grid place-items-center overflow-hidden rounded-xl bg-canvas p-2">

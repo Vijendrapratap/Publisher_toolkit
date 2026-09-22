@@ -187,12 +187,9 @@ export function CreativeGallery({
                 <h4 className="font-display text-base font-semibold text-ink">
                   Amazon Sponsored Brands Video Trailer
                 </h4>
-                <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-[11px] font-semibold text-accent">
-                  Remotion & Hyperframes
-                </span>
               </div>
               <p className="mt-1 text-xs text-ink-muted">
-                1080p widescreen video with dynamic catchlights, kinetic typography springs, and audio atmosphere.
+                1080p video ad with animated text and your cover.
               </p>
             </div>
 

@@ -3,7 +3,7 @@ import { SERVICES, getService } from './registry'
 
 describe('service registry', () => {
   it('lists the active services with unique keys and matching hrefs', () => {
-    expect(SERVICES.map((s) => s.key)).toEqual(['create-book', 'ads', 'landing', 'audiobook'])
+    expect(SERVICES.map((s) => s.key)).toEqual(['create-book', 'ads'])
     for (const s of SERVICES) {
       expect(s.href).toBe(`/${s.key}`)
       expect(s.tintClass).toBe(`bg-tint-${s.key}`)
@@ -11,13 +11,10 @@ describe('service registry', () => {
     }
   })
 
-  it('marks create-book, ads, and landing as live, and audiobook as coming-soon', () => {
-    expect(SERVICES.filter((s) => s.availability === 'live').map((s) => s.key)).toEqual([
-      'create-book',
-      'ads',
-      'landing',
-    ])
-    expect(getService('audiobook').availability).toBe('coming-soon')
+  it('hides landing and audiobook from the nav but still resolves them', () => {
+    expect(SERVICES.every((s) => s.availability === 'live')).toBe(true)
+    expect(getService('landing').key).toBe('landing')
+    expect(getService('audiobook').key).toBe('audiobook')
   })
 
   it('looks services up by key', () => {

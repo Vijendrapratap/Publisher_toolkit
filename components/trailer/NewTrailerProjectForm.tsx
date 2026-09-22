@@ -354,7 +354,7 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
           <h2 className="font-display text-xl font-bold">New Video Trailer Project</h2>
         </div>
         <p className="text-sm text-ink-muted">
-          Turn your book into a cinematic trailer with dynamic Remotion typography, hyperframes lighting, and multi-ratio exports.
+          Turn your book into a short video ad in vertical, square and widescreen formats.
         </p>
       </div>
 
@@ -446,7 +446,7 @@ export function NewTrailerProjectForm({ initialBooks }: { initialBooks?: Trailer
                 <div className="flex-1">
                   <h3 className="font-semibold text-ink text-sm">Product URL</h3>
                   <p className="mt-0.5 text-xs text-ink-muted leading-relaxed">
-                    Paste an Amazon product page, bookstore, or Goodreads link. We pull the book cover, author, hook, and blurb to automatically build your Remotion trailer scenes.
+                    Paste an Amazon product page, bookstore, or Goodreads link. We pull the book cover, author, hook, and blurb to automatically build your video scenes.
                   </p>
 
                   <div className="mt-4 flex flex-col gap-2 sm:flex-row">

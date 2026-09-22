@@ -111,7 +111,7 @@ export function LoginForm() {
           Publisher Toolkit
         </h1>
         <p className="mt-1.5 text-sm text-ink-muted">
-          Sign in to your publisher studio to manage ads, trailers, audiobooks, and book launches.
+          Sign in to your publisher studio to create books, ads and video ads.
         </p>
       </div>
 

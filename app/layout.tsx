@@ -8,7 +8,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: { default: 'Publisher Toolkit', template: '%s · Publisher Toolkit' },
-  description: 'Tools for book publishers: ad creatives, trailers, audiobooks and landing pages.',
+  description: 'Tools for book publishers: book creation, ad creatives and video ads.',
 }
 
 // Runs before paint so the saved theme never flashes. Light is the default —
