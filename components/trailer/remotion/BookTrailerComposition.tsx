@@ -2,6 +2,7 @@
 import React from 'react'
 import {
   AbsoluteFill,
+  Img,
   Sequence,
   interpolate,
   spring,
@@ -9,23 +10,17 @@ import {
   useVideoConfig,
   Easing,
 } from 'remotion'
-import type {
-  TrailerAspectRatio,
-  TrailerMusicMood,
-  TrailerStyle,
-} from '@/lib/services/trailer/options'
+import type { TrailerStyle } from '@/lib/services/trailer/options'
+import type { AdVideoSpec } from '@/lib/services/ads/videoSpec'
+import { adFontFamily } from './fonts'
+import { fitFontSize } from './fit'
 
 export interface BookTrailerCompositionProps {
   [key: string]: unknown
+  spec: AdVideoSpec
   title: string
   author: string
-  blurb: string
-  hookText?: string | null
-  ctaText?: string | null
-  style: TrailerStyle
-  musicMood: TrailerMusicMood
   coverUrl?: string | null
-  aspectRatio: TrailerAspectRatio
   interiorImageUrls?: string[]
 }
 
@@ -37,63 +32,15 @@ interface Palette {
   fontFamily: string
 }
 
-const PALETTES: Record<TrailerStyle, Palette> = {
-  fantasy: {
-    bgGradient: ['#28150a', '#170b05', '#080301'],
-    accent: '#f59e0b',
-    textPrimary: '#fef08a',
-    textSecondary: '#fed7aa',
-    fontFamily: 'serif',
-  },
-  thriller: {
-    bgGradient: ['#0d0407', '#1c060d', '#080204'],
-    accent: '#ef4444',
-    textPrimary: '#ffffff',
-    textSecondary: '#fca5a5',
-    fontFamily: 'sans-serif',
-  },
-  scifi: {
-    bgGradient: ['#050a18', '#0b1633', '#03060f'],
-    accent: '#06b6d4',
-    textPrimary: '#e0f2fe',
-    textSecondary: '#93c5fd',
-    fontFamily: 'sans-serif',
-  },
-  romance: {
-    bgGradient: ['#1c0a14', '#2c1020', '#0f050b'],
-    accent: '#fb7185',
-    textPrimary: '#ffe4e6',
-    textSecondary: '#fbcfe8',
-    fontFamily: 'serif',
-  },
-  cinematic: {
-    bgGradient: ['#07070a', '#181420', '#0a080d'],
-    accent: '#d97706',
-    textPrimary: '#f8fafc',
-    textSecondary: '#cbd5e1',
-    fontFamily: 'serif',
-  },
-  dramatic: {
-    bgGradient: ['#0a0507', '#220812', '#0d0407'],
-    accent: '#f43f5e',
-    textPrimary: '#ffffff',
-    textSecondary: '#fecdd3',
-    fontFamily: 'sans-serif',
-  },
-  minimal: {
-    bgGradient: ['#0b1120', '#132338', '#0f172a'],
-    accent: '#38bdf8',
-    textPrimary: '#f8fafc',
-    textSecondary: '#94a3b8',
-    fontFamily: 'sans-serif',
-  },
-  energetic: {
-    bgGradient: ['#15092a', '#3b0764', '#1f0d3d'],
-    accent: '#c084fc',
-    textPrimary: '#ffffff',
-    textSecondary: '#e9d5ff',
-    fontFamily: 'sans-serif',
-  },
+function paletteFromSpec(spec: AdVideoSpec): Palette {
+  const { bgFrom, bgTo, accent, text } = spec.style.colors
+  return {
+    bgGradient: [bgFrom, bgTo, bgTo],
+    accent,
+    textPrimary: text,
+    textSecondary: `${text}cc`,
+    fontFamily: adFontFamily(spec.style.font),
+  }
 }
 
 // Background layer with atmospheric lighting & style overlays
@@ -338,7 +285,7 @@ function PillBadge({
 function Scene1({
   title,
   author,
-  hookText,
+  hook,
   palette,
   style,
   scale,
@@ -346,7 +293,7 @@ function Scene1({
 }: {
   title: string
   author: string
-  hookText?: string | null
+  hook: string
   palette: Palette
   style: TrailerStyle
   scale: number
@@ -378,7 +325,7 @@ function Scene1({
       ? 'CLASSIFIED LOG'
       : 'OFFICIAL BOOK TRAILER'
 
-  const mainHook = hookText || title || 'An Unforgettable Story'
+  const mainHook = hook
 
   return (
     <AbsoluteFill
@@ -402,7 +349,7 @@ function Scene1({
           maxWidth: '85%',
           color: palette.textPrimary,
           fontFamily: palette.fontFamily,
-          fontSize: Math.max(32, Math.round(72 * scale)),
+          fontSize: fitFontSize(Math.max(32, Math.round(72 * scale)), mainHook, 28),
           fontWeight: 700,
           lineHeight: 1.15,
           letterSpacing: '-0.02em',
@@ -443,7 +390,7 @@ function Scene1({
 
 // Scene 2: The Story / Excerpt
 function Scene2({
-  blurb,
+  storyLine,
   author,
   palette,
   scale,
@@ -451,7 +398,7 @@ function Scene2({
   isWidescreen,
   interiorImageUrl,
 }: {
-  blurb: string
+  storyLine: string
   author: string
   palette: Palette
   scale: number
@@ -470,9 +417,7 @@ function Scene2({
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   )
 
-  const cleanBlurb = blurb
-    ? blurb.replace(/\n+/g, ' ').slice(0, 240)
-    : 'Every page brings a new revelation. Dive into the world of an extraordinary tale.'
+  const cleanBlurb = storyLine
 
   return (
     <AbsoluteFill
@@ -504,8 +449,7 @@ function Scene2({
               border: `1px solid ${palette.accent}30`,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Img
               src={interiorImageUrl}
               alt=""
               style={{
@@ -535,7 +479,7 @@ function Scene2({
           style={{
             marginTop: Math.max(12, 20 * scale),
             fontSize: Math.max(40, Math.round(90 * scale)),
-            fontFamily: 'Georgia, serif',
+            fontFamily: palette.fontFamily,
             fontWeight: 700,
             color: palette.accent,
             lineHeight: 0.8,
@@ -551,7 +495,7 @@ function Scene2({
             color: palette.textPrimary,
             fontFamily: palette.fontFamily,
             fontStyle: 'italic',
-            fontSize: Math.max(18, Math.round(40 * scale)),
+            fontSize: fitFontSize(Math.max(18, Math.round(40 * scale)), cleanBlurb, 90),
             lineHeight: 1.4,
             opacity: enterProgress,
             transform: `translateY(${interpolate(enterProgress, [0, 1], [25, 0])}px)`,
@@ -583,6 +527,7 @@ function Scene3({
   title,
   author,
   coverUrl,
+  benefits,
   palette,
   scale,
   durationInFrames,
@@ -592,6 +537,7 @@ function Scene3({
   title: string
   author: string
   coverUrl?: string | null
+  benefits: string[]
   palette: Palette
   scale: number
   durationInFrames: number
@@ -599,7 +545,7 @@ function Scene3({
   interiorImageUrl?: string | null
 }) {
   const frame = useCurrentFrame()
-  const { fps } = useVideoConfig()
+  const { fps, height } = useVideoConfig()
 
   const enterProgress = spring({ frame, fps, config: { damping: 16 } })
   const exitOpacity = interpolate(
@@ -612,6 +558,10 @@ function Scene3({
   // Subtle 3D rotation & Ken Burns scale
   const bookScale = interpolate(frame, [0, durationInFrames], [0.94, 1.05])
   const bookRotateY = interpolate(frame, [0, durationInFrames], [-6, 5])
+  // Sized from the frame, not a fixed 630px: in a square frame a fixed cover
+  // plus the title column ran past the bottom edge.
+  const coverH = Math.round(height * (isWidescreen ? 0.6 : 0.4))
+  const coverW = Math.round((coverH * 2) / 3)
 
   return (
     <AbsoluteFill
@@ -647,12 +597,11 @@ function Scene3({
               borderRadius: Math.max(6, 14 * scale),
               overflow: 'hidden',
               border: `1px solid ${palette.accent}40`,
-              width: isWidescreen ? 360 * scale : 420 * scale,
-              height: isWidescreen ? 540 * scale : 630 * scale,
+              width: coverW,
+              height: coverH,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Img
               src={interiorImageUrl}
               alt=""
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -674,13 +623,12 @@ function Scene3({
         >
           {coverUrl ? (
             <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Img
                 src={coverUrl}
                 alt=""
                 style={{
-                  width: isWidescreen ? 360 * scale : 420 * scale,
-                  height: isWidescreen ? 540 * scale : 630 * scale,
+                  width: coverW,
+                  height: coverH,
                   objectFit: 'cover',
                   display: 'block',
                 }}
@@ -711,8 +659,8 @@ function Scene3({
           ) : (
             <div
               style={{
-                width: isWidescreen ? 360 * scale : 420 * scale,
-                height: isWidescreen ? 540 * scale : 630 * scale,
+                width: coverW,
+                height: coverH,
                 backgroundColor: '#1c1917',
                 border: `2px solid ${palette.accent}`,
                 display: 'flex',
@@ -754,7 +702,7 @@ function Scene3({
             marginTop: Math.max(16, 28 * scale),
             color: palette.textPrimary,
             fontFamily: palette.fontFamily,
-            fontSize: Math.max(26, Math.round(54 * scale)),
+            fontSize: fitFontSize(Math.max(26, Math.round(54 * scale)), title || 'Untitled Book', 24),
             fontWeight: 700,
             lineHeight: 1.15,
           }}
@@ -772,6 +720,27 @@ function Scene3({
         >
           {author ? `By ${author}` : ''}
         </div>
+
+        {benefits.length > 0 && (
+          <div
+            style={{
+              marginTop: Math.max(14, 26 * scale),
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: Math.max(6, 12 * scale),
+              justifyContent: isWidescreen ? 'flex-start' : 'center',
+            }}
+          >
+            {benefits.map((benefit, i) => {
+              const shown = spring({ frame: Math.max(0, frame - 12 - i * 6), fps, config: { damping: 14 } })
+              return (
+                <div key={i} style={{ opacity: shown, transform: `translateY(${interpolate(shown, [0, 1], [12, 0])}px)` }}>
+                  <PillBadge text={benefit} accent={palette.accent} scale={scale * 0.9} />
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </AbsoluteFill>
   )
@@ -779,13 +748,13 @@ function Scene3({
 
 // Scene 4: Outro Call to Action
 function Scene4({
-  ctaText,
+  cta,
   title,
   palette,
   scale,
   durationInFrames,
 }: {
-  ctaText?: string | null
+  cta: string
   title: string
   palette: Palette
   scale: number
@@ -802,8 +771,7 @@ function Scene4({
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   )
 
-  const platforms = ['AMAZON', 'BARNES & NOBLE', 'APPLE BOOKS', 'AUDIBLE']
-  const ctaHeadline = ctaText || 'AVAILABLE NOW • GET YOUR COPY TODAY'
+  const ctaHeadline = cta
 
   return (
     <AbsoluteFill
@@ -837,37 +805,6 @@ function Scene4({
         {ctaHeadline}
       </div>
 
-      {/* Retailer badges staggered animation */}
-      <div
-        style={{
-          marginTop: Math.max(24, 50 * scale),
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: Math.max(8, 16 * scale),
-          justifyContent: 'center',
-          maxWidth: '90%',
-        }}
-      >
-        {platforms.map((platform, i) => {
-          const badgeProgress = spring({
-            frame: Math.max(0, frame - 15 - i * 5),
-            fps,
-            config: { damping: 12 },
-          })
-          return (
-            <div
-              key={platform}
-              style={{
-                opacity: badgeProgress,
-                transform: `scale(${badgeProgress})`,
-              }}
-            >
-              <PillBadge text={platform} accent={palette.accent} scale={scale * 0.85} />
-            </div>
-          )
-        })}
-      </div>
-
       {title && (
         <div
           style={{
@@ -885,11 +822,11 @@ function Scene4({
   )
 }
 
-function HyperframeLightingSweep({ scale }: { scale: number }) {
+function LightSweep({ scale, sceneFrames }: { scale: number; sceneFrames: number }) {
   const frame = useCurrentFrame()
 
-  // Transition beats at scene changes (frames 0, 75, 150, 225)
-  const beat = frame % 75
+  // Transition beats at scene changes
+  const beat = frame % sceneFrames
   const flareOpacity = interpolate(beat, [0, 4, 18], [0, 0.4, 0], {
     extrapolateRight: 'clamp',
   })
@@ -913,75 +850,52 @@ function HyperframeLightingSweep({ scale }: { scale: number }) {
   )
 }
 
-export function BookTrailerComposition(props: BookTrailerCompositionProps) {
+export function BookTrailerComposition({ spec, title, author, coverUrl, interiorImageUrls }: BookTrailerCompositionProps) {
   const { durationInFrames, width, height } = useVideoConfig()
-  const palette = PALETTES[props.style] ?? PALETTES.cinematic
+  const palette = paletteFromSpec(spec)
   const scale = Math.min(width, height) / 1080
-  const isWidescreen = width > height
-
-  // 4 sequenced scenes with crossfade timing
+  // Square frames use the side-by-side layout too; stacked, they overflow.
+  const isWidescreen = width >= height
   const sceneFrames = Math.floor(durationInFrames / 4)
+  const lastFrames = durationInFrames - sceneFrames * 3
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
-      {/* Background layer with animations and styling */}
-      <AnimatedBackground palette={palette} style={props.style} scale={scale} />
+      <AnimatedBackground palette={palette} style={spec.style.preset as TrailerStyle} scale={scale} />
+      <LightSweep scale={scale} sceneFrames={sceneFrames} />
 
-      {/* Hyperframes cinematic optical sweep */}
-      <HyperframeLightingSweep scale={scale} />
-
-      {/* Scene 1: The Hook */}
       <Sequence from={0} durationInFrames={sceneFrames}>
-        <Scene1
-          title={props.title}
-          author={props.author}
-          hookText={props.hookText}
-          palette={palette}
-          style={props.style}
-          scale={scale}
-          durationInFrames={sceneFrames}
-        />
+        <Scene1 title={title} author={author} hook={spec.script.hook} palette={palette} style={spec.style.preset} scale={scale} durationInFrames={sceneFrames} />
       </Sequence>
 
-      {/* Scene 2: The Story */}
       <Sequence from={sceneFrames} durationInFrames={sceneFrames}>
         <Scene2
-          blurb={props.blurb}
-          author={props.author}
+          storyLine={spec.script.storyLine || title}
+          author={author}
           palette={palette}
           scale={scale}
           durationInFrames={sceneFrames}
           isWidescreen={isWidescreen}
-          interiorImageUrl={props.interiorImageUrls?.[0]}
+          interiorImageUrl={interiorImageUrls?.[0]}
         />
       </Sequence>
 
-      {/* Scene 3: Book Reveal */}
       <Sequence from={sceneFrames * 2} durationInFrames={sceneFrames}>
         <Scene3
-          title={props.title}
-          author={props.author}
-          coverUrl={props.coverUrl}
+          title={title}
+          author={author}
+          coverUrl={coverUrl}
+          benefits={spec.script.benefits}
           palette={palette}
           scale={scale}
           durationInFrames={sceneFrames}
           isWidescreen={isWidescreen}
-          interiorImageUrl={props.interiorImageUrls?.[1] || props.interiorImageUrls?.[0]}
+          interiorImageUrl={interiorImageUrls?.[1] || interiorImageUrls?.[0]}
         />
       </Sequence>
 
-      {/* Scene 4: Call to Action */}
-      <Sequence
-        from={sceneFrames * 3}
-        durationInFrames={durationInFrames - sceneFrames * 3}
-      >
-        <Scene4
-          ctaText={props.ctaText}
-          title={props.title}
-          palette={palette}
-          scale={scale}
-          durationInFrames={durationInFrames - sceneFrames * 3}
-        />
+      <Sequence from={sceneFrames * 3} durationInFrames={lastFrames}>
+        <Scene4 cta={spec.script.cta} title={title} palette={palette} scale={scale} durationInFrames={lastFrames} />
       </Sequence>
     </AbsoluteFill>
   )

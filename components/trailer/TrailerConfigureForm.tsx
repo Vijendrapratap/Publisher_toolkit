@@ -22,6 +22,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/field'
 import { cn } from '@/components/ui/cn'
 import { TrailerLivePreviewPlayer } from './TrailerLivePreviewPlayer'
+import { defaultVideoSpec } from '@/lib/services/ads/videoSpec'
 import {
   ASPECT_RATIO_OPTIONS,
   LENGTH_OPTIONS,
@@ -200,17 +201,20 @@ export function TrailerConfigureForm({
         </div>
       )}
 
-      {/* Interactive Remotion Live Preview */}
       <TrailerLivePreviewPlayer
+        spec={defaultVideoSpec({
+          title: book.title,
+          blurb: book.blurb,
+          hook: hookText,
+          cta: ctaText,
+          style,
+          format: aspectRatios[0] ?? '9:16',
+          length,
+          mood: musicMood,
+        })}
         title={book.title}
         author={book.author}
-        blurb={book.blurb}
-        hookText={hookText}
-        ctaText={ctaText}
-        style={style}
-        musicMood={musicMood}
         coverUrl={book.coverUrl}
-        defaultAspectRatio={aspectRatios[0] ?? '9:16'}
         interiorImageUrls={book.interiorImageUrls}
       />
 

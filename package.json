@@ -26,6 +26,7 @@
     "@napi-rs/canvas": "^1.0.9",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@prisma/client": "^6.19.3",
+    "@remotion/google-fonts": "4.0.525",
     "@remotion/player": "^4.0.525",
     "@vercel/blob": "^2.8.0",
     "ai": "^7.0.101",

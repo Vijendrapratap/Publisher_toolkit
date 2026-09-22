@@ -23,7 +23,6 @@ import { CustomCampaignPicker } from '@/components/ads/CustomCampaignPicker'
 import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
 import { sampleAdCopy } from '@/lib/services/ads/sampleCopy'
 import { nextRadioIndex } from '@/lib/ui/radioKeys'
-import { TrailerLivePreviewPlayer } from '@/components/trailer/TrailerLivePreviewPlayer'
 import {
   STYLE_OPTIONS,
   MUSIC_MOOD_OPTIONS,
@@ -439,7 +438,7 @@ export function ConfigureForm({
         </fieldset>
       </Card>
 
-      {/* Amazon Video Trailer & Hyperframes Motion Suite */}
+      {/* Video ad settings */}
       <Card className="p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5">
@@ -467,7 +466,7 @@ export function ConfigureForm({
 
         {includeVideo && (
           <div className="mt-6 flex flex-col gap-6 border-t border-line/60 pt-6">
-            <div className="grid gap-6 xl:grid-cols-[1fr_24rem]">
+            <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-5">
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
@@ -553,29 +552,6 @@ export function ConfigureForm({
                       </button>
                     ))}
                   </div>
-                </div>
-              </div>
-
-              {/* Live preview */}
-              <div className="flex flex-col gap-2 rounded-2xl bg-surface-2 p-4 shadow-inset">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                    Live Preview
-                  </span>
-                </div>
-                <div className="grid place-items-center overflow-hidden rounded-xl bg-canvas p-2">
-                  <TrailerLivePreviewPlayer
-                    title={book.title || 'Untitled Book'}
-                    author={book.author || 'Author'}
-                    blurb={book.blurb || 'A gripping journey waiting to be discovered.'}
-                    hookText={customHook || previewHeadline}
-                    ctaText={ctaText}
-                    style={videoStyle}
-                    musicMood={videoMood}
-                    coverUrl={book.coverUrl}
-                    defaultAspectRatio={videoFormat}
-                    interiorImageUrls={book.interiorImageUrls}
-                  />
                 </div>
               </div>
             </div>
