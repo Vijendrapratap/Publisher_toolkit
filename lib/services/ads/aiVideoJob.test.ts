@@ -315,10 +315,53 @@ describe('startAiVideoJob', () => {
       expect(job.costUsd).toBe(0.84)
     })
 
-    it('a limit of 0 disables AI video entirely', async () => {
+    it('a limit of 0 disables AI video entirely, with a wording that says so rather than "$0.00"', async () => {
       process.env.AI_VIDEO_DAILY_LIMIT_USD = '0'
-      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toBeInstanceOf(AiVideoUserError)
+      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow('AI video is turned off on this server.')
       expect(submitVideoJob).not.toHaveBeenCalled()
+    })
+
+    it('a failed job with no shots contributes 0 to the cap, not its stale estimated costUsd', async () => {
+      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
+      resetDb([
+        { id: 'failed_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'failed', costUsd: 5, shots: [], createdAt: new Date(), updatedAt: new Date() },
+      ])
+      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
+      const job = await startAiVideoJob(book, brief, 'sk')
+      expect(job.costUsd).toBe(0.84)
+    })
+
+    it('a failed job contributes only its billed shots, not its stale estimated costUsd', async () => {
+      process.env.AI_VIDEO_DAILY_LIMIT_USD = '2'
+      resetDb([
+        {
+          id: 'failed_2', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'failed', costUsd: 5,
+          shots: [{ jobId: 'x', durationSec: 5, status: 'completed', clipUrl: null, costUsd: 0.42 }],
+          createdAt: new Date(), updatedAt: new Date(),
+        },
+      ])
+      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
+      const job = await startAiVideoJob(book, brief, 'sk')
+      expect(job.costUsd).toBe(0.84) // 0.42 billed + 0.84 estimate = 1.26 <= $2; 5 + 0.84 would wrongly refuse
+    })
+
+    it('a non-failed job still contributes its costUsd as-is', async () => {
+      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
+      // 'completed' (not 'running'/'stitching') so this row isn't also picked up as an active job to advance.
+      resetDb([
+        { id: 'completed_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 0.5, shots: [], createdAt: new Date(), updatedAt: new Date() },
+      ])
+      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow(/today.s AI video limit \(\$1\.00\)/) // 0.5 + 0.84 > 1
+      expect(submitVideoJob).not.toHaveBeenCalled()
+    })
+
+    it('stores the billed-so-far total, not the full estimate, when submitting fails partway through', async () => {
+      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockRejectedValueOnce(new Error('boom'))
+      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow('boom')
+      const failedUpdate = vi.mocked(prisma.aiVideoJob.update).mock.calls.at(-1)![0] as any
+      expect(failedUpdate.data.status).toBe('failed')
+      // The one submitted shot has no billed costUsd yet (only polling learns that) — billed-so-far is 0, not the 0.84 estimate.
+      expect(failedUpdate.data.costUsd).toBe(0)
     })
   })
 })

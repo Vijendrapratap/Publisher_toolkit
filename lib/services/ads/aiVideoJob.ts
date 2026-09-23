@@ -99,17 +99,34 @@ function dailyLimitMessage(limit: number): string {
   return `You've reached today's AI video limit ($${limit.toFixed(2)}). Try again tomorrow.`
 }
 
+/** What's actually been billed across a set of shots so far (only shots OpenRouter has reported a cost for). */
+function shotsCostSoFar(shots: ShotState[]): number {
+  return Math.round(shots.reduce((total, s) => total + (s.costUsd ?? 0), 0) * 100) / 100
+}
+
+/**
+ * A failed job's `costUsd` stays at its pre-spend estimate even when nothing
+ * (or only some shots) ever got submitted/billed — counting that estimate
+ * against the cap would keep charging for spend that never happened. Only
+ * its shots' actually-billed costs count; every other status's `costUsd` is
+ * already the real (or best-known) total.
+ */
+function billedCost(row: { costUsd: number | null; status: string; shots: unknown }): number {
+  if (row.status !== 'failed') return row.costUsd ?? 0
+  return shotsCostSoFar((row.shots as ShotState[] | null) ?? [])
+}
+
 /** Sums what this publisher's AI video jobs have cost in the last 24h and refuses before this job would push it over the cap. */
 async function assertUnderDailyCap(publisherId: string, estimatedCost: number | null): Promise<void> {
   const limit = dailyLimitUsd()
-  if (limit <= 0) throw new AiVideoUserError(dailyLimitMessage(limit))
+  if (limit <= 0) throw new AiVideoUserError('AI video is turned off on this server.')
 
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
   const rows = await prisma.aiVideoJob.findMany({
     where: { createdAt: { gte: since }, book: { publisherId } },
-    select: { costUsd: true },
+    select: { costUsd: true, status: true, shots: true },
   })
-  const spentToday = rows.reduce((total, r) => total + (r.costUsd ?? 0), 0)
+  const spentToday = rows.reduce((total, r) => total + billedCost(r), 0)
   if (spentToday + (estimatedCost ?? 0) > limit) throw new AiVideoUserError(dailyLimitMessage(limit))
 }
 
@@ -197,7 +214,8 @@ export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: s
     const message = err instanceof Error ? err.message : 'The video model rejected the request.'
     job = await prisma.aiVideoJob.update({
       where: { id: job.id },
-      data: { shots: json([...shots]), status: 'failed', error: message, costUsd: estimatedCost },
+      // Billed so far, not the full estimate — a shot that never got submitted (or was submitted but never billed) cost nothing.
+      data: { shots: json([...shots]), status: 'failed', error: message, costUsd: shotsCostSoFar(shots) },
     })
     throw err
   }
