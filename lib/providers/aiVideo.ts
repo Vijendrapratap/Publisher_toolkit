@@ -32,16 +32,22 @@ interface RawVideoModel {
   pricing_skus?: Record<string, string>
 }
 
-/** We buy silent image-to-video at the base resolution; pick that price. Token-priced models return null. */
-export function pricePerSecond(skus?: Record<string, string>): number | null {
+/**
+ * We buy silent image-to-video; pick that price. When the chosen resolution
+ * is known, prefer a SKU naming it (e.g. `..._duration_seconds_720p`) over
+ * the model's base-resolution price. Token-priced models return null.
+ */
+export function pricePerSecond(skus?: Record<string, string>, resolution?: string): number | null {
   if (!skus) return null
   const perSecond = Object.entries(skus).filter(
     ([key]) => key.includes('duration_seconds') && !key.includes('with_audio') && !/4k/i.test(key)
   )
-  const chosen =
-    perSecond.find(([key]) => key.startsWith('image_to_video')) ??
-    perSecond.find(([key]) => key.includes('without_audio')) ??
-    perSecond[0]
+  const pick = (candidates: typeof perSecond) =>
+    candidates.find(([key]) => key.startsWith('image_to_video')) ??
+    candidates.find(([key]) => key.includes('without_audio')) ??
+    candidates[0]
+  const withResolution = resolution ? perSecond.filter(([key]) => key.includes(`_${resolution}`)) : []
+  const chosen = withResolution.length > 0 ? pick(withResolution) : pick(perSecond)
   const value = chosen ? Number(chosen[1]) : NaN
   return Number.isFinite(value) ? value : null
 }
@@ -56,12 +62,13 @@ export async function getVideoModelInfo(model: string, apiKey: string): Promise<
   const list = Array.isArray(body) ? body : body.data ?? []
   const raw = list.find((m) => (m.id ?? m.slug) === model)
   if (!raw) return null
+  const resolutions = raw.supported_resolutions ?? []
   return {
     id: raw.id ?? raw.slug ?? model,
     durations: raw.supported_durations ?? [],
     aspectRatios: raw.supported_aspect_ratios ?? [],
-    resolutions: raw.supported_resolutions ?? [],
-    pricePerSecond: pricePerSecond(raw.pricing_skus),
+    resolutions,
+    pricePerSecond: pricePerSecond(raw.pricing_skus, pickResolution(resolutions)),
   }
 }
 

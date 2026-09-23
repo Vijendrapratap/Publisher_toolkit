@@ -19,6 +19,17 @@ describe('pricePerSecond', () => {
   it('returns null for token-priced models', () => {
     expect(pricePerSecond({ video_tokens: '0.000007' })).toBeNull()
   })
+  it('prefers a duration_seconds key naming the chosen resolution', () => {
+    expect(
+      pricePerSecond(
+        { image_to_video_duration_seconds_480p: '0.05', image_to_video_duration_seconds_720p: '0.09', image_to_video_duration_seconds_1080p: '0.15' },
+        '720p'
+      )
+    ).toBe(0.09)
+  })
+  it('falls back to the current behaviour when no key names the resolution', () => {
+    expect(pricePerSecond({ image_to_video_duration_seconds: '0.084' }, '720p')).toBe(0.084)
+  })
 })
 
 describe('pickDuration / pickResolution', () => {
