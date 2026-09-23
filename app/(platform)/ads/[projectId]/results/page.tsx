@@ -11,7 +11,9 @@ import { CreativeGallery } from '@/components/ads/CreativeGallery'
 import { CopyEditor } from '@/components/ads/CopyEditor'
 import { AmazonPackagePanel } from '@/components/ads/AmazonPackagePanel'
 import { InstantVideoCard } from '@/components/ads/InstantVideoCard'
+import { AiVideoPanel } from '@/components/ads/AiVideoPanel'
 import { bookVideoSource, readVideoSpec } from '@/lib/services/ads/videoSpec'
+import { aiVideoBriefSchema } from '@/lib/services/ads/aiVideoBriefSchema'
 
 export default async function ResultsStepPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params
@@ -32,6 +34,7 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
   // shipping a package that is missing a piece the publisher configured.
   const trailerMissing = book.includeVideo !== false && !set.videoUrl
   const videoSpec = readVideoSpec(book.videoSpec, bookVideoSource(book))
+  const savedBrief = aiVideoBriefSchema.safeParse(book.aiVideoBrief)
 
   return (
     <div className="flex flex-col gap-6">
@@ -68,15 +71,23 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
       )}
 
       {book.includeVideo !== false && (
-        <InstantVideoCard
-          projectId={book.id}
-          title={book.title ?? 'Untitled book'}
-          author={book.author ?? ''}
-          coverUrl={book.frontCoverUrl}
-          interiorImageUrls={book.interiorImageUrls}
-          initialSpec={videoSpec}
-          video={{ videoUrl: set.videoUrl, videoPosterUrl: set.videoPosterUrl, videoDuration: set.videoDuration }}
-        />
+        <>
+          <InstantVideoCard
+            projectId={book.id}
+            title={book.title ?? 'Untitled book'}
+            author={book.author ?? ''}
+            coverUrl={book.frontCoverUrl}
+            interiorImageUrls={book.interiorImageUrls}
+            initialSpec={videoSpec}
+            video={{ videoUrl: set.videoUrl, videoPosterUrl: set.videoPosterUrl, videoDuration: set.videoDuration }}
+          />
+          <AiVideoPanel
+            projectId={book.id}
+            coverUrl={book.frontCoverUrl}
+            pageUrls={book.interiorImageUrls}
+            initialBrief={savedBrief.success ? savedBrief.data : null}
+          />
+        </>
       )}
 
       <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
