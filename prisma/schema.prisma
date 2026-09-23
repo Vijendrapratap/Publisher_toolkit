@@ -39,10 +39,12 @@ model Book {
   videoMood         String?       @default("suspenseful")
   videoLength       String?       @default("30s")
   videoSpec         Json?
+  aiVideoBrief      Json?
   parentBookId      String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @default(now()) @updatedAt
   creativeSets      CreativeSet[]
+  aiVideoJobs       AiVideoJob[]
 
   @@index([publisherId])
   @@index([parentBookId])
@@ -229,4 +231,21 @@ model BookCreatorProject {
   @@index([publisherId])
 }
 
+model AiVideoJob {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  status    String   @default("running")
+  model     String
+  format    String
+  brief     Json
+  shots     Json
+  videoUrl  String?
+  posterUrl String?
+  error     String?
+  costUsd   Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@index([bookId])
+}
