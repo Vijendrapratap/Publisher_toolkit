@@ -85,4 +85,8 @@ describe.skipIf(!hasFfmpeg)('stitchAiVideo', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   }, 60_000)
+
+  it('resolves NaN — never throws — when ffprobe cannot read the file, so callers can fall back safely', async () => {
+    await expect(probeDuration('/nonexistent/nowhere.mp4')).resolves.toBeNaN()
+  })
 })

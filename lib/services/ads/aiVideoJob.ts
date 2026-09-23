@@ -18,7 +18,7 @@ import {
 import type { AiVideoBrief } from './aiVideoBriefSchema'
 import { bookVideoSource, readVideoSpec, resolveMusic, videoDimensions, type AdVideoSpec } from './videoSpec'
 import { inlineImage, musicFile } from './videoAssets'
-import { renderAdVideo, renderStillPng } from './renderVideo'
+import { AdVideoRenderError, describeRenderError, renderAdVideo, renderStillPng } from './renderVideo'
 import { probeDuration, stitchAiVideo } from './aiVideoStitch'
 
 export type ShotState = {
@@ -44,6 +44,8 @@ export interface AiVideoJobSummary {
   posterUrl: string | null
   error: string | null
   costUsd: number | null
+  /** True once every shot has a billed cost — `costUsd` is then the real total, not an estimate. */
+  costFinal: boolean
   shots: { status: ShotState['status']; durationSec: number }[]
 }
 
@@ -85,6 +87,32 @@ function isUniqueConstraintError(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002'
 }
 
+/** Unset → $10/day. `0` disables AI video entirely (still logs nothing extra; it's a normal refusal). */
+function dailyLimitUsd(): number {
+  const raw = process.env.AI_VIDEO_DAILY_LIMIT_USD
+  if (raw === undefined || raw.trim() === '') return 10
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : 10
+}
+
+function dailyLimitMessage(limit: number): string {
+  return `You've reached today's AI video limit ($${limit.toFixed(2)}). Try again tomorrow.`
+}
+
+/** Sums what this publisher's AI video jobs have cost in the last 24h and refuses before this job would push it over the cap. */
+async function assertUnderDailyCap(publisherId: string, estimatedCost: number | null): Promise<void> {
+  const limit = dailyLimitUsd()
+  if (limit <= 0) throw new AiVideoUserError(dailyLimitMessage(limit))
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const rows = await prisma.aiVideoJob.findMany({
+    where: { createdAt: { gte: since }, book: { publisherId } },
+    select: { costUsd: true },
+  })
+  const spentToday = rows.reduce((total, r) => total + (r.costUsd ?? 0), 0)
+  if (spentToday + (estimatedCost ?? 0) > limit) throw new AiVideoUserError(dailyLimitMessage(limit))
+}
+
 export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: string): Promise<AiVideoJob> {
   // If a job is already active, give it one chance to resolve on its own
   // (it may just be stuck and about to be reclaimed/timed out) instead of
@@ -107,20 +135,25 @@ export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: s
     )
   }
 
+  const durations = brief.shots.map((shot) => pickDuration(shot.durationSec, info?.durations ?? []))
+  const seconds = durations.reduce((total, d) => total + d, 0)
+  const estimatedCost = info?.pricePerSecond ? Math.round(seconds * info.pricePerSecond * 100) / 100 : null
+
+  // Before any image resolution or spend: a publisher over their daily cap
+  // must not have images read or clips submitted for this job at all.
+  await assertUnderDailyCap(book.publisherId, estimatedCost)
+
   // Resolve every shot's image BEFORE spending anything: a missing page must
   // not leave earlier shots already submitted (and billed) to OpenRouter.
   const prepared = await Promise.all(
-    brief.shots.map(async (shot) => {
+    brief.shots.map(async (shot, i) => {
       const imageUrl = await inlineImage(sourceImageUrl(book, shot.sourceImage))
       if (!imageUrl) {
         throw new AiVideoUserError(`The image for “${shot.sourceImage}” could not be read. Choose another image for that shot.`)
       }
-      return { prompt: shot.prompt, imageUrl, durationSec: pickDuration(shot.durationSec, info?.durations ?? []) }
+      return { prompt: shot.prompt, imageUrl, durationSec: durations[i] }
     })
   )
-
-  const seconds = prepared.reduce((total, s) => total + s.durationSec, 0)
-  const estimatedCost = info?.pricePerSecond ? Math.round(seconds * info.pricePerSecond * 100) / 100 : null
 
   await prisma.book.update({ where: { id: book.id }, data: { aiVideoBrief: json(brief) } })
 
@@ -303,20 +336,23 @@ export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: str
   if (claim.count === 0) return (await prisma.aiVideoJob.findUnique({ where: { id: job.id } })) ?? job
 
   try {
-    const { videoUrl, posterUrl } = await stitchJob(job, shots, book, dir)
+    const { videoUrl, posterUrl } = await stitchJob(job, shots, book, dir, publisherId)
     // Guarded: a reclaim that fired mid-stitch must not have its `completed`
     // write clobber whatever that reclaim already decided.
     await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'stitching' }, data: { status: 'completed', videoUrl, posterUrl } })
     return (await prisma.aiVideoJob.findUnique({ where: { id: job.id } })) ?? { ...job, status: 'completed', videoUrl, posterUrl }
   } catch (err) {
     console.error('ai video stitch failed', err)
-    const message = err instanceof Error ? err.message : 'Putting the video together failed.'
+    // Never the engine's own wording (ffmpeg stderr, a missing-bundle path, a
+    // headless-Chrome crash): safe for a publisher to read. The raw `err` is
+    // still logged above for diagnosis.
+    const message = err instanceof AdVideoRenderError ? describeRenderError(err) : "We couldn't put the video together. Generate again."
     await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'stitching' }, data: { status: 'failed', error: message } })
     return (await prisma.aiVideoJob.findUnique({ where: { id: job.id } })) ?? { ...job, status: 'failed', error: message }
   }
 }
 
-async function stitchJob(job: AiVideoJob, shots: ShotState[], book: Book, dir: string) {
+async function stitchJob(job: AiVideoJob, shots: ShotState[], book: Book, dir: string, publisherId: string) {
   const brief = job.brief as unknown as AiVideoBrief
   const spec: AdVideoSpec = { ...readVideoSpec(book.videoSpec, bookVideoSource(book)), format: job.format as AdVideoSpec['format'] }
   const { width, height } = videoDimensions(spec.format)
@@ -333,7 +369,9 @@ async function stitchJob(job: AiVideoJob, shots: ShotState[], book: Book, dir: s
         captionPath = path.join(tmp, `caption-${i}.png`)
         await writeFile(captionPath, await renderStillPng({ spec, caption }, 'AiCaption'))
       }
-      clips.push({ path: clipPath, durationSec: Math.min(shot.durationSec, await probeDuration(clipPath)), captionPath })
+      const probed = await probeDuration(clipPath)
+      const durationSec = Number.isFinite(probed) && probed > 0 ? Math.min(shot.durationSec, probed) : shot.durationSec
+      clips.push({ path: clipPath, durationSec, captionPath })
     }
 
     const endCard = await renderAdVideo(
@@ -351,7 +389,7 @@ async function stitchJob(job: AiVideoJob, shots: ShotState[], book: Book, dir: s
       width,
       height,
       outputPath,
-      musicPath: await musicFile(resolveMusic(spec), tmp),
+      musicPath: await musicFile(resolveMusic(spec), tmp, publisherId),
     })
 
     const [video, poster] = await Promise.all([
@@ -373,6 +411,7 @@ export function summarizeJob(job: AiVideoJob): AiVideoJobSummary {
     posterUrl: job.posterUrl,
     error: job.error,
     costUsd: job.costUsd,
+    costFinal: shots.length > 0 && shots.every((s) => s.costUsd !== undefined),
     shots: shots.map((s) => ({ status: s.status, durationSec: s.durationSec })),
   }
 }

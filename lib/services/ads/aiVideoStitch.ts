@@ -96,8 +96,18 @@ export async function stitchAiVideo(input: StitchInput): Promise<void> {
   await run('ffmpeg', buildStitchArgs(input))
 }
 
-/** Clips can come back shorter than requested; trimming to the request would break the fades. */
+/**
+ * Clips can come back shorter than requested; trimming to the request would
+ * break the fades. Never throws: a probe failure (missing binary, unreadable
+ * file, garbled output) resolves NaN instead, so a stitch degrades to the
+ * shot's requested duration rather than failing outright. Callers must check
+ * `Number.isFinite(...) && > 0` before trusting the result.
+ */
 export async function probeDuration(file: string): Promise<number> {
-  const out = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file])
-  return Number(out.trim())
+  try {
+    const out = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file])
+    return Number(out.trim())
+  } catch {
+    return NaN
+  }
 }

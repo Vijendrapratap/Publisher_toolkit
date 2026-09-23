@@ -18,7 +18,7 @@ vi.mock('@/lib/services/ads/aiVideoJob', async (importOriginal) => {
   return { AiVideoUserError: actual.AiVideoUserError, summarizeJob: actual.summarizeJob, startAiVideoJob: vi.fn(), advanceAiVideoJob: vi.fn() }
 })
 
-import { GET, POST } from './route'
+import { GET, POST, __resetVideoModelInfoCacheForTests } from './route'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { getVideoModelInfo } from '@/lib/providers/aiVideo'
@@ -31,6 +31,7 @@ const brief = fallbackBrief({ title: 'T', pageCount: 0 })
 
 beforeEach(() => {
   vi.clearAllMocks()
+  __resetVideoModelInfoCacheForTests()
   vi.mocked(getBookForPublisher).mockResolvedValue(book as any)
   vi.mocked(getPublisherAiCredentials).mockResolvedValue({ apiKey: 'sk', model: null })
 })
@@ -48,6 +49,17 @@ describe('POST /api/ads/projects/:id/video/ai', () => {
     const res = await POST(post({ brief }), ctx)
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/1:1/)
+  })
+  it('logs an unexpected failure server-side and returns a safe 500 message', async () => {
+    vi.mocked(startAiVideoJob).mockRejectedValue(new Error('ENOENT: chrome-headless-shell not installed'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await POST(post({ brief }), ctx)
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(body.error).toBe('The AI video could not be started. Please try again.')
+    expect(body.error).not.toMatch(/remotion|ffmpeg|chrome|ENOENT/i)
+    expect(errorSpy).toHaveBeenCalledWith('ai video start failed', expect.any(Error))
+    errorSpy.mockRestore()
   })
   it('rejects an invalid brief and a missing key', async () => {
     expect((await POST(post({ brief: { shots: [] } }), ctx)).status).toBe(400)
@@ -86,5 +98,32 @@ describe('GET /api/ads/projects/:id/video/ai', () => {
     const res = await GET(new Request('http://localhost'), ctx)
     expect(res.status).toBe(200)
     expect((await res.json()).model).toBeNull()
+  })
+
+  it('caches the model lookup for 5 minutes instead of calling OpenRouter on every poll', async () => {
+    vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(null)
+    vi.mocked(getVideoModelInfo).mockResolvedValue({
+      id: 'kwaivgi/kling-v3.0-std', durations: [5], aspectRatios: ['16:9'], resolutions: ['720p'], pricePerSecond: 0.084,
+    })
+    await GET(new Request('http://localhost'), ctx)
+    await GET(new Request('http://localhost'), ctx)
+    await GET(new Request('http://localhost'), ctx)
+    expect(getVideoModelInfo).toHaveBeenCalledTimes(1)
+  })
+
+  it('looks the model up again once the cache entry expires', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(null)
+      vi.mocked(getVideoModelInfo).mockResolvedValue({
+        id: 'kwaivgi/kling-v3.0-std', durations: [5], aspectRatios: ['16:9'], resolutions: ['720p'], pricePerSecond: 0.084,
+      })
+      await GET(new Request('http://localhost'), ctx)
+      vi.advanceTimersByTime(5 * 60 * 1000 + 1)
+      await GET(new Request('http://localhost'), ctx)
+      expect(getVideoModelInfo).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

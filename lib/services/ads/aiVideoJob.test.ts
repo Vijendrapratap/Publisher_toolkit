@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { AiVideoBrief } from './aiVideoBriefSchema'
 import { OpenRouterHttpError } from '@/lib/providers/aiVideo'
 
@@ -22,6 +22,18 @@ const { aiVideoJobStore, resetDb, getRows } = vi.hoisted(() => {
         }
         if ('lt' in cond) {
           if (!(row[key] instanceof Date) || !(row[key].getTime() < cond.lt.getTime())) return false
+          continue
+        }
+        if ('gte' in cond) {
+          if (!(row[key] instanceof Date) || !(row[key].getTime() >= cond.gte.getTime())) return false
+          continue
+        }
+        const KNOWN_KEYS = ['in', 'lt', 'gte', 'not', 'gt', 'lte']
+        if (!Object.keys(cond).some((k) => KNOWN_KEYS.includes(k))) {
+          // A plain object with none of the recognised operator keys is a
+          // relation filter (e.g. `book: { publisherId }`) — matched against
+          // the row's own denormalised copy of that relation.
+          if (!matchesWhere(row[key] ?? {}, cond)) return false
           continue
         }
         // An operator this fake doesn't know must fail loudly, not match
@@ -76,6 +88,10 @@ const { aiVideoJobStore, resetDb, getRows } = vi.hoisted(() => {
         }
         return null
       }),
+      findMany: vi.fn(async ({ where, select }: any) => {
+        const matched = [...rows.values()].filter((row) => matchesWhere(row, where ?? {}))
+        return select ? matched.map((row) => Object.fromEntries(Object.keys(select).map((k) => [k, row[k]]))) : matched.map((row) => ({ ...row }))
+      }),
     },
   }
 })
@@ -99,7 +115,8 @@ vi.mock('./videoAssets', () => ({
   inlineImage: vi.fn(async (u: string | null | undefined) => (u ? `data:${u}` : null)),
   musicFile: vi.fn(async () => '/app/public/music/epic.mp3'),
 }))
-vi.mock('./renderVideo', () => ({
+vi.mock('./renderVideo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./renderVideo')>()),
   renderStillPng: vi.fn(async () => Buffer.from('png')),
   renderAdVideo: vi.fn(async () => ({ videoBuffer: Buffer.from('end'), posterBuffer: Buffer.from('poster'), durationSec: 3, width: 1920, height: 1080 })),
 }))
@@ -111,8 +128,9 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
 
 import { prisma } from '@/lib/db'
 import { getVideoJob, getVideoModelInfo, submitVideoJob, downloadVideoJob } from '@/lib/providers/aiVideo'
-import { stitchAiVideo } from './aiVideoStitch'
+import { probeDuration, stitchAiVideo } from './aiVideoStitch'
 import { inlineImage } from './videoAssets'
+import { AdVideoRenderError, renderAdVideo } from './renderVideo'
 import { AiVideoUserError, advanceAiVideoJob, startAiVideoJob, summarizeJob } from './aiVideoJob'
 
 const book: any = {
@@ -244,6 +262,65 @@ describe('startAiVideoJob', () => {
     expect(submitVideoJob).toHaveBeenCalledTimes(2) // the new job's own shots
     expect(job.costUsd).toBe(0.84)
   })
+
+  describe('daily AI video spend cap', () => {
+    afterEach(() => {
+      delete process.env.AI_VIDEO_DAILY_LIMIT_USD
+    })
+
+    it('refuses before resolving any image once today’s spend plus this estimate would exceed the limit', async () => {
+      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
+      resetDb([
+        { id: 'earlier_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 0.5, createdAt: new Date(), updatedAt: new Date() },
+        { id: 'earlier_2', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 0.6, createdAt: new Date(), updatedAt: new Date() },
+      ])
+      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toBeInstanceOf(AiVideoUserError)
+      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow(/today.s AI video limit \(\$1\.00\)/)
+      expect(inlineImage).not.toHaveBeenCalled()
+      expect(submitVideoJob).not.toHaveBeenCalled()
+      expect(prisma.aiVideoJob.create).not.toHaveBeenCalled()
+    })
+
+    it('allows a job whose spend-plus-estimate stays under the limit', async () => {
+      process.env.AI_VIDEO_DAILY_LIMIT_USD = '5'
+      resetDb([
+        { id: 'earlier_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 1, createdAt: new Date(), updatedAt: new Date() },
+      ])
+      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
+      const job = await startAiVideoJob(book, brief, 'sk')
+      expect(job.costUsd).toBe(0.84)
+      expect(submitVideoJob).toHaveBeenCalledTimes(2)
+    })
+
+    it('excludes spend older than 24 hours from the running total', async () => {
+      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
+      resetDb([
+        {
+          id: 'yesterday_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 5,
+          createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000), updatedAt: new Date(),
+        },
+      ])
+      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
+      const job = await startAiVideoJob(book, brief, 'sk')
+      expect(job.costUsd).toBe(0.84)
+    })
+
+    it('excludes another publisher’s spend from the running total', async () => {
+      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
+      resetDb([
+        { id: 'other_pub', bookId: 'book_other', book: { publisherId: 'pub_other' }, status: 'completed', costUsd: 5, createdAt: new Date(), updatedAt: new Date() },
+      ])
+      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
+      const job = await startAiVideoJob(book, brief, 'sk')
+      expect(job.costUsd).toBe(0.84)
+    })
+
+    it('a limit of 0 disables AI video entirely', async () => {
+      process.env.AI_VIDEO_DAILY_LIMIT_USD = '0'
+      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toBeInstanceOf(AiVideoUserError)
+      expect(submitVideoJob).not.toHaveBeenCalled()
+    })
+  })
 })
 
 describe('advanceAiVideoJob', () => {
@@ -280,6 +357,14 @@ describe('advanceAiVideoJob', () => {
     expect(job.status).toBe('completed')
     expect(job.costUsd).toBe(0.84)
     expect(job.videoUrl).toMatch(/ai-video\/job_1\/ai-video\.mp4$/)
+  })
+
+  it("falls back to the shot's requested duration when ffprobe can't read the clip (NaN)", async () => {
+    vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed', costUsd: 0.42 })
+    vi.mocked(downloadVideoJob).mockResolvedValue(Buffer.from('mp4'))
+    vi.mocked(probeDuration).mockResolvedValueOnce(NaN)
+    await advanceAiVideoJob(running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { brief: singleShotBrief }), book, 'sk', 'pub_1')
+    expect(stitchAiVideo).toHaveBeenCalledWith(expect.objectContaining({ clips: [expect.objectContaining({ durationSec: 5 })] }))
   })
 
   it('fails the job with the model’s message when a shot fails', async () => {
@@ -422,6 +507,32 @@ describe('advanceAiVideoJob', () => {
     expect(job.error).toMatch(/interrupted/)
   })
 
+  it('stores a safe message (never the engine’s own wording) when the stitch throws', async () => {
+    vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed', costUsd: 0.42 })
+    vi.mocked(downloadVideoJob).mockResolvedValue(Buffer.from('mp4'))
+    vi.mocked(stitchAiVideo).mockRejectedValueOnce(new Error('ffmpeg failed: /usr/bin/chrome-headless-shell crashed rendering remotion bundle'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const job = await advanceAiVideoJob(running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { brief: singleShotBrief }), book, 'sk', 'pub_1')
+    expect(job.status).toBe('failed')
+    expect(job.error).toBe("We couldn't put the video together. Generate again.")
+    expect(job.error).not.toMatch(/remotion|ffmpeg|chrome/i)
+    // The raw error must still be logged server-side for diagnosis.
+    expect(errorSpy).toHaveBeenCalledWith('ai video stitch failed', expect.any(Error))
+    errorSpy.mockRestore()
+  })
+
+  it('uses describeRenderError’s safe wording when the stitch fails inside the video renderer', async () => {
+    vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed', costUsd: 0.42 })
+    vi.mocked(downloadVideoJob).mockResolvedValue(Buffer.from('mp4'))
+    vi.mocked(renderAdVideo).mockRejectedValueOnce(new AdVideoRenderError('The video bundle is missing. Run `npm run remotion:bundle` and try again.'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const job = await advanceAiVideoJob(running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { brief: singleShotBrief }), book, 'sk', 'pub_1')
+    expect(job.status).toBe('failed')
+    expect(job.error).toBe("Video export isn't set up on this server yet. Please contact support.")
+    expect(job.error).not.toMatch(/remotion|ffmpeg|chrome/i)
+    errorSpy.mockRestore()
+  })
+
   it('does not let a completed-stitch write clobber a row that moved on mid-stitch', async () => {
     vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed', costUsd: 0.42 })
     vi.mocked(downloadVideoJob).mockResolvedValue(Buffer.from('mp4'))
@@ -468,9 +579,25 @@ describe('advanceAiVideoJob', () => {
 })
 
 describe('summarizeJob', () => {
-  it('exposes only what the browser needs', () => {
+  it('exposes only what the browser needs, and costFinal false while a shot has no billed cost yet', () => {
     expect(
       summarizeJob({ id: 'j', status: 'running', videoUrl: null, posterUrl: null, error: null, costUsd: 1, shots: [{ jobId: 'secret', durationSec: 5, status: 'pending', clipUrl: null }] } as any)
-    ).toEqual({ id: 'j', status: 'running', videoUrl: null, posterUrl: null, error: null, costUsd: 1, shots: [{ status: 'pending', durationSec: 5 }] })
+    ).toEqual({ id: 'j', status: 'running', videoUrl: null, posterUrl: null, error: null, costUsd: 1, costFinal: false, shots: [{ status: 'pending', durationSec: 5 }] })
+  })
+
+  it('reports costFinal true once every shot has a billed cost', () => {
+    const summary = summarizeJob({
+      id: 'j', status: 'completed', videoUrl: '/v.mp4', posterUrl: '/p.png', error: null, costUsd: 0.84,
+      shots: [
+        { jobId: 'a', durationSec: 5, status: 'completed', clipUrl: '/a.mp4', costUsd: 0.42 },
+        { jobId: 'b', durationSec: 5, status: 'completed', clipUrl: '/b.mp4', costUsd: 0.42 },
+      ],
+    } as any)
+    expect(summary.costFinal).toBe(true)
+  })
+
+  it('reports costFinal false when there are no shots yet', () => {
+    const summary = summarizeJob({ id: 'j', status: 'running', videoUrl: null, posterUrl: null, error: null, costUsd: null, shots: [] } as any)
+    expect(summary.costFinal).toBe(false)
   })
 })
