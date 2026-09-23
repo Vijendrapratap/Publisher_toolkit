@@ -521,6 +521,33 @@ describe('advanceAiVideoJob', () => {
     expect(job.error).toMatch(/took too long/)
   })
 
+  it('persists a shot\'s costUsd learned this same poll round when the running timeout fails the job — otherwise the daily cap under-counts real spend', async () => {
+    vi.mocked(getVideoJob).mockResolvedValue({ status: 'in_progress', costUsd: 0.42 })
+    const job = await advanceAiVideoJob(
+      running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { brief: singleShotBrief, createdAt: staleDate(RUNNING_TIMEOUT_MS + 1000) }),
+      book, 'sk', 'pub_1'
+    )
+    expect(job.status).toBe('failed')
+    const failWrite = vi.mocked(prisma.aiVideoJob.updateMany).mock.calls.find(([args]: any) => args.data.status === 'failed')
+    expect(failWrite).toBeDefined()
+    expect((failWrite![0] as any).data.shots[0].costUsd).toBe(0.42)
+  })
+
+  it('persists a shot\'s costUsd learned this same poll round when the download timeout fails the job', async () => {
+    vi.mocked(downloadVideoJob).mockRejectedValue(new Error('still failing'))
+    const job = await advanceAiVideoJob(
+      running([{ jobId: 'or_1', durationSec: 5, status: 'downloading', clipUrl: null, costUsd: 0.42 }], {
+        brief: singleShotBrief,
+        createdAt: staleDate(DOWNLOAD_TIMEOUT_MS + 1000),
+      }),
+      book, 'sk', 'pub_1'
+    )
+    expect(job.status).toBe('failed')
+    const failWrite = vi.mocked(prisma.aiVideoJob.updateMany).mock.calls.find(([args]: any) => args.data.status === 'failed')
+    expect(failWrite).toBeDefined()
+    expect((failWrite![0] as any).data.shots[0].costUsd).toBe(0.42)
+  })
+
   it('downloads and stitches a job older than 60 minutes whose shots report completed on this poll', async () => {
     vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed', costUsd: 0.42 })
     vi.mocked(downloadVideoJob).mockResolvedValue(Buffer.from('mp4'))

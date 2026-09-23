@@ -331,10 +331,11 @@ export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: str
     const stuckDownloading = shots.some((s) => s.status === 'downloading')
 
     if (remoteUnfinished && now - job.createdAt.getTime() > RUNNING_TIMEOUT_MS) {
-      return guardedFail(job, { status: 'failed', error: RUNNING_TIMEOUT_MESSAGE })
+      // Persist `shots` too — a shot's costUsd learned this same poll round (billedCost relies on it for a failed row) would otherwise be lost.
+      return guardedFail(job, { shots: json(shots), status: 'failed', error: RUNNING_TIMEOUT_MESSAGE })
     }
     if (stuckDownloading && now - job.createdAt.getTime() > DOWNLOAD_TIMEOUT_MS) {
-      return guardedFail(job, { status: 'failed', error: DOWNLOAD_TIMEOUT_MESSAGE })
+      return guardedFail(job, { shots: json(shots), status: 'failed', error: DOWNLOAD_TIMEOUT_MESSAGE })
     }
     // Never overwrite a row another poll has already claimed (e.g. moved to stitching).
     await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'running' }, data: { shots: json(shots) } })

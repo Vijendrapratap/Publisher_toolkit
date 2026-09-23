@@ -34,7 +34,7 @@ export default async function ConfigureStepPage({
         includeVideo: book.includeVideo ?? true,
         videoFormat: (book.videoFormat as any) ?? '16:9',
         videoStyle: (book.videoStyle as any) ?? (book.templateKey as any) ?? 'cinematic',
-        videoMood: (book.videoMood as any) ?? 'epic',
+        videoMood: (book.videoMood as any) ?? 'suspenseful',
         videoLength: (book.videoLength as any) ?? '15s',
       }}
       book={{
