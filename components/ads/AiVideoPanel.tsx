@@ -103,38 +103,54 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
 
   async function writeBrief(revise: boolean) {
     setWriting(true)
-    const res = await fetch(`/api/ads/projects/${projectId}/video/ai/brief`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ current: revise ? brief : undefined, instruction: instruction || undefined }),
-    })
-    const body = await res.json().catch(() => ({}))
-    setWriting(false)
-    if (!res.ok) {
-      toast.error(body.error ?? 'The AI could not write the prompt.')
-      return
+    try {
+      const res = await fetch(`/api/ads/projects/${projectId}/video/ai/brief`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current: revise ? brief : undefined, instruction: instruction || undefined }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(body.error ?? 'The AI could not write the prompt.')
+        return
+      }
+      setBrief(body.brief)
+      if (body.source === 'fallback') {
+        toast.warning(
+          revise
+            ? "The AI couldn't revise the prompt right now. Your prompt is unchanged."
+            : 'AI was unavailable, so a starter prompt was filled in. Edit it before generating.'
+        )
+      }
+      setInstruction('')
+    } catch {
+      toast.error('The AI could not write the prompt.', { description: 'Check your connection and try again.' })
+    } finally {
+      setWriting(false)
     }
-    setBrief(body.brief)
-    if (body.source === 'fallback') toast.warning('AI was unavailable, so a starter prompt was filled in. Edit it before generating.')
-    setInstruction('')
   }
 
   async function generate() {
     if (!check?.success) return
     setStarting(true)
-    const res = await fetch(`/api/ads/projects/${projectId}/video/ai`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ brief: check.data }),
-    })
-    const body = await res.json().catch(() => ({}))
-    setStarting(false)
-    if (!res.ok) {
-      toast.error(body.error ?? 'The AI video could not be started.')
-      return
+    try {
+      const res = await fetch(`/api/ads/projects/${projectId}/video/ai`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brief: check.data }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(body.error ?? 'The AI video could not be started.')
+        return
+      }
+      setJob(body.job)
+      toast.success('AI video started', { description: 'Each shot takes a few minutes. You can keep working.' })
+    } catch {
+      toast.error('The AI video could not be started.', { description: 'Check your connection and try again.' })
+    } finally {
+      setStarting(false)
     }
-    setJob(body.job)
-    toast.success('AI video started', { description: 'Each shot takes a few minutes. You can keep working.' })
   }
 
   const setShot = (i: number, patch: Partial<AiVideoBrief['shots'][number]>) =>
@@ -195,7 +211,11 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
                 <a href={job.videoUrl} download="ai-video-ad.mp4" className={cn(buttonClasses({ size: 'sm' }), 'bg-ai text-canvas hover:bg-ai/90')}>
                   <Download className="size-3.5" aria-hidden /> Download AI video
                 </a>
-                {job.costUsd !== null && <span className="text-sm text-ink-muted">Cost: ${job.costUsd.toFixed(2)}</span>}
+                {job.costUsd !== null && (
+                  <span className="text-sm text-ink-muted">
+                    {job.costFinal ? 'Cost' : 'Estimated cost'}: ${job.costUsd.toFixed(2)}
+                  </span>
+                )}
               </div>
             </div>
           ) : job.status === 'failed' ? (

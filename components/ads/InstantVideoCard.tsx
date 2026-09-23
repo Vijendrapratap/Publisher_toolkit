@@ -75,24 +75,33 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
 
   async function uploadMusic(file: File) {
     setUploading(true)
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch(`/api/ads/projects/${projectId}/music`, { method: 'POST', body: form })
-    const body = await res.json().catch(() => ({}))
-    setUploading(false)
-    if (!res.ok) {
-      toast.error(body.error ?? 'We couldn’t upload that file.')
-      return
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch(`/api/ads/projects/${projectId}/music`, { method: 'POST', body: form })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(body.error ?? 'We couldn’t upload that file.')
+        return
+      }
+      setMusic({ kind: 'upload', url: body.url, name: body.name })
+    } catch {
+      toast.error('We couldn’t upload that file.', { description: 'Check your connection and try again.' })
+    } finally {
+      setUploading(false)
     }
-    setMusic({ kind: 'upload', url: body.url, name: body.name })
   }
 
   function togglePreview() {
     const audio = audioRef.current
     if (!audio) return
-    if (playing) audio.pause()
-    else void audio.play()
-    setPlaying(!playing)
+    if (playing) {
+      audio.pause()
+      setPlaying(false)
+    } else {
+      setPlaying(true)
+      audio.play().catch(() => setPlaying(false))
+    }
   }
 
   const dirty = JSON.stringify(spec) !== JSON.stringify(saved)
@@ -134,7 +143,7 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
   async function exportVideo() {
     if (dirty && !(await save())) return
     setExporting(true)
-    const toastId = toast.loading('Rendering your video…', { description: 'This usually takes under a minute.' })
+    const toastId = toast.loading('Rendering your video…', { description: 'This can take a few minutes for longer videos.' })
     try {
       const res = await fetch(`/api/ads/projects/${projectId}/video/instant`, { method: 'POST' })
       const json = await res.json().catch(() => ({}))
