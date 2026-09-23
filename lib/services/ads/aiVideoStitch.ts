@@ -18,12 +18,17 @@ export function buildStitchArgs(input: StitchInput): string[] {
   const { width: w, height: h } = input
   const fit = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=30,setsar=1,format=yuv420p`
   // AI clips keep their source image's shape (a portrait cover stays portrait),
-  // so they sit whole inside the frame over a blurred fill of themselves.
+  // so they sit whole inside the frame over a blurred fill of themselves. The
+  // fill is downscaled before blurring (a cheap way to get a heavy blur — a
+  // boxblur radius alone can't erase letterforms at this size) and darkened
+  // slightly so it clearly reads as background, never as a second, ghosted copy.
   const fitOverBlur = (label: string, out: string) =>
     `${label}split[bg${out}][fg${out}];` +
-    `[bg${out}]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=24:2[bgb${out}];` +
+    `[bg${out}]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},` +
+    `scale=iw/8:ih/8,boxblur=8:3,scale=${w}:${h},eq=brightness=-0.12:saturation=0.9[bgb${out}];` +
     `[fg${out}]scale=${w}:${h}:force_original_aspect_ratio=decrease[fgs${out}];` +
     `[bgb${out}][fgs${out}]overlay=(W-w)/2:(H-h)/2,fps=30,setsar=1,format=yuv420p`
+  if (input.clips.length === 0) throw new Error('At least one clip is required')
   const args: string[] = ['-y']
   const filters: string[] = []
   const segments: { label: string; durationSec: number }[] = []

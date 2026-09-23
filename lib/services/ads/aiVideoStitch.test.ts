@@ -23,9 +23,18 @@ describe('buildStitchArgs', () => {
 
   it('keeps each whole clip inside the frame over a blurred fill, and overlays captions', () => {
     expect(graph).toContain('[0:v]split[bg0][fg0]')
-    expect(graph).toContain('[bg0]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,boxblur=24:2')
+    expect(graph).toContain(
+      '[bg0]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,' +
+        'scale=iw/8:ih/8,boxblur=8:3,scale=1920:1080,eq=brightness=-0.12:saturation=0.9'
+    )
     expect(graph).toContain('[fg0]scale=1920:1080:force_original_aspect_ratio=decrease')
     expect(graph).toContain('[s0][1:v]overlay=0:0')
+  })
+
+  it('throws when there are no clips', () => {
+    expect(() =>
+      buildStitchArgs({ clips: [], endCardPath: 'end.mp4', endCardSec: 3, width: 1920, height: 1080, outputPath: 'out.mp4' })
+    ).toThrow('At least one clip is required')
   })
   it('cross-fades clips into the end card at the right offsets', () => {
     expect(graph).toContain('xfade=transition=fade:duration=0.5:offset=4.50')
