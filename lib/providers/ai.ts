@@ -5,7 +5,7 @@ import type { ZodType } from 'zod'
 export const DEFAULT_PROCESSING_MODEL = 'deepseek/deepseek-v4.1-flash'
 export const DEFAULT_LANDING_MODEL = 'deepseek/deepseek-v4.1-flash'
 export const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image'
-export const DEFAULT_VIDEO_MODEL = 'google/veo-2'
+export const DEFAULT_VIDEO_MODEL = 'kwaivgi/kling-v3.0-std'
 
 /**
  * A publisher can bring their own OpenRouter account; the server key is the
@@ -124,8 +124,9 @@ export function getImageModelName(credentials?: AiCredentials): string {
   return credentials?.model?.trim() || process.env.OPENROUTER_IMAGE_MODEL || DEFAULT_IMAGE_MODEL
 }
 
-export function getVideoModelName(credentials?: AiCredentials): string {
-  return credentials?.model?.trim() || process.env.OPENROUTER_VIDEO_MODEL || DEFAULT_VIDEO_MODEL
+/** Never the publisher's text-model setting: a chat model cannot make video. */
+export function getVideoModelName(): string {
+  return process.env.OPENROUTER_VIDEO_MODEL || DEFAULT_VIDEO_MODEL
 }
 
 export interface GeneratedAiImage {
