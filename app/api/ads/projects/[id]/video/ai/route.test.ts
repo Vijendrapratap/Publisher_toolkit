@@ -21,6 +21,7 @@ vi.mock('@/lib/services/ads/aiVideoJob', async (importOriginal) => {
 import { GET, POST } from './route'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { getPublisherAiCredentials } from '@/lib/publisher/settings'
+import { getVideoModelInfo } from '@/lib/providers/aiVideo'
 import { prisma } from '@/lib/db'
 import { AiVideoUserError, advanceAiVideoJob, startAiVideoJob } from '@/lib/services/ads/aiVideoJob'
 
@@ -67,5 +68,23 @@ describe('GET /api/ads/projects/:id/video/ai', () => {
   it('returns no job when none exists', async () => {
     vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(null)
     expect((await (await GET(new Request('http://localhost'), ctx)).json()).job).toBeNull()
+  })
+
+  it('returns the stored job instead of a 500 when advancing it throws', async () => {
+    vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(jobRow as any)
+    vi.mocked(advanceAiVideoJob).mockRejectedValue(new Error('OpenRouter is unreachable'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await GET(new Request('http://localhost'), ctx)
+    expect(res.status).toBe(200)
+    expect((await res.json()).job).toMatchObject({ id: 'job_1', status: 'running' })
+    errorSpy.mockRestore()
+  })
+
+  it('does not 500 when the model info lookup fails', async () => {
+    vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(null)
+    vi.mocked(getVideoModelInfo).mockRejectedValueOnce(new Error('network blip'))
+    const res = await GET(new Request('http://localhost'), ctx)
+    expect(res.status).toBe(200)
+    expect((await res.json()).model).toBeNull()
   })
 })

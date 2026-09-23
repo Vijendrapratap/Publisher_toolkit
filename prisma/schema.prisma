@@ -231,6 +231,10 @@ model BookCreatorProject {
   @@index([publisherId])
 }
 
+/// Only one active (running/stitching) job per book is allowed: enforced by a
+/// partial unique index in migration 20260923140000_ai_video_one_active.
+/// Prisma's schema language can't express a partial index, so it lives in
+/// that migration's raw SQL only — not here.
 model AiVideoJob {
   id        String   @id @default(cuid())
   bookId    String

@@ -47,8 +47,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const apiKey = resolveApiKey(await getPublisherAiCredentials(publisherId))
   const latest = await prisma.aiVideoJob.findFirst({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } })
-  const job = latest && apiKey ? await advanceAiVideoJob(latest, book, apiKey, publisherId) : latest
-  const info = apiKey ? await getVideoModelInfo(getVideoModelName(), apiKey) : null
+  let job = latest
+  if (latest && apiKey) {
+    try {
+      job = await advanceAiVideoJob(latest, book, apiKey, publisherId)
+    } catch (err) {
+      // A poll failure must not break the panel's status display — show what's stored and retry next time.
+      console.error('ai video advance failed', err)
+      job = latest
+    }
+  }
+  const info = apiKey ? await getVideoModelInfo(getVideoModelName(), apiKey).catch(() => null) : null
 
   return NextResponse.json({
     job: job ? summarizeJob(job) : null,

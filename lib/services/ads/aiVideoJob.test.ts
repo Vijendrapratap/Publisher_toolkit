@@ -26,7 +26,7 @@ vi.mock('@/lib/providers/storage', () => ({
   readStoredFile: vi.fn(async () => ({ data: Buffer.from('clip'), contentType: 'video/mp4' })),
 }))
 vi.mock('./videoAssets', () => ({
-  inlineImage: vi.fn(async (u: string | null) => (u ? `data:${u}` : null)),
+  inlineImage: vi.fn(async (u: string | null | undefined) => (u ? `data:${u}` : null)),
   musicFile: vi.fn(async () => '/app/public/music/epic.mp3'),
 }))
 vi.mock('./renderVideo', () => ({
@@ -42,6 +42,7 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
 import { prisma } from '@/lib/db'
 import { getVideoJob, getVideoModelInfo, submitVideoJob, downloadVideoJob } from '@/lib/providers/aiVideo'
 import { stitchAiVideo } from './aiVideoStitch'
+import { inlineImage } from './videoAssets'
 import { AiVideoUserError, advanceAiVideoJob, startAiVideoJob, summarizeJob } from './aiVideoJob'
 
 const book: any = {
@@ -57,11 +58,17 @@ const brief: AiVideoBrief = {
 }
 const kling = { id: 'kwaivgi/kling-v3.0-std', durations: [3, 5, 10], aspectRatios: ['16:9', '9:16', '1:1'], resolutions: ['720p'], pricePerSecond: 0.084 }
 
+const STITCHING_STALE_MS = 10 * 60 * 1000
+const RUNNING_STALE_MS = 60 * 60 * 1000
+const staleDate = (ms: number) => new Date(Date.now() - ms)
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(null)
   vi.mocked(getVideoModelInfo).mockResolvedValue(kling)
   vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
+  // Reassert the default so a test that overrides it (below) can't leak into the next one.
+  vi.mocked(inlineImage).mockImplementation(async (u: string | null | undefined) => (u ? `data:${u}` : null))
 })
 
 describe('startAiVideoJob', () => {
@@ -83,10 +90,59 @@ describe('startAiVideoJob', () => {
     vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue({ id: 'old' } as any)
     await expect(startAiVideoJob(book, brief, 'sk')).rejects.toBeInstanceOf(AiVideoUserError)
   })
+
+  it("resolves every shot's image before spending anything, so a missing image submits nothing", async () => {
+    vi.mocked(inlineImage).mockImplementation(async (u: string | null | undefined) => (u === book.frontCoverUrl ? null : `data:${u}`))
+    await expect(startAiVideoJob(book, brief, 'sk')).rejects.toBeInstanceOf(AiVideoUserError)
+    expect(submitVideoJob).not.toHaveBeenCalled()
+    expect(prisma.aiVideoJob.create).not.toHaveBeenCalled()
+  })
+
+  it('creates the job row before the first submit and persists each jobId as it comes back', async () => {
+    await startAiVideoJob(book, brief, 'sk')
+    const createOrder = vi.mocked(prisma.aiVideoJob.create).mock.invocationCallOrder[0]
+    const firstSubmitOrder = vi.mocked(submitVideoJob).mock.invocationCallOrder[0]
+    expect(createOrder).toBeLessThan(firstSubmitOrder)
+
+    const updateCalls = vi.mocked(prisma.aiVideoJob.update).mock.calls
+    expect(updateCalls[0][0]).toEqual(
+      expect.objectContaining({ data: expect.objectContaining({ shots: [{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }] }) })
+    )
+    expect(updateCalls[1][0]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          shots: [
+            { jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null },
+            { jobId: 'or_2', durationSec: 5, status: 'pending', clipUrl: null },
+          ],
+        }),
+      })
+    )
+  })
+
+  it('maps a duplicate active job at the database level to the same friendly error', async () => {
+    vi.mocked(prisma.aiVideoJob.create).mockRejectedValueOnce(Object.assign(new Error('Unique constraint failed on the fields: (`bookId`)'), { code: 'P2002' }))
+    await expect(startAiVideoJob(book, brief, 'sk')).rejects.toBeInstanceOf(AiVideoUserError)
+    expect(submitVideoJob).not.toHaveBeenCalled()
+  })
+
+  it('fails stale running/stitching rows before creating, so a retry after a stuck job succeeds', async () => {
+    const job = await startAiVideoJob(book, brief, 'sk')
+    expect(prisma.aiVideoJob.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ bookId: 'book_1' }), data: expect.objectContaining({ status: 'failed' }) })
+    )
+    const clearOrder = vi.mocked(prisma.aiVideoJob.updateMany).mock.invocationCallOrder[0]
+    const createOrder = vi.mocked(prisma.aiVideoJob.create).mock.invocationCallOrder[0]
+    expect(clearOrder).toBeLessThan(createOrder)
+    expect(submitVideoJob).toHaveBeenCalledTimes(2)
+    expect(job.costUsd).toBe(0.84)
+  })
 })
 
 describe('advanceAiVideoJob', () => {
-  const running = (shots: any[]): any => ({ id: 'job_1', bookId: 'book_1', status: 'running', format: '16:9', brief, shots, model: 'm' })
+  const running = (shots: any[], overrides: Partial<any> = {}): any => ({
+    id: 'job_1', bookId: 'book_1', status: 'running', format: '16:9', brief, shots, model: 'm', updatedAt: new Date(), ...overrides,
+  })
 
   it('records progress while shots are still rendering', async () => {
     vi.mocked(getVideoJob).mockResolvedValue({ status: 'in_progress' })
@@ -120,6 +176,67 @@ describe('advanceAiVideoJob', () => {
     const job = await advanceAiVideoJob(running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }]), book, 'sk', 'pub_1')
     expect(job.status).toBe('failed')
     expect(job.error).toBe('content policy')
+  })
+
+  it("does not let one shot's poll error fail the whole advance", async () => {
+    vi.mocked(getVideoJob).mockImplementation(async (_apiKey: string, id: string) => {
+      if (id === 'or_1') throw new Error('network blip')
+      return { status: 'in_progress' }
+    })
+    const job = await advanceAiVideoJob(
+      running([
+        { jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null },
+        { jobId: 'or_2', durationSec: 5, status: 'pending', clipUrl: null },
+      ]),
+      book, 'sk', 'pub_1'
+    )
+    expect((job.shots as any)[0].status).toBe('pending')
+    expect((job.shots as any)[1].status).toBe('in_progress')
+  })
+
+  it('marks a shot failed when OpenRouter no longer has its job (404)', async () => {
+    vi.mocked(getVideoJob).mockRejectedValue(new Error('Could not check the video job (HTTP 404).'))
+    const job = await advanceAiVideoJob(running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }]), book, 'sk', 'pub_1')
+    expect(job.status).toBe('failed')
+    expect((job.shots as any)[0].status).toBe('failed')
+  })
+
+  it('reclaims a stale stitching job and re-stitches the already-downloaded clips', async () => {
+    const job = await advanceAiVideoJob(
+      running(
+        [
+          { jobId: 'or_1', durationSec: 5, status: 'completed', clipUrl: '/api/files/clip1.mp4', costUsd: 0.42 },
+          { jobId: 'or_2', durationSec: 5, status: 'completed', clipUrl: '/api/files/clip2.mp4', costUsd: 0.42 },
+        ],
+        { status: 'stitching', updatedAt: staleDate(STITCHING_STALE_MS + 1000) }
+      ),
+      book, 'sk', 'pub_1'
+    )
+    expect(prisma.aiVideoJob.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: 'job_1', status: 'stitching' }), data: { status: 'running' } })
+    )
+    expect(getVideoJob).not.toHaveBeenCalled()
+    expect(stitchAiVideo).toHaveBeenCalled()
+    expect(job.status).toBe('completed')
+  })
+
+  it('leaves a stitching job alone while it is still within the grace window', async () => {
+    const job = await advanceAiVideoJob(
+      running([{ jobId: 'or_1', durationSec: 5, status: 'completed', clipUrl: '/x.mp4' }], { status: 'stitching', updatedAt: staleDate(1000) }),
+      book, 'sk', 'pub_1'
+    )
+    expect(job.status).toBe('stitching')
+    expect(stitchAiVideo).not.toHaveBeenCalled()
+  })
+
+  it('fails a stale running job that made no progress, without polling', async () => {
+    const job = await advanceAiVideoJob(
+      running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { updatedAt: staleDate(RUNNING_STALE_MS + 1000) }),
+      book, 'sk', 'pub_1'
+    )
+    expect(job.status).toBe('failed')
+    expect(job.error).toMatch(/took too long/)
+    expect(getVideoJob).not.toHaveBeenCalled()
   })
 })
 
