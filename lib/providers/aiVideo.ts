@@ -4,6 +4,17 @@
  */
 const BASE = 'https://openrouter.ai/api/v1'
 
+/** A non-OK response from OpenRouter's video API; callers branch on `status` (e.g. 404 means "gone"). */
+export class OpenRouterHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message)
+    this.name = 'OpenRouterHttpError'
+  }
+}
+
 export interface VideoModelInfo {
   id: string
   durations: number[]
@@ -99,7 +110,7 @@ export async function submitVideoJob(input: {
   })
   const body = (await res.json().catch(() => ({}))) as { id?: string; error?: unknown }
   if (!res.ok || !body.id) {
-    throw new Error(errorMessage(body.error) ?? `The video model rejected the request (HTTP ${res.status}).`)
+    throw new OpenRouterHttpError(errorMessage(body.error) ?? `The video model rejected the request (HTTP ${res.status}).`, res.status)
   }
   return body.id
 }
@@ -112,7 +123,7 @@ export async function getVideoJob(apiKey: string, id: string): Promise<{ status:
     signal: AbortSignal.timeout(15_000),
   })
   const body = (await res.json().catch(() => ({}))) as { status?: VideoJobStatus; error?: unknown; usage?: { cost?: number } }
-  if (!res.ok) throw new Error(errorMessage(body.error) ?? `Could not check the video job (HTTP ${res.status}).`)
+  if (!res.ok) throw new OpenRouterHttpError(errorMessage(body.error) ?? `Could not check the video job (HTTP ${res.status}).`, res.status)
   return { status: body.status ?? 'pending', error: errorMessage(body.error), costUsd: body.usage?.cost }
 }
 
@@ -121,6 +132,6 @@ export async function downloadVideoJob(apiKey: string, id: string): Promise<Buff
     headers: { Authorization: `Bearer ${apiKey}` },
     signal: AbortSignal.timeout(120_000),
   })
-  if (!res.ok) throw new Error(`Could not download the generated clip (HTTP ${res.status}).`)
+  if (!res.ok) throw new OpenRouterHttpError(`Could not download the generated clip (HTTP ${res.status}).`, res.status)
   return Buffer.from(await res.arrayBuffer())
 }

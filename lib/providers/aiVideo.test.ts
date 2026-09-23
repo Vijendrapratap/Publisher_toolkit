@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { getVideoJob, getVideoModelInfo, pickDuration, pickResolution, pricePerSecond, submitVideoJob } from './aiVideo'
+import { downloadVideoJob, getVideoJob, getVideoModelInfo, OpenRouterHttpError, pickDuration, pickResolution, pricePerSecond, submitVideoJob } from './aiVideo'
 
 const fetchMock = vi.fn()
 beforeEach(() => vi.stubGlobal('fetch', fetchMock))
@@ -56,9 +56,12 @@ describe('submitVideoJob', () => {
     })
     expect(init.headers.Authorization).toBe('Bearer k')
   })
-  it("surfaces the provider's error message", async () => {
+  it("surfaces the provider's error message as a typed HTTP error carrying the status", async () => {
     fetchMock.mockResolvedValue(json({ error: { message: 'aspect_ratio 1:1 is not supported' } }, 400))
-    await expect(submitVideoJob({ apiKey: 'k', model: 'm', prompt: 'p', imageUrl: 'x', durationSec: 5, aspectRatio: '1:1' })).rejects.toThrow('aspect_ratio 1:1 is not supported')
+    const err: unknown = await submitVideoJob({ apiKey: 'k', model: 'm', prompt: 'p', imageUrl: 'x', durationSec: 5, aspectRatio: '1:1' }).catch((e) => e)
+    expect(err).toBeInstanceOf(OpenRouterHttpError)
+    expect((err as OpenRouterHttpError).status).toBe(400)
+    expect((err as OpenRouterHttpError).message).toBe('aspect_ratio 1:1 is not supported')
   })
 })
 
@@ -66,5 +69,25 @@ describe('getVideoJob', () => {
   it('maps status, error and cost', async () => {
     fetchMock.mockResolvedValue(json({ id: 'job_1', status: 'completed', usage: { cost: 0.42 } }))
     expect(await getVideoJob('k', 'job_1')).toEqual({ status: 'completed', error: undefined, costUsd: 0.42 })
+  })
+  it('throws a typed HTTP error carrying the status on a JSON error body', async () => {
+    fetchMock.mockResolvedValue(json({ error: { message: 'job not found' } }, 404))
+    const err: unknown = await getVideoJob('k', 'job_1').catch((e) => e)
+    expect(err).toBeInstanceOf(OpenRouterHttpError)
+    expect((err as OpenRouterHttpError).status).toBe(404)
+    expect((err as OpenRouterHttpError).message).toBe('job not found')
+  })
+})
+
+describe('downloadVideoJob', () => {
+  it('downloads the clip bytes', async () => {
+    fetchMock.mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200 }))
+    expect(await downloadVideoJob('k', 'job_1')).toEqual(Buffer.from([1, 2, 3]))
+  })
+  it('throws a typed HTTP error carrying the status on failure', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 404 }))
+    const err: unknown = await downloadVideoJob('k', 'job_1').catch((e) => e)
+    expect(err).toBeInstanceOf(OpenRouterHttpError)
+    expect((err as OpenRouterHttpError).status).toBe(404)
   })
 })

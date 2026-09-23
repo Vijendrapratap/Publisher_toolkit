@@ -10,6 +10,7 @@ import {
   downloadVideoJob,
   getVideoJob,
   getVideoModelInfo,
+  OpenRouterHttpError,
   pickDuration,
   pickResolution,
   submitVideoJob,
@@ -47,9 +48,17 @@ const json = (value: unknown) => value as Prisma.InputJsonValue
 
 /** A stitch that dies (crash, restart, OOM) leaves the row here forever otherwise. */
 const STITCHING_STALE_MS = 10 * 60 * 1000
-/** A shot that never reports back (or a poller nobody keeps calling) leaves the row here forever otherwise. */
-const RUNNING_STALE_MS = 60 * 60 * 1000
-const TIMEOUT_MESSAGE = 'The AI video took too long. Generate again.'
+/**
+ * From `createdAt`, never `updatedAt` — every poll refreshes `updatedAt`, which
+ * would mean this never fires while the panel is being watched. Only applies
+ * once shots remain unfinished AFTER this round's poll: a job whose shots all
+ * just finished is always stitched, however old.
+ */
+const RUNNING_TIMEOUT_MS = 60 * 60 * 1000
+/** How long `startAiVideoJob`'s own submit loop is allowed to still be mid-flight. */
+const SUBMIT_TIMEOUT_MS = 10 * 60 * 1000
+const RUNNING_TIMEOUT_MESSAGE = 'The AI video took too long. Generate again.'
+const SUBMIT_TIMEOUT_MESSAGE = 'Starting the AI video was interrupted. Generate again.'
 const ALREADY_RUNNING_MESSAGE = 'An AI video is already being made for this book. Wait for it to finish.'
 
 function sourceImageUrl(book: Book, key: string): string | null {
@@ -62,37 +71,18 @@ function isUniqueConstraintError(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002'
 }
 
-function isNotFoundError(err: unknown): boolean {
-  return err instanceof Error && /\b404\b/.test(err.message)
-}
-
 export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: string): Promise<AiVideoJob> {
-  const now = Date.now()
-  const runningCutoff = new Date(now - RUNNING_STALE_MS)
-  const stitchingCutoff = new Date(now - STITCHING_STALE_MS)
-  const activeWhere = {
-    bookId: book.id,
-    OR: [
-      { status: 'running', updatedAt: { gte: runningCutoff } },
-      { status: 'stitching', updatedAt: { gte: stitchingCutoff } },
-    ],
+  // If a job is already active, give it one chance to resolve on its own
+  // (it may just be stuck and about to be reclaimed/timed out) instead of
+  // failing it ourselves — a directly-failed row would throw away paid work
+  // advanceAiVideoJob would otherwise have finished and billed correctly.
+  const active = await prisma.aiVideoJob.findFirst({ where: { bookId: book.id, status: { in: ['running', 'stitching'] } } })
+  if (active) {
+    const advanced = await advanceAiVideoJob(active, book, apiKey, book.publisherId)
+    if (advanced.status === 'running' || advanced.status === 'stitching') {
+      throw new AiVideoUserError(ALREADY_RUNNING_MESSAGE)
+    }
   }
-
-  const active = await prisma.aiVideoJob.findFirst({ where: activeWhere })
-  if (active) throw new AiVideoUserError(ALREADY_RUNNING_MESSAGE)
-
-  // A stale row never finished on its own; fail it so it doesn't block the
-  // one-active-job-per-book unique index from letting this retry insert.
-  await prisma.aiVideoJob.updateMany({
-    where: {
-      bookId: book.id,
-      OR: [
-        { status: 'running', updatedAt: { lt: runningCutoff } },
-        { status: 'stitching', updatedAt: { lt: stitchingCutoff } },
-      ],
-    },
-    data: { status: 'failed', error: TIMEOUT_MESSAGE },
-  })
 
   const model = getVideoModelName()
   const spec = readVideoSpec(book.videoSpec, bookVideoSource(book))
@@ -137,6 +127,11 @@ export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: s
   const resolution = pickResolution(info?.resolutions ?? [])
   try {
     for (const shot of prepared) {
+      // Something else (a concurrent poll's SUBMIT_TIMEOUT, e.g.) may have
+      // already given up on this row; don't keep spending against it.
+      const current = await prisma.aiVideoJob.findUnique({ where: { id: job.id } })
+      if (!current || current.status !== 'running') throw new AiVideoUserError(SUBMIT_TIMEOUT_MESSAGE)
+
       const jobId = await submitVideoJob({
         apiKey,
         model,
@@ -165,26 +160,38 @@ export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: s
 
 async function pollShot(shot: ShotState, i: number, apiKey: string, dir: string): Promise<void> {
   if (shot.status === 'completed' || shot.status === 'failed') return
+
+  let remote: Awaited<ReturnType<typeof getVideoJob>>
   try {
-    const remote = await getVideoJob(apiKey, shot.jobId)
-    if (remote.costUsd !== undefined) shot.costUsd = remote.costUsd
-    if (remote.status === 'completed') {
+    remote = await getVideoJob(apiKey, shot.jobId)
+  } catch (err) {
+    // A clip OpenRouter has lost track of can never complete; anything else
+    // (a network blip, a timeout) is retried on the next poll.
+    if (err instanceof OpenRouterHttpError && err.status === 404) {
+      shot.status = 'failed'
+      shot.error = 'The video model no longer has this clip.'
+    }
+    return
+  }
+
+  if (remote.costUsd !== undefined) shot.costUsd = remote.costUsd
+
+  if (remote.status === 'completed') {
+    try {
       const clip = await downloadVideoJob(apiKey, shot.jobId)
       shot.clipUrl = (await storeFile(`${dir}/shot-${i + 1}.mp4`, clip, 'video/mp4')).url
       shot.status = 'completed'
-    } else if (remote.status === 'failed' || remote.status === 'cancelled' || remote.status === 'expired') {
-      shot.status = 'failed'
-      shot.error = remote.error ?? `The video model reported “${remote.status}”.`
-    } else {
-      shot.status = remote.status === 'in_progress' ? 'in_progress' : 'pending'
+    } catch {
+      // The clip is done and paid for but not fetched yet (or a blip while
+      // fetching it) — retry the download next poll rather than fail a shot
+      // OpenRouter says succeeded. RUNNING_TIMEOUT_MS bounds how long this can drag on.
+      shot.status = 'in_progress'
     }
-  } catch (err) {
-    // A shot that OpenRouter has lost track of can never complete; anything
-    // else (a network blip, a timeout) is retried on the next poll.
-    if (isNotFoundError(err)) {
-      shot.status = 'failed'
-      shot.error = 'The video model no longer has this job.'
-    }
+  } else if (remote.status === 'failed' || remote.status === 'cancelled' || remote.status === 'expired') {
+    shot.status = 'failed'
+    shot.error = remote.error ?? `The video model reported “${remote.status}”.`
+  } else {
+    shot.status = remote.status === 'in_progress' ? 'in_progress' : 'pending'
   }
 }
 
@@ -205,12 +212,19 @@ export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: str
 
   if (job.status !== 'running') return job
 
-  if (now - job.updatedAt.getTime() > RUNNING_STALE_MS) {
-    return prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'failed', error: TIMEOUT_MESSAGE } })
-  }
-
+  const brief = job.brief as unknown as AiVideoBrief
   const shots = job.shots as unknown as ShotState[]
   const dir = `ads/${publisherId}/ai-video/${job.id}`
+
+  // startAiVideoJob's own submit loop hasn't finished yet — nothing to poll.
+  // Only give up if it's been stuck implausibly long (a genuine crash
+  // mid-submit), never just because the loop is still going.
+  if (shots.length < brief.shots.length) {
+    if (now - job.createdAt.getTime() > SUBMIT_TIMEOUT_MS) {
+      return prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'failed', error: SUBMIT_TIMEOUT_MESSAGE } })
+    }
+    return job
+  }
 
   await Promise.all(shots.map((shot, i) => pollShot(shot, i, apiKey, dir)))
 
@@ -218,11 +232,19 @@ export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: str
   if (failed) {
     return prisma.aiVideoJob.update({ where: { id: job.id }, data: { shots: json(shots), status: 'failed', error: failed.error } })
   }
+
   if (!shots.every((s) => s.status === 'completed')) {
+    // Only now — after this round's poll found shots still unfinished — does
+    // the running timeout apply. A job whose shots just finished never hits
+    // this branch at all, however old the row is.
+    if (now - job.createdAt.getTime() > RUNNING_TIMEOUT_MS) {
+      return prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'failed', error: RUNNING_TIMEOUT_MESSAGE } })
+    }
     // Never overwrite a row another poll has already claimed (e.g. moved to stitching).
     await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'running' }, data: { shots: json(shots) } })
     return (await prisma.aiVideoJob.findUnique({ where: { id: job.id } })) ?? job
   }
+
   // Every shot is billed now: replace the estimate with the real total.
   const billed = shots.every((s) => s.costUsd !== undefined)
     ? Math.round(shots.reduce((t, s) => t + (s.costUsd ?? 0), 0) * 100) / 100
@@ -237,13 +259,15 @@ export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: str
 
   try {
     const { videoUrl, posterUrl } = await stitchJob(job, shots, book, dir)
-    return prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'completed', videoUrl, posterUrl } })
+    // Guarded: a reclaim that fired mid-stitch must not have its `completed`
+    // write clobber whatever that reclaim already decided.
+    await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'stitching' }, data: { status: 'completed', videoUrl, posterUrl } })
+    return (await prisma.aiVideoJob.findUnique({ where: { id: job.id } })) ?? { ...job, status: 'completed', videoUrl, posterUrl }
   } catch (err) {
     console.error('ai video stitch failed', err)
-    return prisma.aiVideoJob.update({
-      where: { id: job.id },
-      data: { status: 'failed', error: err instanceof Error ? err.message : 'Putting the video together failed.' },
-    })
+    const message = err instanceof Error ? err.message : 'Putting the video together failed.'
+    await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'stitching' }, data: { status: 'failed', error: message } })
+    return (await prisma.aiVideoJob.findUnique({ where: { id: job.id } })) ?? { ...job, status: 'failed', error: message }
   }
 }
 
