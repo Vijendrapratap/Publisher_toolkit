@@ -161,7 +161,7 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
   }
 
   return (
-    <section aria-labelledby="instant-video-title" className="rounded-3xl border border-instant/30 bg-instant-soft p-5 shadow-card sm:p-6">
+    <section aria-labelledby="instant-video-title" className="rounded-3xl border border-instant/20 bg-instant-soft p-5 shadow-card sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="grid size-9 place-items-center rounded-xl bg-instant text-canvas">

@@ -21,6 +21,7 @@ export interface AiVideoPanelProps {
   coverUrl: string | null
   pageUrls: string[]
   initialBrief: AiVideoBrief | null
+  initialJob: AiVideoJobSummary | null
 }
 
 const ACTIVE = new Set(['running', 'stitching'])
@@ -35,13 +36,13 @@ const inputClass =
   'w-full min-w-0 rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none transition focus:border-ai focus:ring-2 focus:ring-ai/25'
 const labelClass = 'flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wider text-ink-muted'
 
-export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: AiVideoPanelProps) {
+export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief, initialJob }: AiVideoPanelProps) {
   const [open, setOpen] = useState(false)
   const [brief, setBrief] = useState<AiVideoBrief | null>(initialBrief)
   const [instruction, setInstruction] = useState('')
   const [writing, setWriting] = useState(false)
   const [starting, setStarting] = useState(false)
-  const [job, setJob] = useState<AiVideoJobSummary | null>(null)
+  const [job, setJob] = useState<AiVideoJobSummary | null>(initialJob)
   const [model, setModel] = useState<ModelInfo | null>(null)
   const [aiConfigured, setAiConfigured] = useState(true)
 
@@ -159,28 +160,68 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
   if (!open) {
     const inProgress = Boolean(job && ACTIVE.has(job.status))
     const ready = job?.status === 'completed'
+
+    // A finished video is the point of this panel: show it without making the
+    // publisher open anything.
+    if (ready && job?.videoUrl) {
+      return (
+        <section aria-labelledby="ai-video-ready-title" className="rounded-3xl border border-ai/20 bg-ai-soft p-5 shadow-card sm:p-6">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="grid size-9 place-items-center rounded-xl bg-ai text-canvas">
+                <Clapperboard className="size-5" aria-hidden />
+              </span>
+              <div>
+                <h3 id="ai-video-ready-title" className="font-display text-lg font-semibold text-ink">AI Video</h3>
+                <p className="text-sm text-ink-muted">
+                  Made from your cover and pages
+                  {job.costUsd !== null ? ` · ${job.costFinal ? 'cost' : 'estimated cost'} $${job.costUsd.toFixed(2)}` : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <a href={job.videoUrl} download="ai-video-ad.mp4" className={cn(buttonClasses({ size: 'sm' }), 'bg-ai text-canvas hover:bg-ai/90')}>
+                <Download className="size-3.5" aria-hidden /> Download AI video
+              </a>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+                <Wand2 className="size-3.5" aria-hidden /> Edit &amp; regenerate
+              </Button>
+            </div>
+          </header>
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            poster={job.posterUrl ?? undefined}
+            src={job.videoUrl}
+            className="mt-4 max-h-[60vh] w-full rounded-2xl bg-black object-contain"
+          />
+        </section>
+      )
+    }
+
     return (
-      <div className="flex flex-col items-start gap-2 rounded-3xl border border-ai/30 bg-ai-soft p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col items-start gap-2 rounded-3xl border border-ai/20 bg-ai-soft p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
             {inProgress && <Loader2 className="size-4 animate-spin text-ai" aria-hidden />}
             {inProgress ? 'Your AI video is being made…' : ready ? 'Your AI video is ready' : 'Want something more cinematic?'}
           </p>
           <p className="text-sm text-ink-muted">
-            {inProgress || ready
-              ? 'Open the panel to see it.'
+            {inProgress
+              ? 'Each shot takes a few minutes. You can keep working.'
               : 'An AI video made from your cover and pages. You review and edit the prompt first.'}
           </p>
         </div>
         <Button type="button" onClick={() => setOpen(true)} className="bg-ai text-canvas hover:bg-ai/90">
-          <Sparkles className="size-4" aria-hidden /> {inProgress || ready ? 'Open AI video' : 'Generate with AI'}
+          <Sparkles className="size-4" aria-hidden /> {inProgress ? 'View progress' : 'Generate with AI'}
         </Button>
       </div>
     )
   }
 
   return (
-    <section aria-labelledby="ai-video-title" className="rounded-3xl border border-ai/30 bg-ai-soft p-5 shadow-card sm:p-6">
+    <section aria-labelledby="ai-video-title" className="rounded-3xl border border-ai/20 bg-ai-soft p-5 shadow-card sm:p-6">
       <header className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="grid size-9 place-items-center rounded-xl bg-ai text-canvas">

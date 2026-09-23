@@ -14,6 +14,8 @@ import { InstantVideoCard } from '@/components/ads/InstantVideoCard'
 import { AiVideoPanel } from '@/components/ads/AiVideoPanel'
 import { bookVideoSource, readVideoSpec } from '@/lib/services/ads/videoSpec'
 import { aiVideoBriefSchema } from '@/lib/services/ads/aiVideoBriefSchema'
+import { summarizeJob } from '@/lib/services/ads/aiVideoJob'
+import { prisma } from '@/lib/db'
 
 export default async function ResultsStepPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params
@@ -35,6 +37,8 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
   const trailerMissing = book.includeVideo !== false && !set.videoUrl
   const videoSpec = readVideoSpec(book.videoSpec, bookVideoSource(book))
   const savedBrief = aiVideoBriefSchema.safeParse(book.aiVideoBrief)
+  // Loaded here so a finished AI video is on the page immediately, not after a client fetch.
+  const latestAiJob = await prisma.aiVideoJob.findFirst({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } })
 
   return (
     <div className="flex flex-col gap-6">
@@ -86,6 +90,7 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
             coverUrl={book.frontCoverUrl}
             pageUrls={book.interiorImageUrls}
             initialBrief={savedBrief.success ? savedBrief.data : null}
+            initialJob={latestAiJob ? summarizeJob(latestAiJob) : null}
           />
         </>
       )}
