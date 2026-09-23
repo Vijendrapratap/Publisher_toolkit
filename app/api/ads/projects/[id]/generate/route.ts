@@ -87,9 +87,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         const spec = readVideoSpec(book.videoSpec, bookVideoSource(book))
         const video = await renderAdVideo({
           spec,
-          title: details.title,
+          title: details.title || 'Untitled book',
           author: details.author,
-          musicSrc: await inlineMusic(resolveMusic(spec)),
+          musicSrc: await inlineMusic(resolveMusic(spec), publisherId),
           ...(await adVideoImages(book)),
         })
 

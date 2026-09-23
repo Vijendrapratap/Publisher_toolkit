@@ -28,6 +28,7 @@ vi.mock('@/lib/db', () => ({ prisma: { creativeSet: { update: vi.fn().mockResolv
 import { POST } from './route'
 import { getBookForPublisher, getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
 import { AdVideoRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
+import { inlineMusic } from '@/lib/services/ads/videoAssets'
 import { prisma } from '@/lib/db'
 
 const ctx = { params: Promise.resolve({ id: 'book_1' }) }
@@ -55,6 +56,11 @@ describe('POST /api/ads/projects/:id/video/instant', () => {
       where: { id: 'set_1' },
       data: { videoUrl: json.videoUrl, videoPosterUrl: json.videoPosterUrl, videoDuration: 15 },
     })
+  })
+
+  it('resolves music scoped to the requesting publisher, never another one’s upload', async () => {
+    await POST(req(), ctx)
+    expect(inlineMusic).toHaveBeenCalledWith(expect.anything(), 'pub_1')
   })
 
   it('asks for a generated campaign first', async () => {

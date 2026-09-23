@@ -24,7 +24,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       spec,
       title: book.title ?? 'Untitled book',
       author: book.author ?? '',
-      musicSrc: await inlineMusic(resolveMusic(spec)),
+      musicSrc: await inlineMusic(resolveMusic(spec), publisherId),
       ...(await adVideoImages(book)),
     })
 

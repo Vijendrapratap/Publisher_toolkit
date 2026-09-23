@@ -35,6 +35,8 @@ vi.mock('@/lib/db', () => ({
 import { POST } from './route'
 import { generateAdCopy } from '@/lib/services/ads/copy'
 import { renderCreativeImages } from '@/lib/services/ads/render'
+import { renderAdVideo } from '@/lib/services/ads/renderVideo'
+import { inlineMusic } from '@/lib/services/ads/videoAssets'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { prisma } from '@/lib/db'
 
@@ -119,5 +121,18 @@ describe('POST /api/ads/projects/:id/generate', () => {
   it('returns 400 when the book has no cover image', async () => {
     vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, frontCoverUrl: null } as any)
     expect((await POST(new Request('http://localhost'), ctx('book_1'))).status).toBe(400)
+  })
+
+  it('resolves music scoped to the requesting publisher, never another one’s upload', async () => {
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
+    await POST(new Request('http://localhost'), ctx('book_1'))
+    expect(inlineMusic).toHaveBeenCalledWith(expect.anything(), 'pub_1')
+  })
+
+  it('falls back to "Untitled book" for the video title, like the other video routes', async () => {
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, title: '' } as any)
+    await POST(new Request('http://localhost'), ctx('book_1'))
+    expect(renderAdVideo).toHaveBeenCalledWith(expect.objectContaining({ title: 'Untitled book' }))
   })
 })

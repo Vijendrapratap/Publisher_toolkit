@@ -13,7 +13,7 @@ import { PATCH } from './route'
 import { prisma } from '@/lib/db'
 import { storeFile } from '@/lib/providers/storage'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
-import { defaultVideoSpec } from '@/lib/services/ads/videoSpec'
+import { defaultVideoSpec, presetStyle } from '@/lib/services/ads/videoSpec'
 
 function ctx(id: string) {
   return { params: Promise.resolve({ id }) }
@@ -151,5 +151,81 @@ describe('PATCH /api/ads/projects/:id', () => {
   it('accepts every length the configure form offers', async () => {
     const res = await PATCH(jsonRequest({ videoLength: '20s' }), ctx('book_1'))
     expect(res.status).toBe(200)
+  })
+
+  describe('re-deriving a saved videoSpec from configure-page fields', () => {
+    const savedSpec = defaultVideoSpec({ title: 'T' })
+
+    it('merges a changed format into the saved spec, alongside the column', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec } as any)
+      const res = await PATCH(jsonRequest({ videoFormat: '9:16' }), ctx('book_1'))
+      expect(res.status).toBe(200)
+      const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
+      expect(call.data.videoFormat).toBe('9:16')
+      expect(call.data.videoSpec).toMatchObject({ ...savedSpec, format: '9:16' })
+    })
+
+    it('maps style/hook/cta onto the preset palette and script, clipped to the spec limits', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec } as any)
+      const res = await PATCH(jsonRequest({ videoStyle: 'fantasy', customHook: 'A brand new hook', ctaText: 'Buy now' }), ctx('book_1'))
+      expect(res.status).toBe(200)
+      const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
+      expect(call.data.videoSpec.style).toEqual(presetStyle('fantasy'))
+      expect(call.data.videoSpec.script.hook).toBe('A brand new hook')
+      expect(call.data.videoSpec.script.cta).toBe('Buy now')
+      // Untouched script fields survive the merge.
+      expect(call.data.videoSpec.script.storyLine).toBe(savedSpec.script.storyLine)
+    })
+
+    it('ignores an empty customHook/ctaText rather than blanking the saved script', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec } as any)
+      const res = await PATCH(jsonRequest({ customHook: '', ctaText: '' }), ctx('book_1'))
+      expect(res.status).toBe(200)
+      const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
+      expect(call.data.videoSpec.script.hook).toBe(savedSpec.script.hook)
+      expect(call.data.videoSpec.script.cta).toBe(savedSpec.script.cta)
+    })
+
+    it('leaves the spec untouched when the update has no video fields', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec } as any)
+      const res = await PATCH(jsonRequest({ title: 'New title' }), ctx('book_1'))
+      expect(res.status).toBe(200)
+      const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
+      expect(call.data).not.toHaveProperty('videoSpec')
+    })
+
+    it('does not touch the spec when the book has none saved yet', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: null } as any)
+      const res = await PATCH(jsonRequest({ videoFormat: '9:16' }), ctx('book_1'))
+      expect(res.status).toBe(200)
+      const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
+      expect(call.data).not.toHaveProperty('videoSpec')
+    })
+
+    it('does not re-derive when the update already sends its own videoSpec', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec } as any)
+      const explicitSpec = { ...savedSpec, format: '1:1' as const }
+      const res = await PATCH(jsonRequest({ videoFormat: '9:16', videoSpec: explicitSpec }), ctx('book_1'))
+      expect(res.status).toBe(200)
+      const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
+      expect(call.data.videoSpec).toEqual(explicitSpec)
+    })
+  })
+
+  describe('uploaded music ownership', () => {
+    it('rejects a video spec whose uploaded music does not belong to this publisher', async () => {
+      const spec = defaultVideoSpec({ title: 'T' })
+      spec.music = { kind: 'upload', url: '/api/files/ads/someone-else/music/track.mp3', name: 'track.mp3' }
+      const res = await PATCH(jsonRequest({ videoSpec: spec }), ctx('book_1'))
+      expect(res.status).toBe(400)
+      expect(prisma.book.update).not.toHaveBeenCalled()
+    })
+
+    it('accepts uploaded music that does belong to this publisher', async () => {
+      const spec = defaultVideoSpec({ title: 'T' })
+      spec.music = { kind: 'upload', url: '/api/files/ads/pub_1/music/track.mp3', name: 'track.mp3' }
+      const res = await PATCH(jsonRequest({ videoSpec: spec }), ctx('book_1'))
+      expect(res.status).toBe(200)
+    })
   })
 })

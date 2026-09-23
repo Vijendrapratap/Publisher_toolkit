@@ -4,7 +4,38 @@ import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { storeFile } from '@/lib/providers/storage'
 import { projectUpdateSchema } from '@/lib/services/ads/options'
 import { isAllowedCoverType, storeUploadedImage, COVER_RULE } from '@/lib/services/shared/upload'
+import { adVideoSpecSchema, clip, ownsMusicUpload, presetStyle, SCRIPT_LIMITS, type AdVideoSpec } from '@/lib/services/ads/videoSpec'
 import { prisma } from '@/lib/db'
+import type { z } from 'zod'
+
+/** Fields the Configure page saves that also feed the video script/style. */
+const VIDEO_FIELD_KEYS = ['videoFormat', 'videoLength', 'videoMood', 'videoStyle', 'customHook', 'ctaText'] as const
+
+/**
+ * The Configure page's plain book columns (format/length/mood/style/hook/
+ * cta) are the source of truth for those fields, but the AI Video and
+ * Instant Video editors render from `videoSpec` alone. Without this, saving
+ * Configure silently stopped applying to a book that already had a spec —
+ * the spec just kept the values from whenever it was first generated.
+ */
+function deriveVideoSpecUpdate(update: z.infer<typeof projectUpdateSchema>, currentSpec: AdVideoSpec): AdVideoSpec | null {
+  if (!VIDEO_FIELD_KEYS.some((key) => update[key] !== undefined)) return null
+
+  const spec: AdVideoSpec = {
+    ...currentSpec,
+    ...(update.videoFormat ? { format: update.videoFormat } : {}),
+    ...(update.videoLength ? { length: update.videoLength } : {}),
+    ...(update.videoMood ? { mood: update.videoMood } : {}),
+    ...(update.videoStyle ? { style: presetStyle(update.videoStyle) } : {}),
+    script: {
+      ...currentSpec.script,
+      ...(update.customHook?.trim() ? { hook: clip(update.customHook, SCRIPT_LIMITS.hook) } : {}),
+      ...(update.ctaText?.trim() ? { cta: clip(update.ctaText, SCRIPT_LIMITS.cta) } : {}),
+    },
+  }
+  const parsed = adVideoSpecSchema.safeParse(spec)
+  return parsed.success ? parsed.data : null
+}
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -21,10 +52,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid update' }, { status: 400 })
     }
     const update = parsed.data
+    if (update.videoSpec?.music && !ownsMusicUpload(update.videoSpec.music, publisherId)) {
+      return NextResponse.json({ error: "That music file doesn't belong to this account." }, { status: 400 })
+    }
+
+    let data: typeof update = update
+    if (!update.videoSpec) {
+      const currentSpec = adVideoSpecSchema.safeParse(book.videoSpec)
+      if (currentSpec.success) {
+        const derived = deriveVideoSpecUpdate(update, currentSpec.data)
+        if (derived) data = { ...update, videoSpec: derived }
+      }
+    }
+
     const completesConfig = Boolean(update.platforms && update.copyTone && update.templateKey)
     const updated = await prisma.book.update({
       where: { id: book.id },
-      data: completesConfig ? { ...update, status: 'configured' } : update,
+      data: completesConfig ? { ...data, status: 'configured' } : data,
     })
     return NextResponse.json({ id: updated.id }, { status: 200 })
   }

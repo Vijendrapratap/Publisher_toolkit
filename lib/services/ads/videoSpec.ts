@@ -147,6 +147,19 @@ export function musicUrl(music: NonNullable<AdVideoSpec['music']>): string | nul
   return music.kind === 'library' ? `/music/${music.track}.mp3` : music.url
 }
 
+/**
+ * Every uploaded music file this publisher owns lives under this prefix (see
+ * the music upload route). Anything else is another publisher's file: never
+ * read it server-side, whatever the client sent.
+ */
+export function musicUploadPrefix(publisherId: string): string {
+  return `/api/files/ads/${publisherId}/music/`
+}
+
+export function ownsMusicUpload(music: NonNullable<AdVideoSpec['music']>, publisherId: string): boolean {
+  return music.kind !== 'upload' || music.url.startsWith(musicUploadPrefix(publisherId))
+}
+
 export function bookVideoSource(book: {
   title: string | null
   blurb: string | null
