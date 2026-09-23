@@ -24,7 +24,10 @@ const { aiVideoJobStore, resetDb, getRows } = vi.hoisted(() => {
           if (!(row[key] instanceof Date) || !(row[key].getTime() < cond.lt.getTime())) return false
           continue
         }
-        continue
+        // An operator this fake doesn't know must fail loudly, not match
+        // vacuously — a silently-ignored `where` clause would hide a real
+        // guard (e.g. a status precondition) not actually being enforced.
+        throw new Error(`fake prisma: unrecognised where operator for "${key}": ${JSON.stringify(cond)}`)
       }
       if (row[key] !== cond) return false
     }
@@ -136,6 +139,7 @@ const singleShotBrief: AiVideoBrief = {
 const STITCHING_STALE_MS = 10 * 60 * 1000
 const RUNNING_TIMEOUT_MS = 60 * 60 * 1000
 const SUBMIT_TIMEOUT_MS = 10 * 60 * 1000
+const DOWNLOAD_TIMEOUT_MS = 24 * 60 * 60 * 1000
 const staleDate = (ms: number) => new Date(Date.now() - ms)
 
 beforeEach(() => {
@@ -308,13 +312,50 @@ describe('advanceAiVideoJob', () => {
     expect((job.shots as any)[0].status).toBe('failed')
   })
 
-  it('leaves a shot in_progress (not failed) when the completed clip fails to download', async () => {
+  it('leaves a shot downloading (not failed) when the completed clip fails to download', async () => {
     vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed', costUsd: 0.42 })
     vi.mocked(downloadVideoJob).mockRejectedValue(new Error('temporary network error'))
     const job = await advanceAiVideoJob(running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { brief: singleShotBrief }), book, 'sk', 'pub_1')
     expect(job.status).toBe('running')
-    expect((job.shots as any)[0].status).toBe('in_progress')
+    expect((job.shots as any)[0].status).toBe('downloading')
     expect(stitchAiVideo).not.toHaveBeenCalled()
+  })
+
+  it('leaves a shot downloading (not failed) past the 60-minute running timeout — a finished, paid shot must not be discarded', async () => {
+    vi.mocked(getVideoJob).mockResolvedValue({ status: 'completed', costUsd: 0.42 })
+    vi.mocked(downloadVideoJob).mockRejectedValue(new Error('temporary network error'))
+    const job = await advanceAiVideoJob(
+      running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { brief: singleShotBrief, createdAt: staleDate(RUNNING_TIMEOUT_MS + 1000) }),
+      book, 'sk', 'pub_1'
+    )
+    expect(job.status).toBe('running')
+    expect((job.shots as any)[0].status).toBe('downloading')
+    expect(stitchAiVideo).not.toHaveBeenCalled()
+  })
+
+  it('retries only the download once a shot is downloading, and stitches once it succeeds', async () => {
+    vi.mocked(downloadVideoJob).mockResolvedValue(Buffer.from('mp4'))
+    const job = await advanceAiVideoJob(
+      running([{ jobId: 'or_1', durationSec: 5, status: 'downloading', clipUrl: null, costUsd: 0.42 }], { brief: singleShotBrief }),
+      book, 'sk', 'pub_1'
+    )
+    expect(getVideoJob).not.toHaveBeenCalled()
+    expect(downloadVideoJob).toHaveBeenCalledTimes(1)
+    expect(job.status).toBe('completed')
+    expect(stitchAiVideo).toHaveBeenCalled()
+  })
+
+  it('fails a shot stuck downloading for more than 24 hours', async () => {
+    vi.mocked(downloadVideoJob).mockRejectedValue(new Error('still failing'))
+    const job = await advanceAiVideoJob(
+      running([{ jobId: 'or_1', durationSec: 5, status: 'downloading', clipUrl: null, costUsd: 0.42 }], {
+        brief: singleShotBrief,
+        createdAt: staleDate(DOWNLOAD_TIMEOUT_MS + 1000),
+      }),
+      book, 'sk', 'pub_1'
+    )
+    expect(job.status).toBe('failed')
+    expect(job.error).toMatch(/couldn.t download/i)
   })
 
   it('reclaims a stale stitching job and re-stitches the already-downloaded clips', async () => {
@@ -394,6 +435,35 @@ describe('advanceAiVideoJob', () => {
     const job = await advanceAiVideoJob(running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { brief: singleShotBrief }), book, 'sk', 'pub_1')
     expect(job.status).toBe('failed')
     expect(job.error).toBe('raced elsewhere')
+  })
+
+  it('does not let a 404 shot-failure write clobber a row already claimed for stitching', async () => {
+    const job = running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], { brief: singleShotBrief })
+    vi.mocked(getVideoJob).mockRejectedValue(new OpenRouterHttpError('gone', 404))
+    const stored = getRows().get('job_1')
+    if (stored) {
+      stored.status = 'stitching'
+      stored.videoUrl = '/already-stitched.mp4'
+    }
+    const result = await advanceAiVideoJob(job, book, 'sk', 'pub_1')
+    expect(result.status).toBe('stitching')
+    expect(result.videoUrl).toBe('/already-stitched.mp4')
+  })
+
+  it('does not let a running-timeout failed-write clobber a row already claimed for stitching', async () => {
+    const job = running([{ jobId: 'or_1', durationSec: 5, status: 'pending', clipUrl: null }], {
+      brief: singleShotBrief,
+      createdAt: staleDate(RUNNING_TIMEOUT_MS + 1000),
+    })
+    vi.mocked(getVideoJob).mockResolvedValue({ status: 'in_progress' })
+    const stored = getRows().get('job_1')
+    if (stored) {
+      stored.status = 'stitching'
+      stored.videoUrl = '/already-stitched.mp4'
+    }
+    const result = await advanceAiVideoJob(job, book, 'sk', 'pub_1')
+    expect(result.status).toBe('stitching')
+    expect(result.videoUrl).toBe('/already-stitched.mp4')
   })
 })
 

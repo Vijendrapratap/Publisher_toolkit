@@ -24,7 +24,13 @@ import { probeDuration, stitchAiVideo } from './aiVideoStitch'
 export type ShotState = {
   jobId: string
   durationSec: number
-  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  /**
+   * 'downloading': OpenRouter reports this clip completed (and it's paid
+   * for), but fetching it hasn't succeeded yet — distinct from 'in_progress'
+   * so the running timeout can't fail an already-finished, already-billed
+   * job just because the download is slow to retry.
+   */
+  status: 'pending' | 'in_progress' | 'downloading' | 'completed' | 'failed'
   clipUrl: string | null
   error?: string
   /** What OpenRouter actually billed; can exceed duration × price (minimum billed length). */
@@ -57,8 +63,16 @@ const STITCHING_STALE_MS = 10 * 60 * 1000
 const RUNNING_TIMEOUT_MS = 60 * 60 * 1000
 /** How long `startAiVideoJob`'s own submit loop is allowed to still be mid-flight. */
 const SUBMIT_TIMEOUT_MS = 10 * 60 * 1000
+/**
+ * A far more generous cap than RUNNING_TIMEOUT_MS: every remote shot is
+ * already done and paid for, only the download keeps failing. Long enough
+ * that a lengthy outage on our end doesn't throw away finished, billed work,
+ * short enough that a permanently-broken download can't lock the book forever.
+ */
+const DOWNLOAD_TIMEOUT_MS = 24 * 60 * 60 * 1000
 const RUNNING_TIMEOUT_MESSAGE = 'The AI video took too long. Generate again.'
 const SUBMIT_TIMEOUT_MESSAGE = 'Starting the AI video was interrupted. Generate again.'
+const DOWNLOAD_TIMEOUT_MESSAGE = "We couldn't download the finished clips. Generate again."
 const ALREADY_RUNNING_MESSAGE = 'An AI video is already being made for this book. Wait for it to finish.'
 
 function sourceImageUrl(book: Book, key: string): string | null {
@@ -158,8 +172,26 @@ export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: s
   return job
 }
 
+/** OpenRouter already reported this clip done (and billed); only fetching it is retried. */
+async function tryDownload(shot: ShotState, i: number, apiKey: string, dir: string): Promise<void> {
+  try {
+    const clip = await downloadVideoJob(apiKey, shot.jobId)
+    shot.clipUrl = (await storeFile(`${dir}/shot-${i + 1}.mp4`, clip, 'video/mp4')).url
+    shot.status = 'completed'
+  } catch {
+    // Never re-ask getVideoJob for this shot again — OpenRouter already said
+    // it's done. DOWNLOAD_TIMEOUT_MS (not RUNNING_TIMEOUT_MS) bounds this.
+    shot.status = 'downloading'
+  }
+}
+
 async function pollShot(shot: ShotState, i: number, apiKey: string, dir: string): Promise<void> {
   if (shot.status === 'completed' || shot.status === 'failed') return
+
+  if (shot.status === 'downloading') {
+    await tryDownload(shot, i, apiKey, dir)
+    return
+  }
 
   let remote: Awaited<ReturnType<typeof getVideoJob>>
   try {
@@ -177,22 +209,26 @@ async function pollShot(shot: ShotState, i: number, apiKey: string, dir: string)
   if (remote.costUsd !== undefined) shot.costUsd = remote.costUsd
 
   if (remote.status === 'completed') {
-    try {
-      const clip = await downloadVideoJob(apiKey, shot.jobId)
-      shot.clipUrl = (await storeFile(`${dir}/shot-${i + 1}.mp4`, clip, 'video/mp4')).url
-      shot.status = 'completed'
-    } catch {
-      // The clip is done and paid for but not fetched yet (or a blip while
-      // fetching it) — retry the download next poll rather than fail a shot
-      // OpenRouter says succeeded. RUNNING_TIMEOUT_MS bounds how long this can drag on.
-      shot.status = 'in_progress'
-    }
+    await tryDownload(shot, i, apiKey, dir)
   } else if (remote.status === 'failed' || remote.status === 'cancelled' || remote.status === 'expired') {
     shot.status = 'failed'
     shot.error = remote.error ?? `The video model reported “${remote.status}”.`
   } else {
     shot.status = remote.status === 'in_progress' ? 'in_progress' : 'pending'
   }
+}
+
+/**
+ * Fails a job that's still `running` — guarded so an overlapping poll that
+ * already claimed the row for stitching (or moved it on some other way)
+ * can't have its result clobbered by a late timeout/shot-failure write.
+ */
+async function guardedFail(
+  job: AiVideoJob,
+  data: { status: 'failed'; error?: string | null; shots?: Prisma.InputJsonValue }
+): Promise<AiVideoJob> {
+  await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'running' }, data })
+  return (await prisma.aiVideoJob.findUnique({ where: { id: job.id } })) ?? ({ ...job, ...data } as AiVideoJob)
 }
 
 export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: string, publisherId: string): Promise<AiVideoJob> {
@@ -230,15 +266,24 @@ export async function advanceAiVideoJob(job: AiVideoJob, book: Book, apiKey: str
 
   const failed = shots.find((s) => s.status === 'failed')
   if (failed) {
-    return prisma.aiVideoJob.update({ where: { id: job.id }, data: { shots: json(shots), status: 'failed', error: failed.error } })
+    return guardedFail(job, { shots: json(shots), status: 'failed', error: failed.error })
   }
 
   if (!shots.every((s) => s.status === 'completed')) {
     // Only now — after this round's poll found shots still unfinished — does
-    // the running timeout apply. A job whose shots just finished never hits
-    // this branch at all, however old the row is.
-    if (now - job.createdAt.getTime() > RUNNING_TIMEOUT_MS) {
-      return prisma.aiVideoJob.update({ where: { id: job.id }, data: { status: 'failed', error: RUNNING_TIMEOUT_MESSAGE } })
+    // either timeout apply. A job whose shots just finished never hits this
+    // branch at all, however old the row is. The running timeout only counts
+    // a shot whose remote work is itself unfinished — never one that's done
+    // and paid for but merely stuck retrying its download, which has its own
+    // far longer cap.
+    const remoteUnfinished = shots.some((s) => s.status === 'pending' || s.status === 'in_progress')
+    const stuckDownloading = shots.some((s) => s.status === 'downloading')
+
+    if (remoteUnfinished && now - job.createdAt.getTime() > RUNNING_TIMEOUT_MS) {
+      return guardedFail(job, { status: 'failed', error: RUNNING_TIMEOUT_MESSAGE })
+    }
+    if (stuckDownloading && now - job.createdAt.getTime() > DOWNLOAD_TIMEOUT_MS) {
+      return guardedFail(job, { status: 'failed', error: DOWNLOAD_TIMEOUT_MESSAGE })
     }
     // Never overwrite a row another poll has already claimed (e.g. moved to stitching).
     await prisma.aiVideoJob.updateMany({ where: { id: job.id, status: 'running' }, data: { shots: json(shots) } })
