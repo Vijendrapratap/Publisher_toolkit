@@ -48,33 +48,50 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
   const images = [{ key: 'cover', label: 'Cover', url: coverUrl }, ...pageUrls.slice(0, 5).map((url, i) => ({ key: `page-${i + 1}`, label: `Page ${i + 1}`, url }))]
   const durations = (model?.durations.length ? model.durations : [4, 5, 6, 8]).filter((d) => d >= 3 && d <= 10)
 
+  // Never throws: a network hiccup or a non-OK response is swallowed here so
+  // that (a) callers never see an unhandled rejection and (b) the poll loop
+  // below can always reschedule itself regardless of how this attempt went.
   const refresh = useCallback(async () => {
-    const res = await fetch(`/api/ads/projects/${projectId}/video/ai`)
-    if (!res.ok) return
-    const body = await res.json()
-    setJob(body.job)
-    setModel(body.model)
-    setAiConfigured(body.aiConfigured)
+    try {
+      const res = await fetch(`/api/ads/projects/${projectId}/video/ai`)
+      if (!res.ok) return
+      const body = await res.json()
+      setJob(body.job)
+      setModel(body.model)
+      setAiConfigured(body.aiConfigured)
+    } catch {
+      // Retried by the next scheduled poll; nothing to do here.
+    }
   }, [projectId])
 
+  // Once on mount (not gated on `open`) so the collapsed banner can reflect
+  // an in-progress or finished job before the publisher opens the panel.
   useEffect(() => {
-    if (open) void refresh()
-  }, [open, refresh])
+    void refresh()
+  }, [refresh])
 
-  // Self-scheduling: the next poll is only queued once the previous fetch has
-  // resolved (a fixed 5s gap between calls, never an overlapping request),
-  // and only while the job is still running/stitching. Re-running this effect
-  // whenever `job` changes both restarts the chain after every poll and stops
-  // it the moment the job leaves the active set.
+  // Self-scheduling: the next poll is only queued once the previous attempt
+  // has settled — success or failure alike, via `finally` — a fixed 5s gap
+  // between calls, never an overlapping request. `refresh` itself never
+  // throws, so this reschedules through any number of failed attempts; only
+  // a job that leaves the active set (job changes, effect reruns, and the
+  // new job is no longer running/stitching) or unmounting stops it.
   useEffect(() => {
     if (!job || !ACTIVE.has(job.status)) return
     let cancelled = false
-    const timer = setTimeout(() => {
-      if (!cancelled) void refresh()
-    }, 5000)
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const tick = async () => {
+      try {
+        await refresh()
+      } finally {
+        if (!cancelled) timer = setTimeout(tick, 5000)
+      }
+    }
+    timer = setTimeout(tick, 5000)
     return () => {
       cancelled = true
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
     }
   }, [job, refresh])
 
@@ -124,14 +141,23 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
     setBrief((b) => b && { ...b, shots: b.shots.map((s, j) => (j === i ? { ...s, ...patch } : s)) })
 
   if (!open) {
+    const inProgress = Boolean(job && ACTIVE.has(job.status))
+    const ready = job?.status === 'completed'
     return (
       <div className="flex flex-col items-start gap-2 rounded-3xl border border-ai/30 bg-ai-soft p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="font-display text-lg font-semibold text-ink">Want something more cinematic?</p>
-          <p className="text-sm text-ink-muted">An AI video made from your cover and pages. You review and edit the prompt first.</p>
+          <p className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
+            {inProgress && <Loader2 className="size-4 animate-spin text-ai" aria-hidden />}
+            {inProgress ? 'Your AI video is being made…' : ready ? 'Your AI video is ready' : 'Want something more cinematic?'}
+          </p>
+          <p className="text-sm text-ink-muted">
+            {inProgress || ready
+              ? 'Open the panel to see it.'
+              : 'An AI video made from your cover and pages. You review and edit the prompt first.'}
+          </p>
         </div>
         <Button type="button" onClick={() => setOpen(true)} className="bg-ai text-canvas hover:bg-ai/90">
-          <Sparkles className="size-4" aria-hidden /> Generate with AI
+          <Sparkles className="size-4" aria-hidden /> {inProgress || ready ? 'Open AI video' : 'Generate with AI'}
         </Button>
       </div>
     )
@@ -244,7 +270,7 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
               </div>
               <label className="mt-3 flex flex-col gap-1.5">
                 <span className={labelClass}>What happens <span className="font-normal normal-case">{shot.prompt.length}/{BRIEF_LIMITS.prompt}</span></span>
-                <textarea aria-label={`Shot ${i + 1} prompt`} rows={3} className={inputClass} value={shot.prompt} onChange={(e) => setShot(i, { prompt: e.target.value })} />
+                <textarea aria-label={`Shot ${i + 1} prompt`} rows={3} maxLength={BRIEF_LIMITS.prompt} className={inputClass} value={shot.prompt} onChange={(e) => setShot(i, { prompt: e.target.value })} />
               </label>
               <div className="mt-3 grid gap-3 sm:grid-cols-[8rem_1fr]">
                 <label className="flex flex-col gap-1.5">
@@ -257,7 +283,7 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
                 </label>
                 <label className="flex flex-col gap-1.5">
                   <span className={labelClass}>Caption (optional) <span className="font-normal normal-case">{shot.caption.length}/{BRIEF_LIMITS.caption}</span></span>
-                  <input className={inputClass} value={shot.caption} onChange={(e) => setShot(i, { caption: e.target.value })} />
+                  <input className={inputClass} maxLength={BRIEF_LIMITS.caption} value={shot.caption} onChange={(e) => setShot(i, { caption: e.target.value })} />
                 </label>
               </div>
             </div>
@@ -276,11 +302,11 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief }: Ai
           <div className="grid gap-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5">
               <span className={labelClass}>End card headline <span className="font-normal normal-case">{brief.endCard.headline.length}/{BRIEF_LIMITS.headline}</span></span>
-              <input className={inputClass} value={brief.endCard.headline} onChange={(e) => setBrief({ ...brief, endCard: { ...brief.endCard, headline: e.target.value } })} />
+              <input className={inputClass} maxLength={BRIEF_LIMITS.headline} value={brief.endCard.headline} onChange={(e) => setBrief({ ...brief, endCard: { ...brief.endCard, headline: e.target.value } })} />
             </label>
             <label className="flex flex-col gap-1.5">
               <span className={labelClass}>Call to action <span className="font-normal normal-case">{brief.endCard.cta.length}/{BRIEF_LIMITS.cta}</span></span>
-              <input className={inputClass} value={brief.endCard.cta} onChange={(e) => setBrief({ ...brief, endCard: { ...brief.endCard, cta: e.target.value } })} />
+              <input className={inputClass} maxLength={BRIEF_LIMITS.cta} value={brief.endCard.cta} onChange={(e) => setBrief({ ...brief, endCard: { ...brief.endCard, cta: e.target.value } })} />
             </label>
           </div>
 

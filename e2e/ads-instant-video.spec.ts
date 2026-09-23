@@ -20,7 +20,7 @@ for (const width of [1440, 1180, 1024]) {
     await card.getByRole('button', { name: '1. Hook' }).click()
     // Input values are not text content, so this only matches the player's frame.
     await expect(card).toContainText('A brand new hook line')
-    await expect(card.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await expect(card.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
     await expect(page.getByText(/remotion|hyperframe/i)).toHaveCount(0)
 
     // Nothing in the card is clipped: every button/input's content fits its box.
