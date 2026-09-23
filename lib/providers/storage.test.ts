@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { storeFile, readStoredFile, toDataUri } from './storage'
+import { storeFile, readStoredFile, toDataUri, contentTypeFor } from './storage'
 
 let dir: string
 beforeEach(async () => {
@@ -30,6 +30,13 @@ describe('local storage', () => {
 
   it('rejects path traversal', async () => {
     await expect(storeFile('ads/../../etc/passwd', Buffer.from('x'), 'text/plain')).rejects.toThrow('invalid path')
+  })
+
+  it('recognises audio and video extensions used by the ads video/music features', () => {
+    expect(contentTypeFor('track.mp3')).toBe('audio/mpeg')
+    expect(contentTypeFor('track.wav')).toBe('audio/wav')
+    expect(contentTypeFor('track.m4a')).toBe('audio/mp4')
+    expect(contentTypeFor('clip.mp4')).toBe('video/mp4')
   })
 
   it('reads data URIs and converts files to data URIs', async () => {

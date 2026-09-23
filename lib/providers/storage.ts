@@ -11,6 +11,10 @@ const CONTENT_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.pdf': 'application/pdf',
   '.zip': 'application/zip',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.m4a': 'audio/mp4',
+  '.mp4': 'video/mp4',
 }
 
 export function isBlobConfigured(): boolean {
