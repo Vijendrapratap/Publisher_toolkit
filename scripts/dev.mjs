@@ -32,8 +32,7 @@ if (!existsSync(path.join(process.cwd(), '.remotion-bundle', 'index.html'))) {
   console.log('[remotion] bundle missing — running `npm run remotion:bundle`')
   const bundle = spawnSync('npm', ['run', 'remotion:bundle'], { stdio: 'inherit', env })
   if (bundle.status !== 0) {
-    await stop()
-    process.exit(bundle.status ?? 1)
+    console.warn('Video bundle build failed — video export will be unavailable until `npm run remotion:bundle` succeeds.')
   }
 }
 
