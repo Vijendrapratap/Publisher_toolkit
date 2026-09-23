@@ -1,6 +1,8 @@
 // One-command local run: database (if needed) → migrations → Next.js.
 // Any extra args pass through to `next dev` (e.g. `npm run dev -- --port 3100`).
 import { spawn, spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { startEmbeddedDb, isPortOpen } from './embedded-db.mjs'
 
 const DEV_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/publisher_toolkit_dev'
@@ -24,6 +26,15 @@ const migrate = spawnSync('npx', ['prisma', 'migrate', 'deploy'], { stdio: 'inhe
 if (migrate.status !== 0) {
   await stop()
   process.exit(migrate.status ?? 1)
+}
+
+if (!existsSync(path.join(process.cwd(), '.remotion-bundle', 'index.html'))) {
+  console.log('[remotion] bundle missing — running `npm run remotion:bundle`')
+  const bundle = spawnSync('npm', ['run', 'remotion:bundle'], { stdio: 'inherit', env })
+  if (bundle.status !== 0) {
+    await stop()
+    process.exit(bundle.status ?? 1)
+  }
 }
 
 // detached so `next` (and npx) leads its own process group — next dev spawns
