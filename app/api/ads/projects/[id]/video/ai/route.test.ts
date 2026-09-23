@@ -111,6 +111,19 @@ describe('GET /api/ads/projects/:id/video/ai', () => {
     expect(getVideoModelInfo).toHaveBeenCalledTimes(1)
   })
 
+  it('does not cache a failed model lookup — the very next call retries it', async () => {
+    vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(null)
+    vi.mocked(getVideoModelInfo)
+      .mockRejectedValueOnce(new Error('network blip'))
+      .mockResolvedValueOnce({ id: 'kwaivgi/kling-v3.0-std', durations: [5], aspectRatios: ['16:9'], resolutions: ['720p'], pricePerSecond: 0.084 })
+    const first = await GET(new Request('http://localhost'), ctx)
+    expect((await first.json()).model).toBeNull()
+
+    const second = await GET(new Request('http://localhost'), ctx)
+    expect((await second.json()).model).toMatchObject({ id: 'kwaivgi/kling-v3.0-std' })
+    expect(getVideoModelInfo).toHaveBeenCalledTimes(2)
+  })
+
   it('looks the model up again once the cache entry expires', async () => {
     vi.useFakeTimers()
     try {

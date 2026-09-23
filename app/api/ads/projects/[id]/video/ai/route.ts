@@ -20,13 +20,16 @@ const NO_KEY = 'Add an OpenRouter API key in Settings to use AI video.'
 // OpenRouter on every poll is pure waste. Keyed by model, not by publisher
 // or API key — capability info doesn't vary per caller.
 const MODEL_INFO_TTL_MS = 5 * 60 * 1000
-const modelInfoCache = new Map<string, { value: VideoModelInfo | null; expiresAt: number }>()
+// Only ever holds a successful lookup — a transient failure (network blip,
+// OpenRouter hiccup) must not lock the panel out of a working lookup for
+// the rest of the TTL.
+const modelInfoCache = new Map<string, { value: VideoModelInfo; expiresAt: number }>()
 
 async function cachedVideoModelInfo(model: string, apiKey: string): Promise<VideoModelInfo | null> {
   const cached = modelInfoCache.get(model)
   if (cached && cached.expiresAt > Date.now()) return cached.value
   const value = await getVideoModelInfo(model, apiKey).catch(() => null)
-  modelInfoCache.set(model, { value, expiresAt: Date.now() + MODEL_INFO_TTL_MS })
+  if (value) modelInfoCache.set(model, { value, expiresAt: Date.now() + MODEL_INFO_TTL_MS })
   return value
 }
 
