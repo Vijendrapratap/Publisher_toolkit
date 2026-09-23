@@ -6,31 +6,42 @@ import { projectUpdateSchema } from '@/lib/services/ads/options'
 import { isAllowedCoverType, storeUploadedImage, COVER_RULE } from '@/lib/services/shared/upload'
 import { adVideoSpecSchema, clip, ownsMusicUpload, presetStyle, SCRIPT_LIMITS, type AdVideoSpec } from '@/lib/services/ads/videoSpec'
 import { prisma } from '@/lib/db'
+import type { Book } from '@prisma/client'
 import type { z } from 'zod'
 
 /** Fields the Configure page saves that also feed the video script/style. */
 const VIDEO_FIELD_KEYS = ['videoFormat', 'videoLength', 'videoMood', 'videoStyle', 'customHook', 'ctaText'] as const
+type VideoFieldKey = (typeof VIDEO_FIELD_KEYS)[number]
 
 /**
  * The Configure page's plain book columns (format/length/mood/style/hook/
  * cta) are the source of truth for those fields, but the AI Video and
- * Instant Video editors render from `videoSpec` alone. Without this, saving
- * Configure silently stopped applying to a book that already had a spec —
- * the spec just kept the values from whenever it was first generated.
+ * Instant Video editors render from `videoSpec` alone, and can leave it
+ * diverged from those columns on purpose (a custom font/colour, a hook
+ * tweaked in place). Without comparing against the book's own columns,
+ * ANY Configure save (even one that only changes platforms) re-applies
+ * every video field unconditionally and clobbers that divergence. Only a
+ * field that actually changed on the Configure page should be re-applied.
  */
-function deriveVideoSpecUpdate(update: z.infer<typeof projectUpdateSchema>, currentSpec: AdVideoSpec): AdVideoSpec | null {
-  if (!VIDEO_FIELD_KEYS.some((key) => update[key] !== undefined)) return null
+function deriveVideoSpecUpdate(update: z.infer<typeof projectUpdateSchema>, currentSpec: AdVideoSpec, book: Book): AdVideoSpec | null {
+  const changed = (key: VideoFieldKey): boolean => {
+    const value = update[key]
+    if (value === undefined) return false
+    if ((key === 'customHook' || key === 'ctaText') && !value.trim()) return false
+    return value !== book[key]
+  }
+  if (!VIDEO_FIELD_KEYS.some(changed)) return null
 
   const spec: AdVideoSpec = {
     ...currentSpec,
-    ...(update.videoFormat ? { format: update.videoFormat } : {}),
-    ...(update.videoLength ? { length: update.videoLength } : {}),
-    ...(update.videoMood ? { mood: update.videoMood } : {}),
-    ...(update.videoStyle ? { style: presetStyle(update.videoStyle) } : {}),
+    ...(changed('videoFormat') ? { format: update.videoFormat! } : {}),
+    ...(changed('videoLength') ? { length: update.videoLength! } : {}),
+    ...(changed('videoMood') ? { mood: update.videoMood! } : {}),
+    ...(changed('videoStyle') ? { style: presetStyle(update.videoStyle!) } : {}),
     script: {
       ...currentSpec.script,
-      ...(update.customHook?.trim() ? { hook: clip(update.customHook, SCRIPT_LIMITS.hook) } : {}),
-      ...(update.ctaText?.trim() ? { cta: clip(update.ctaText, SCRIPT_LIMITS.cta) } : {}),
+      ...(changed('customHook') ? { hook: clip(update.customHook!, SCRIPT_LIMITS.hook) } : {}),
+      ...(changed('ctaText') ? { cta: clip(update.ctaText!, SCRIPT_LIMITS.cta) } : {}),
     },
   }
   const parsed = adVideoSpecSchema.safeParse(spec)
@@ -60,7 +71,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!update.videoSpec) {
       const currentSpec = adVideoSpecSchema.safeParse(book.videoSpec)
       if (currentSpec.success) {
-        const derived = deriveVideoSpecUpdate(update, currentSpec.data)
+        const derived = deriveVideoSpecUpdate(update, currentSpec.data, book)
         if (derived) data = { ...update, videoSpec: derived }
       }
     }

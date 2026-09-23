@@ -156,34 +156,73 @@ describe('PATCH /api/ads/projects/:id', () => {
   describe('re-deriving a saved videoSpec from configure-page fields', () => {
     const savedSpec = defaultVideoSpec({ title: 'T' })
 
-    it('merges a changed format into the saved spec, alongside the column', async () => {
-      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec } as any)
-      const res = await PATCH(jsonRequest({ videoFormat: '9:16' }), ctx('book_1'))
+    // The book columns Configure last saved. A spec that has since diverged
+    // from them (e.g. Instant Video edited the font/colours or format
+    // directly, only saving `videoSpec`) must survive a Configure save that
+    // resubmits these SAME column values — only an actual change on the
+    // Configure page should apply.
+    const bookColumns = {
+      videoFormat: '16:9',
+      videoLength: '15s',
+      videoMood: 'epic',
+      videoStyle: 'cinematic',
+      customHook: 'Original hook from the book',
+      ctaText: 'Shop now',
+    }
+    // Diverged from bookColumns via an Instant Video edit: custom font/colours,
+    // a different format, and a different hook than the book columns hold.
+    const customSpec = {
+      ...savedSpec,
+      format: '1:1' as const,
+      style: {
+        preset: 'cinematic' as const,
+        font: 'caveat' as const,
+        colors: { bgFrom: '#111111', bgTo: '#222222', accent: '#ff00ff', text: '#ffffff' },
+      },
+      script: { ...savedSpec.script, hook: 'A totally custom hook', cta: 'Grab it' },
+      music: { kind: 'library' as const, track: 'epic' as const },
+    }
+    const sameAsColumns = {
+      videoFormat: bookColumns.videoFormat,
+      videoLength: bookColumns.videoLength,
+      videoMood: bookColumns.videoMood,
+      videoStyle: bookColumns.videoStyle,
+      customHook: bookColumns.customHook,
+      ctaText: bookColumns.ctaText,
+    }
+
+    it('leaves a spec with custom font/colours and a different format/hook completely unchanged when Configure resubmits the same column values', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: customSpec, ...bookColumns } as any)
+      const res = await PATCH(jsonRequest(sameAsColumns), ctx('book_1'))
       expect(res.status).toBe(200)
       const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
-      expect(call.data.videoFormat).toBe('9:16')
-      expect(call.data.videoSpec).toMatchObject({ ...savedSpec, format: '9:16' })
+      expect(call.data).not.toHaveProperty('videoSpec')
     })
 
-    it('maps style/hook/cta onto the preset palette and script, clipped to the spec limits', async () => {
-      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec } as any)
-      const res = await PATCH(jsonRequest({ videoStyle: 'fantasy', customHook: 'A brand new hook', ctaText: 'Buy now' }), ctx('book_1'))
+    it('updates only spec.format when only videoFormat changes on Configure, keeping the custom style/music/hook', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: customSpec, ...bookColumns } as any)
+      const res = await PATCH(jsonRequest({ ...sameAsColumns, videoFormat: '9:16' }), ctx('book_1'))
+      expect(res.status).toBe(200)
+      const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
+      expect(call.data.videoSpec).toEqual({ ...customSpec, format: '9:16' })
+    })
+
+    it('applies the preset style when videoStyle changes on Configure', async () => {
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: customSpec, ...bookColumns } as any)
+      const res = await PATCH(jsonRequest({ ...sameAsColumns, videoStyle: 'fantasy' }), ctx('book_1'))
       expect(res.status).toBe(200)
       const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
       expect(call.data.videoSpec.style).toEqual(presetStyle('fantasy'))
-      expect(call.data.videoSpec.script.hook).toBe('A brand new hook')
-      expect(call.data.videoSpec.script.cta).toBe('Buy now')
-      // Untouched script fields survive the merge.
-      expect(call.data.videoSpec.script.storyLine).toBe(savedSpec.script.storyLine)
+      expect(call.data.videoSpec.format).toBe(customSpec.format)
+      expect(call.data.videoSpec.script.hook).toBe(customSpec.script.hook)
     })
 
     it('ignores an empty customHook/ctaText rather than blanking the saved script', async () => {
-      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec } as any)
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: savedSpec, ...bookColumns } as any)
       const res = await PATCH(jsonRequest({ customHook: '', ctaText: '' }), ctx('book_1'))
       expect(res.status).toBe(200)
       const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
-      expect(call.data.videoSpec.script.hook).toBe(savedSpec.script.hook)
-      expect(call.data.videoSpec.script.cta).toBe(savedSpec.script.cta)
+      expect(call.data).not.toHaveProperty('videoSpec')
     })
 
     it('leaves the spec untouched when the update has no video fields', async () => {
