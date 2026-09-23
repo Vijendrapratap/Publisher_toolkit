@@ -21,6 +21,17 @@ so they are not re-litigated.
 - **Published landing covers are served by `/p/[slug]/cover`,** which proxies
   blob reads through the server. Fine, but it means a public page's images are
   not on the CDN. Consider signing a blob URL instead if traffic warrants it.
+- **Uploaded ad-video music assumes a local-storage URL shape.** The upload
+  URL rule (`musicSchema` in `lib/services/ads/videoSpec.ts`, currently
+  `url: z.string().startsWith('/api/files/')`) and the server-side ownership
+  check that reads it (`ownsMusicUpload`/`musicUploadPrefix`, requiring
+  `/api/files/ads/${publisherId}/music/...`) both assume `storeFile` returns a
+  local `/api/files/...` path. Once Blob is enabled, `storeFile` instead
+  returns a `*.blob.vercel-storage.com` URL, which neither check would accept
+  — every upload would silently be treated as "no music". Both need to accept
+  the Blob URL shape (and the ownership check still needs some way to tie a
+  Blob URL back to the owning publisher, e.g. by keeping the publisher/prefix
+  segment in the stored pathname and checking it rather than the origin).
 
 ## Before a publisher has thousands of projects
 

@@ -175,9 +175,18 @@ OpenRouter's model pricing (per video-second × total seconds) next to the
 brief, submits one `POST https://openrouter.ai/api/v1/videos` job per shot
 (`model` from `OPENROUTER_VIDEO_MODEL`, `frame_images: [{ frame_type:
 'first_frame', image: <source> }]`, `duration`, `aspect_ratio`,
-`resolution: '1080p'`, `generate_audio: false`) and stores the job ids and
+`resolution: '720p'`, `generate_audio: false`) and stores the job ids and
 status on a new `AiVideoJob` row (projectId, status, shots[{jobId, status,
 clipUrl}], videoUrl, error, costUsd). It returns immediately.
+
+720p, not the model's higher resolutions, is chosen by `pickResolution` in
+`lib/providers/aiVideo.ts`: every current model supports it, and it keeps a
+2-3 shot ad affordable. Any render or stitch failure has its raw error (the
+engine's own wording — ffmpeg stderr, a missing-bundle path, a headless-Chrome
+crash) logged server-side only; the publisher only ever sees a plain,
+engine-free message (`describeRenderError` in `renderVideo.ts`, or the
+equivalent fixed strings in `aiVideoJob.ts`/the AI video route) — see the
+global constraint against engine names in user-visible text.
 
 `GET /api/ads/projects/[id]/video/ai` polls OpenRouter for unfinished shots,
 downloads finished clips to storage, and when all are done renders the final
