@@ -87,50 +87,12 @@ function isUniqueConstraintError(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: unknown }).code === 'P2002'
 }
 
-/** Unset → $10/day. `0` disables AI video entirely (still logs nothing extra; it's a normal refusal). */
-function dailyLimitUsd(): number {
-  const raw = process.env.AI_VIDEO_DAILY_LIMIT_USD
-  if (raw === undefined || raw.trim() === '') return 10
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : 10
-}
-
-function dailyLimitMessage(limit: number): string {
-  return `You've reached today's AI video limit ($${limit.toFixed(2)}). Try again tomorrow.`
-}
-
 /** What's actually been billed across a set of shots so far (only shots OpenRouter has reported a cost for). */
 function shotsCostSoFar(shots: ShotState[]): number {
   return Math.round(shots.reduce((total, s) => total + (s.costUsd ?? 0), 0) * 100) / 100
 }
 
-/**
- * A failed job's `costUsd` stays at its pre-spend estimate even when nothing
- * (or only some shots) ever got submitted/billed — counting that estimate
- * against the cap would keep charging for spend that never happened. Only
- * its shots' actually-billed costs count; every other status's `costUsd` is
- * already the real (or best-known) total.
- */
-function billedCost(row: { costUsd: number | null; status: string; shots: unknown }): number {
-  if (row.status !== 'failed') return row.costUsd ?? 0
-  return shotsCostSoFar((row.shots as ShotState[] | null) ?? [])
-}
-
-/** Sums what this publisher's AI video jobs have cost in the last 24h and refuses before this job would push it over the cap. */
-async function assertUnderDailyCap(publisherId: string, estimatedCost: number | null): Promise<void> {
-  const limit = dailyLimitUsd()
-  if (limit <= 0) throw new AiVideoUserError('AI video is turned off on this server.')
-
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
-  const rows = await prisma.aiVideoJob.findMany({
-    where: { createdAt: { gte: since }, book: { publisherId } },
-    select: { costUsd: true, status: true, shots: true },
-  })
-  const spentToday = rows.reduce((total, r) => total + billedCost(r), 0)
-  if (spentToday + (estimatedCost ?? 0) > limit) throw new AiVideoUserError(dailyLimitMessage(limit))
-}
-
-export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: string): Promise<AiVideoJob> {
+export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: string, jobId?: string): Promise<AiVideoJob> {
   // If a job is already active, give it one chance to resolve on its own
   // (it may just be stuck and about to be reclaimed/timed out) instead of
   // failing it ourselves — a directly-failed row would throw away paid work
@@ -156,10 +118,6 @@ export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: s
   const seconds = durations.reduce((total, d) => total + d, 0)
   const estimatedCost = info?.pricePerSecond ? Math.round(seconds * info.pricePerSecond * 100) / 100 : null
 
-  // Before any image resolution or spend: a publisher over their daily cap
-  // must not have images read or clips submitted for this job at all.
-  await assertUnderDailyCap(book.publisherId, estimatedCost)
-
   // Resolve every shot's image BEFORE spending anything: a missing page must
   // not leave earlier shots already submitted (and billed) to OpenRouter.
   const prepared = await Promise.all(
@@ -177,7 +135,7 @@ export async function startAiVideoJob(book: Book, brief: AiVideoBrief, apiKey: s
   let job: AiVideoJob
   try {
     job = await prisma.aiVideoJob.create({
-      data: { bookId: book.id, model, format: spec.format, brief: json(brief), shots: json([]), costUsd: estimatedCost },
+      data: { id: jobId, bookId: book.id, model, format: spec.format, brief: json(brief), shots: json([]), costUsd: estimatedCost },
     })
   } catch (err) {
     // The active check above raced with another request that inserted first.

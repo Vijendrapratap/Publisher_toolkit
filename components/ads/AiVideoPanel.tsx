@@ -8,6 +8,7 @@ import { cn } from '@/components/ui/cn'
 import { BRIEF_LIMITS, aiVideoBriefSchema, type AiVideoBrief } from '@/lib/services/ads/aiVideoBriefSchema'
 import { pickDuration } from '@/lib/providers/aiVideo'
 import type { AiVideoJobSummary } from '@/lib/services/ads/aiVideoJob'
+import { CREDIT_PRICES, aiVideoUnits } from '@/lib/credits/prices'
 
 interface ModelInfo {
   id: string
@@ -100,6 +101,8 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief, init
   const problem = check && !check.success ? check.error.issues[0]?.message : null
   const seconds = brief ? brief.shots.reduce((t, s) => t + pickDuration(s.durationSec, model?.durations ?? []), 0) : 0
   const estimate = model?.pricePerSecond ? seconds * model.pricePerSecond : null
+  // Charged from the requested durations, same as the route — not the model-snapped ones above.
+  const credits = brief ? aiVideoUnits(brief.shots.map((s) => s.durationSec)) * CREDIT_PRICES['ads.video.ai'] : 0
   const busy = Boolean(job && ACTIVE.has(job.status))
 
   async function writeBrief(revise: boolean) {
@@ -238,9 +241,7 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief, init
       </header>
 
       {!aiConfigured && (
-        <p className="mt-4 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning">
-          AI video needs an OpenRouter API key. <a href="/settings" className="font-semibold underline">Add it in Settings</a>.
-        </p>
+        <p className="mt-4 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning">AI video isn&apos;t available right now.</p>
       )}
 
       {job && (
@@ -386,7 +387,7 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief, init
               {model ? ` · ${model.id}` : ''}
             </p>
             <Button type="button" onClick={generate} loading={starting} disabled={starting || busy || Boolean(problem) || !aiConfigured} className="bg-ai text-canvas hover:bg-ai/90">
-              <Sparkles className="size-4" aria-hidden /> Generate AI video
+              <Sparkles className="size-4" aria-hidden /> Generate · {credits} credits
             </Button>
           </div>
         </div>

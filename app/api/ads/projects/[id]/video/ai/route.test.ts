@@ -16,16 +16,25 @@ vi.mock('@/lib/services/ads/aiVideoJob', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/services/ads/aiVideoJob')>()
   return { AiVideoUserError: actual.AiVideoUserError, summarizeJob: actual.summarizeJob, startAiVideoJob: vi.fn(), advanceAiVideoJob: vi.fn() }
 })
+vi.mock('@/lib/credits/ledger', () => ({ reserveCredits: vi.fn(), settleReservation: vi.fn(), refundReservation: vi.fn() }))
 
 import { GET, POST, __resetVideoModelInfoCacheForTests } from './route'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { getVideoModelInfo } from '@/lib/providers/aiVideo'
 import { prisma } from '@/lib/db'
 import { AiVideoUserError, advanceAiVideoJob, startAiVideoJob } from '@/lib/services/ads/aiVideoJob'
+import { reserveCredits, refundReservation, settleReservation } from '@/lib/credits/ledger'
 
 const ctx = { params: Promise.resolve({ id: 'book_1' }) }
 const post = (body: unknown) => new Request('http://localhost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 const brief = fallbackBrief({ title: 'T', pageCount: 0 })
+const twoShotBrief = {
+  shots: [
+    { prompt: 'Slow push-in on the cover, dust drifting in soft light', sourceImage: 'cover', durationSec: 5, caption: '' },
+    { prompt: 'Gentle parallax drift across the first page, warm light', sourceImage: 'page-1', durationSec: 5, caption: '' },
+  ],
+  endCard: { headline: 'Read it', cta: 'Buy now' },
+}
 
 // The route runs on the platform key only, read straight from the env var.
 let prevApiKey: string | undefined
@@ -48,8 +57,22 @@ describe('POST /api/ads/projects/:id/video/ai', () => {
     vi.mocked(startAiVideoJob).mockResolvedValue(jobRow as any)
     const res = await POST(post({ brief }), ctx)
     expect(res.status).toBe(202)
-    expect(startAiVideoJob).toHaveBeenCalledWith(book, brief, 'sk')
+    expect(startAiVideoJob).toHaveBeenCalledWith(book, brief, 'sk', expect.any(String))
     expect((await res.json()).job.id).toBe('job_1')
+  })
+  it('reserves credits for every 5s block before starting, keyed by the job id', async () => {
+    vi.mocked(startAiVideoJob).mockResolvedValue(jobRow as any)
+    const res = await POST(post({ brief: twoShotBrief }), ctx)
+    expect(res.status).toBe(202)
+    const call = vi.mocked(reserveCredits).mock.calls[0][0]
+    expect(call).toMatchObject({ userId: 'pub_1', action: 'ads.video.ai', units: 2 })
+    expect(call.key).toBe(`video:${vi.mocked(startAiVideoJob).mock.calls[0][3]}`)
+  })
+  it('refunds when the job cannot be started', async () => {
+    vi.mocked(startAiVideoJob).mockRejectedValueOnce(new AiVideoUserError('already running'))
+    const res = await POST(post({ brief: twoShotBrief }), ctx)
+    expect(res.status).toBe(400)
+    expect(refundReservation).toHaveBeenCalledWith(vi.mocked(reserveCredits).mock.calls[0][0].key)
   })
   it('explains fixable problems as 400s', async () => {
     vi.mocked(startAiVideoJob).mockRejectedValue(new AiVideoUserError("can't make 1:1 videos"))
@@ -145,5 +168,27 @@ describe('GET /api/ads/projects/:id/video/ai', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('settles a completed job and refunds a failed one on poll', async () => {
+    vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(jobRow as any)
+    vi.mocked(advanceAiVideoJob).mockResolvedValueOnce({ ...jobRow, id: 'j1', status: 'completed', costUsd: 0.84 } as any)
+    await GET(new Request('http://localhost'), ctx)
+    expect(settleReservation).toHaveBeenCalledWith('video:j1', { costUsd: 0.84 })
+
+    vi.mocked(advanceAiVideoJob).mockResolvedValueOnce({ ...jobRow, id: 'j2', status: 'failed' } as any)
+    await GET(new Request('http://localhost'), ctx)
+    expect(refundReservation).toHaveBeenCalledWith('video:j2')
+  })
+
+  it('does not break the poll response when settling credits throws', async () => {
+    vi.mocked(prisma.aiVideoJob.findFirst).mockResolvedValue(jobRow as any)
+    vi.mocked(advanceAiVideoJob).mockResolvedValueOnce({ ...jobRow, id: 'j3', status: 'completed', costUsd: 0.5 } as any)
+    vi.mocked(settleReservation).mockRejectedValueOnce(new Error('db blip'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await GET(new Request('http://localhost'), ctx)
+    expect(res.status).toBe(200)
+    expect((await res.json()).job).toMatchObject({ id: 'j3', status: 'completed' })
+    errorSpy.mockRestore()
   })
 })

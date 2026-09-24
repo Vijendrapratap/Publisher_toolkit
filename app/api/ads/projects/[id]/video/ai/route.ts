@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
@@ -7,6 +8,9 @@ import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { aiVideoBriefSchema } from '@/lib/services/ads/aiVideoBriefSchema'
 import { AiVideoUserError, advanceAiVideoJob, startAiVideoJob, summarizeJob } from '@/lib/services/ads/aiVideoJob'
 import { prisma } from '@/lib/db'
+import { refundReservation, reserveCredits, settleReservation } from '@/lib/credits/ledger'
+import { aiVideoUnits } from '@/lib/credits/prices'
+import { creditErrorResponse } from '@/lib/credits/charge'
 
 // Stitching (captions, end card, ffmpeg) happens inside a poll.
 export const maxDuration = 300
@@ -49,10 +53,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const apiKey = resolveApiKey()
   if (!apiKey) return NextResponse.json({ error: NO_KEY }, { status: 400 })
 
+  const jobId = randomUUID()
+  const key = `video:${jobId}`
   try {
-    const job = await startAiVideoJob(book, parsed.data.brief, apiKey)
+    await reserveCredits({
+      userId: publisherId,
+      action: 'ads.video.ai',
+      units: aiVideoUnits(parsed.data.brief.shots.map((s) => s.durationSec)),
+      refId: book.id,
+      key,
+    })
+  } catch (err) {
+    const creditResponse = creditErrorResponse(err)
+    if (creditResponse) return creditResponse
+    throw err
+  }
+  try {
+    const job = await startAiVideoJob(book, parsed.data.brief, apiKey, jobId)
     return NextResponse.json({ job: summarizeJob(job) }, { status: 202 })
   } catch (err) {
+    // A job row may exist and already be failed; the refund key is the same either way.
+    await refundReservation(key)
     if (err instanceof AiVideoUserError) return NextResponse.json({ error: err.message }, { status: 400 })
     console.error('ai video start failed', err)
     return NextResponse.json({ error: 'The AI video could not be started. Please try again.' }, { status: 500 })
@@ -77,6 +98,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       job = latest
     }
   }
+  // Idempotent: only the first settle/refund of a key applies, so every poll
+  // may call these. A throw here must not break the poll response — the next
+  // poll retries, since both calls are idempotent.
+  if (job?.status === 'completed') {
+    try {
+      await settleReservation(`video:${job.id}`, { costUsd: job.costUsd ?? undefined })
+    } catch (err) {
+      console.error('ai video credit settle failed', err)
+    }
+  }
+  if (job?.status === 'failed') {
+    try {
+      await refundReservation(`video:${job.id}`)
+    } catch (err) {
+      console.error('ai video credit refund failed', err)
+    }
+  }
+
   const info = apiKey ? await cachedVideoModelInfo(getVideoModelName(), apiKey) : null
 
   return NextResponse.json({

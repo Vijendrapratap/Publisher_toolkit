@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { AiVideoBrief } from './aiVideoBriefSchema'
 import { OpenRouterHttpError } from '@/lib/providers/aiVideo'
 
@@ -58,8 +58,10 @@ const { aiVideoJobStore, resetDb, getRows } = vi.hoisted(() => {
     aiVideoJobStore: {
       create: vi.fn(async ({ data }: any) => {
         idSeq += 1
-        const id = `job_${idSeq}`
-        const row = { id, status: 'running', videoUrl: null, posterUrl: null, error: null, createdAt: new Date(), updatedAt: new Date(), ...data }
+        // Mirrors real Prisma: an explicit id in `data` is used as the row's
+        // id; `id: undefined` (present but unset) falls back to a generated one.
+        const id = data.id ?? `job_${idSeq}`
+        const row = { status: 'running', videoUrl: null, posterUrl: null, error: null, createdAt: new Date(), updatedAt: new Date(), ...data, id }
         rows.set(id, row)
         return { ...row }
       }),
@@ -263,106 +265,19 @@ describe('startAiVideoJob', () => {
     expect(job.costUsd).toBe(0.84)
   })
 
-  describe('daily AI video spend cap', () => {
-    afterEach(() => {
-      delete process.env.AI_VIDEO_DAILY_LIMIT_USD
-    })
+  it('stores the billed-so-far total, not the full estimate, when submitting fails partway through', async () => {
+    vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockRejectedValueOnce(new Error('boom'))
+    await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow('boom')
+    const failedUpdate = vi.mocked(prisma.aiVideoJob.update).mock.calls.at(-1)![0] as any
+    expect(failedUpdate.data.status).toBe('failed')
+    // The one submitted shot has no billed costUsd yet (only polling learns that) — billed-so-far is 0, not the 0.84 estimate.
+    expect(failedUpdate.data.costUsd).toBe(0)
+  })
 
-    it('refuses before resolving any image once today’s spend plus this estimate would exceed the limit', async () => {
-      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
-      resetDb([
-        { id: 'earlier_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 0.5, createdAt: new Date(), updatedAt: new Date() },
-        { id: 'earlier_2', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 0.6, createdAt: new Date(), updatedAt: new Date() },
-      ])
-      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toBeInstanceOf(AiVideoUserError)
-      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow(/today.s AI video limit \(\$1\.00\)/)
-      expect(inlineImage).not.toHaveBeenCalled()
-      expect(submitVideoJob).not.toHaveBeenCalled()
-      expect(prisma.aiVideoJob.create).not.toHaveBeenCalled()
-    })
-
-    it('allows a job whose spend-plus-estimate stays under the limit', async () => {
-      process.env.AI_VIDEO_DAILY_LIMIT_USD = '5'
-      resetDb([
-        { id: 'earlier_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 1, createdAt: new Date(), updatedAt: new Date() },
-      ])
-      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
-      const job = await startAiVideoJob(book, brief, 'sk')
-      expect(job.costUsd).toBe(0.84)
-      expect(submitVideoJob).toHaveBeenCalledTimes(2)
-    })
-
-    it('excludes spend older than 24 hours from the running total', async () => {
-      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
-      resetDb([
-        {
-          id: 'yesterday_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 5,
-          createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000), updatedAt: new Date(),
-        },
-      ])
-      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
-      const job = await startAiVideoJob(book, brief, 'sk')
-      expect(job.costUsd).toBe(0.84)
-    })
-
-    it('excludes another publisher’s spend from the running total', async () => {
-      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
-      resetDb([
-        { id: 'other_pub', bookId: 'book_other', book: { publisherId: 'pub_other' }, status: 'completed', costUsd: 5, createdAt: new Date(), updatedAt: new Date() },
-      ])
-      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
-      const job = await startAiVideoJob(book, brief, 'sk')
-      expect(job.costUsd).toBe(0.84)
-    })
-
-    it('a limit of 0 disables AI video entirely, with a wording that says so rather than "$0.00"', async () => {
-      process.env.AI_VIDEO_DAILY_LIMIT_USD = '0'
-      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow('AI video is turned off on this server.')
-      expect(submitVideoJob).not.toHaveBeenCalled()
-    })
-
-    it('a failed job with no shots contributes 0 to the cap, not its stale estimated costUsd', async () => {
-      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
-      resetDb([
-        { id: 'failed_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'failed', costUsd: 5, shots: [], createdAt: new Date(), updatedAt: new Date() },
-      ])
-      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
-      const job = await startAiVideoJob(book, brief, 'sk')
-      expect(job.costUsd).toBe(0.84)
-    })
-
-    it('a failed job contributes only its billed shots, not its stale estimated costUsd', async () => {
-      process.env.AI_VIDEO_DAILY_LIMIT_USD = '2'
-      resetDb([
-        {
-          id: 'failed_2', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'failed', costUsd: 5,
-          shots: [{ jobId: 'x', durationSec: 5, status: 'completed', clipUrl: null, costUsd: 0.42 }],
-          createdAt: new Date(), updatedAt: new Date(),
-        },
-      ])
-      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
-      const job = await startAiVideoJob(book, brief, 'sk')
-      expect(job.costUsd).toBe(0.84) // 0.42 billed + 0.84 estimate = 1.26 <= $2; 5 + 0.84 would wrongly refuse
-    })
-
-    it('a non-failed job still contributes its costUsd as-is', async () => {
-      process.env.AI_VIDEO_DAILY_LIMIT_USD = '1'
-      // 'completed' (not 'running'/'stitching') so this row isn't also picked up as an active job to advance.
-      resetDb([
-        { id: 'completed_1', bookId: 'book_1', book: { publisherId: 'pub_1' }, status: 'completed', costUsd: 0.5, shots: [], createdAt: new Date(), updatedAt: new Date() },
-      ])
-      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow(/today.s AI video limit \(\$1\.00\)/) // 0.5 + 0.84 > 1
-      expect(submitVideoJob).not.toHaveBeenCalled()
-    })
-
-    it('stores the billed-so-far total, not the full estimate, when submitting fails partway through', async () => {
-      vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockRejectedValueOnce(new Error('boom'))
-      await expect(startAiVideoJob(book, brief, 'sk')).rejects.toThrow('boom')
-      const failedUpdate = vi.mocked(prisma.aiVideoJob.update).mock.calls.at(-1)![0] as any
-      expect(failedUpdate.data.status).toBe('failed')
-      // The one submitted shot has no billed costUsd yet (only polling learns that) — billed-so-far is 0, not the 0.84 estimate.
-      expect(failedUpdate.data.costUsd).toBe(0)
-    })
+  it('creates the job row with the given job id, so the caller can key a credit reservation to it', async () => {
+    vi.mocked(submitVideoJob).mockResolvedValueOnce('or_1').mockResolvedValueOnce('or_2')
+    const job = await startAiVideoJob(book, brief, 'sk', 'given-job-id')
+    expect(job.id).toBe('given-job-id')
   })
 })
 
