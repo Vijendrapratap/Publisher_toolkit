@@ -1,12 +1,17 @@
+import Link from 'next/link'
 import { SignIn } from '@clerk/nextjs'
 import { isClerkConfigured } from '@/lib/providers/auth'
-import { LoginForm } from '@/components/auth/LoginForm'
 
 export default function SignInPage() {
   if (!isClerkConfigured()) {
     return (
       <main className="grid min-h-dvh place-items-center bg-canvas p-6">
-        <LoginForm />
+        <div className="flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-ink">Local mode — you&apos;re signed in as the local publisher.</p>
+          <Link href="/" className="text-sm font-medium text-accent underline">
+            Go to the app
+          </Link>
+        </div>
       </main>
     )
   }

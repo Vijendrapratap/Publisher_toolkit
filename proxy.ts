@@ -1,20 +1,15 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { clerkMiddleware } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
-import { isClerkConfigured } from '@/lib/providers/auth'
+// Imported from the leaf module, not '@/lib/providers/auth': that file also
+// pulls in lib/credits/ledger.ts (Prisma, node:crypto), which the Edge
+// Runtime here can't code-split away — see lib/providers/clerk-config.ts.
+import { isClerkConfigured } from '@/lib/providers/clerk-config'
 
-// Anchored so only the sign-in and sign-up routes themselves are public —
-// the unanchored version also exempted paths like /sign-in-anything.
-// `/p/:slug` is a published book site and is public by design.
-const isPublicRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/p/(.*)'])
-
-// Local dev without real Clerk credentials: Clerk's own middleware rejects the
-// placeholder key outright, so skip it entirely and let
-// requireCurrentPublisherId()'s dev fallback handle auth downstream.
-export default isClerkConfigured()
-  ? clerkMiddleware(async (auth, req) => {
-      if (!isPublicRoute(req)) await auth.protect()
-    })
-  : () => NextResponse.next()
+// Auth is enforced per resource by requireCurrentPublisherId() (every API
+// route and platform page calls it), not by path matching here — Clerk
+// deprecated createRouteMatcher because matchers drift from Next's routing.
+// Public by construction: /sign-in, /sign-up, /p/:slug, /api/webhooks/clerk.
+export default isClerkConfigured() ? clerkMiddleware() : () => NextResponse.next()
 
 export const config = {
   matcher: [

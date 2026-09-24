@@ -1,83 +1,44 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@clerk/nextjs/server', () => ({ auth: vi.fn() }))
-vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: Object.assign(vi.fn(), { protect: vi.fn(async () => ({ userId: 'user_clerk_1' })) }),
+  currentUser: vi.fn(async () => ({ primaryEmailAddress: { emailAddress: 'reader@example.com' } })),
+}))
+vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), connection: vi.fn(async () => {}) }))
+vi.mock('@/lib/credits/ledger', () => ({ ensureUser: vi.fn(async (id: string) => ({ id })) }))
 
 import { auth } from '@clerk/nextjs/server'
-import { cookies } from 'next/headers'
-import {
-  requireCurrentPublisherId,
-  UnauthenticatedError,
-  isClerkConfigured,
-  DEV_PUBLISHER_ID,
-  PUBLISHER_COOKIE,
-} from './auth'
+import { ensureUser } from '@/lib/credits/ledger'
+import { DEV_PUBLISHER_ID, requireCurrentPublisherId } from './auth'
 
-const env = { ...process.env }
-
-function configureClerk() {
-  process.env.CLERK_SECRET_KEY = 'sk_test_abc123'
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_abc123'
+const setKeys = (on: boolean) => {
+  vi.stubEnv('CLERK_SECRET_KEY', on ? 'sk_test_real' : '')
+  vi.stubEnv('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', on ? 'pk_test_real' : '')
 }
-
-function mockCookie(value?: string) {
-  vi.mocked(cookies).mockResolvedValue({ get: () => (value ? { value } : undefined) } as never)
-}
-
-beforeEach(() => {
-  delete process.env.CLERK_SECRET_KEY
-  delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-  mockCookie()
-})
-
-afterEach(() => {
-  process.env = { ...env }
-  vi.mocked(auth).mockReset()
-})
-
-describe('isClerkConfigured', () => {
-  it('is false when the keys are unset', () => {
-    expect(isClerkConfigured()).toBe(false)
-  })
-
-  it('is false for the placeholder keys', () => {
-    process.env.CLERK_SECRET_KEY = 'sk_test_placeholder'
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_placeholder'
-    expect(isClerkConfigured()).toBe(false)
-  })
-
-  it('is false with a secret but no publishable key, which would crash at boot', () => {
-    process.env.CLERK_SECRET_KEY = 'sk_test_abc123'
-    expect(isClerkConfigured()).toBe(false)
-  })
-
-  it('is true once both real keys are present', () => {
-    configureClerk()
-    expect(isClerkConfigured()).toBe(true)
-  })
-})
 
 describe('requireCurrentPublisherId', () => {
-  it('returns the local publisher id without calling Clerk in local mode', async () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.unstubAllEnvs()
+  })
+
+  it('uses auth.protect() and ensures the user row when Clerk is configured', async () => {
+    setKeys(true)
+    await expect(requireCurrentPublisherId()).resolves.toBe('user_clerk_1')
+    expect(auth.protect).toHaveBeenCalled()
+    expect(ensureUser).toHaveBeenCalledWith('user_clerk_1', expect.any(Function))
+  })
+
+  it('falls back to the dev publisher outside production', async () => {
+    setKeys(false)
+    vi.stubEnv('NODE_ENV', 'development')
     await expect(requireCurrentPublisherId()).resolves.toBe(DEV_PUBLISHER_ID)
-    expect(auth).not.toHaveBeenCalled()
+    expect(ensureUser).toHaveBeenCalledWith(DEV_PUBLISHER_ID, expect.any(Function))
   })
 
-  it('reads the local session cookie when one is set', async () => {
-    mockCookie('pub_local_42')
-    await expect(requireCurrentPublisherId()).resolves.toBe('pub_local_42')
-    expect(PUBLISHER_COOKIE).toBe('pt_publisher_id')
-  })
-
-  it('returns the Clerk userId when signed in', async () => {
-    configureClerk()
-    vi.mocked(auth).mockResolvedValue({ userId: 'pub_123' } as never)
-    await expect(requireCurrentPublisherId()).resolves.toBe('pub_123')
-  })
-
-  it('throws UnauthenticatedError when signed out', async () => {
-    configureClerk()
-    vi.mocked(auth).mockResolvedValue({ userId: null } as never)
-    await expect(requireCurrentPublisherId()).rejects.toBeInstanceOf(UnauthenticatedError)
+  it('refuses the dev fallback in production', async () => {
+    setKeys(false)
+    vi.stubEnv('NODE_ENV', 'production')
+    await expect(requireCurrentPublisherId()).rejects.toThrow(/Clerk/)
   })
 })

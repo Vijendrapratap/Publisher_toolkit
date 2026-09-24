@@ -319,21 +319,6 @@ export function AccountChip({
               <ArrowRight className="size-3.5" />
             </Link>
           </div>
-
-          {/* Footer Strip */}
-          <div className="mt-3 flex items-center justify-end border-t border-line/60 pt-2 text-[11px] text-ink-muted">
-            <button
-              type="button"
-              onClick={async () => {
-                await fetch('/api/auth/logout', { method: 'POST' })
-                toast.success('Signed out')
-                window.location.href = '/sign-in'
-              }}
-              className="text-danger hover:underline font-medium"
-            >
-              Sign Out
-            </button>
-          </div>
         </div>
       )}
     </div>
