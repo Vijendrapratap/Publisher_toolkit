@@ -40,4 +40,10 @@ describe('POST /api/ads/projects/:id/music', () => {
     const big = new File([new Uint8Array(15 * 1024 * 1024 + 1)], 'long.mp3', { type: 'audio/mpeg' })
     expect((await POST(upload(big), ctx)).status).toBe(400)
   })
+
+  it('returns 404 for another publisher’s project', async () => {
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce(null)
+    const res = await POST(upload(new File([Buffer.from('ID3')], 'x.mp3', { type: 'audio/mpeg' })), ctx)
+    expect(res.status).toBe(404)
+  })
 })

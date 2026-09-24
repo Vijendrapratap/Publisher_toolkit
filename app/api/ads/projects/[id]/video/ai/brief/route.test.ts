@@ -55,4 +55,10 @@ describe('POST /api/ads/projects/:id/video/ai/brief', () => {
     const res = await POST(req({ current: { shots: [] } }), ctx)
     expect(res.status).toBe(400)
   })
+
+  it('returns 404 for another publisher’s project', async () => {
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce(null)
+    const res = await POST(req({}), ctx)
+    expect(res.status).toBe(404)
+  })
 })

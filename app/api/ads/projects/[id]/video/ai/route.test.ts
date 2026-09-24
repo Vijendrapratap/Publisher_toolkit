@@ -105,6 +105,11 @@ describe('POST /api/ads/projects/:id/video/ai', () => {
     delete process.env.OPENROUTER_API_KEY
     expect((await POST(post({ brief }), ctx)).status).toBe(400)
   })
+
+  it('returns 404 for another publisher’s project', async () => {
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce(null)
+    expect((await POST(post({ brief }), ctx)).status).toBe(404)
+  })
 })
 
 describe('GET /api/ads/projects/:id/video/ai', () => {
@@ -199,5 +204,11 @@ describe('GET /api/ads/projects/:id/video/ai', () => {
     expect(res.status).toBe(200)
     expect((await res.json()).job).toMatchObject({ id: 'j3', status: 'completed' })
     errorSpy.mockRestore()
+  })
+
+  it('returns 404 for another publisher’s project', async () => {
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce(null)
+    const res = await GET(new Request('http://localhost'), ctx)
+    expect(res.status).toBe(404)
   })
 })
