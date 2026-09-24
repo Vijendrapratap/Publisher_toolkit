@@ -97,7 +97,10 @@ export function GenerateRunner({
         setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       } finally {
         clearInterval(timer)
-        if (!cancelled.current) window.dispatchEvent(new Event('credits:changed'))
+        // Dispatched even after a user cancel: the abort only stops the
+        // client from waiting — the server-side generation (and its credit
+        // charge) keeps running to completion.
+        window.dispatchEvent(new Event('credits:changed'))
       }
     })()
 
