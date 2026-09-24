@@ -148,8 +148,17 @@ export function refundReservation(key: string): Promise<void> {
 let lastSweep = 0
 
 /**
- * Refunds reservations a crashed request never closed. AI video is excluded:
- * its jobs legitimately run for up to a day and are closed by the status poll.
+ * Refunds reservations a crashed request never closed.
+ *
+ * `ads.video.ai` reservations aren't simply crashed: they cover jobs that
+ * legitimately run for up to a day and are normally closed by the status
+ * poll (`GET .../video/ai`) as the job completes or fails. But that poll
+ * only ever advances the *latest* job for a book, so an earlier job that got
+ * superseded by a newer one — or a POST that died between reserving credits
+ * and creating the job row — has no poll left to close it. For those, look
+ * the job up by the id embedded in the key (`video:<jobId>`, set by the
+ * route) and settle/refund to match what actually happened to it; a job
+ * still `running`/`stitching` is left alone, same as it would be by the poll.
  */
 export async function sweepStaleReservations(opts: { force?: boolean; now?: number } = {}): Promise<number> {
   const now = opts.now ?? Date.now()
@@ -157,14 +166,22 @@ export async function sweepStaleReservations(opts: { force?: boolean; now?: numb
   lastSweep = now
 
   const stale = await prisma.creditLedger.findMany({
-    where: {
-      kind: 'reserve',
-      settled: false,
-      createdAt: { lt: new Date(now - STALE_MS) },
-      NOT: { action: 'ads.video.ai' },
-    },
-    select: { idempotencyKey: true },
+    where: { kind: 'reserve', settled: false, createdAt: { lt: new Date(now - STALE_MS) } },
+    select: { idempotencyKey: true, action: true },
   })
-  for (const row of stale) await refundReservation(row.idempotencyKey)
+  for (const row of stale) {
+    if (row.action !== 'ads.video.ai') {
+      await refundReservation(row.idempotencyKey)
+      continue
+    }
+    const jobId = row.idempotencyKey.slice('video:'.length)
+    const job = await prisma.aiVideoJob.findUnique({ where: { id: jobId }, select: { status: true, costUsd: true } })
+    if (!job || job.status === 'failed') {
+      await refundReservation(row.idempotencyKey)
+    } else if (job.status === 'completed') {
+      await settleReservation(row.idempotencyKey, { costUsd: job.costUsd ?? undefined })
+    }
+    // running/stitching: still in flight — leave it for the poll (or a later sweep) to close.
+  }
   return stale.length
 }

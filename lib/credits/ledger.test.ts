@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { prisma } from '@/lib/db'
 import {
@@ -103,20 +104,57 @@ describe('reserve / settle / refund', () => {
 })
 
 describe('sweepStaleReservations', () => {
-  it('refunds only unsettled, non-video reservations older than 30 minutes', async () => {
-    const id = await newUser()
+  const videoBookIds: string[] = []
+
+  afterEach(async () => {
+    await prisma.aiVideoJob.deleteMany({ where: { bookId: { in: videoBookIds } } })
+    await prisma.book.deleteMany({ where: { id: { in: videoBookIds } } })
+    videoBookIds.length = 0
+  })
+
+  const newVideoJob = async (status: string, costUsd: number | null = null) => {
+    const book = await prisma.book.create({ data: { publisherId: `${PREFIX}pub` } })
+    videoBookIds.push(book.id)
+    return prisma.aiVideoJob.create({ data: { bookId: book.id, status, model: 'm', format: '16:9', brief: {}, shots: [], costUsd } })
+  }
+
+  it('refunds stale non-video reservations; for video ones, follows the job: held while running, refunded if failed or missing, settled (no refund) if completed', async () => {
+    const startingBalance = 1000
+    const id = await newUser(startingBalance)
     const old = new Date(Date.now() - 31 * 60 * 1000)
-    const stale = await reserveCredits({ userId: id, action: 'ads.image' })
-    const video = await reserveCredits({ userId: id, action: 'ads.video.ai' })
+
+    const staleNonVideo = await reserveCredits({ userId: id, action: 'ads.image' })
     const fresh = await reserveCredits({ userId: id, action: 'landing.agent' })
+
+    const runningJob = await newVideoJob('running')
+    const runningRes = await reserveCredits({ userId: id, action: 'ads.video.ai', key: `video:${runningJob.id}` })
+
+    const missingRes = await reserveCredits({ userId: id, action: 'ads.video.ai', key: `video:${randomUUID()}` })
+
+    const failedJob = await newVideoJob('failed')
+    const failedRes = await reserveCredits({ userId: id, action: 'ads.video.ai', key: `video:${failedJob.id}` })
+
+    const completedJob = await newVideoJob('completed', 0.5)
+    const completedRes = await reserveCredits({ userId: id, action: 'ads.video.ai', key: `video:${completedJob.id}` })
+
     await prisma.creditLedger.updateMany({
-      where: { idempotencyKey: { in: [stale.key, video.key] } },
+      where: { idempotencyKey: { in: [staleNonVideo.key, runningRes.key, missingRes.key, failedRes.key, completedRes.key] } },
       data: { createdAt: old },
     })
 
     await sweepStaleReservations({ force: true })
 
-    expect(await getBalance(id)).toBe(SIGNUP_CREDITS - video.credits - fresh.credits)
+    // Held/settled reservations still count against the balance; refunded ones don't.
+    expect(await getBalance(id)).toBe(startingBalance - fresh.credits - runningRes.credits - completedRes.credits)
+
+    expect((await prisma.creditLedger.findUniqueOrThrow({ where: { idempotencyKey: staleNonVideo.key } })).settled).toBe(true)
+    expect((await prisma.creditLedger.findUniqueOrThrow({ where: { idempotencyKey: runningRes.key } })).settled).toBe(false)
+    expect((await prisma.creditLedger.findUniqueOrThrow({ where: { idempotencyKey: missingRes.key } })).settled).toBe(true)
+    expect((await prisma.creditLedger.findUniqueOrThrow({ where: { idempotencyKey: failedRes.key } })).settled).toBe(true)
+    expect(await prisma.creditLedger.findUniqueOrThrow({ where: { idempotencyKey: completedRes.key } })).toMatchObject({
+      settled: true,
+      costUsd: 0.5,
+    })
   })
 })
 

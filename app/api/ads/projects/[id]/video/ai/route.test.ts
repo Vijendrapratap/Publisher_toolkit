@@ -74,6 +74,15 @@ describe('POST /api/ads/projects/:id/video/ai', () => {
     expect(res.status).toBe(400)
     expect(refundReservation).toHaveBeenCalledWith(vi.mocked(reserveCredits).mock.calls[0][0].key)
   })
+  it('still returns the original error when the refund itself throws', async () => {
+    vi.mocked(startAiVideoJob).mockRejectedValueOnce(new AiVideoUserError('already running'))
+    vi.mocked(refundReservation).mockRejectedValueOnce(new Error('db blip'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await POST(post({ brief: twoShotBrief }), ctx)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('already running')
+    errorSpy.mockRestore()
+  })
   it('explains fixable problems as 400s', async () => {
     vi.mocked(startAiVideoJob).mockRejectedValue(new AiVideoUserError("can't make 1:1 videos"))
     const res = await POST(post({ brief }), ctx)

@@ -72,8 +72,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const job = await startAiVideoJob(book, parsed.data.brief, apiKey, jobId)
     return NextResponse.json({ job: summarizeJob(job) }, { status: 202 })
   } catch (err) {
-    // A job row may exist and already be failed; the refund key is the same either way.
-    await refundReservation(key)
+    // A job row may exist and already be failed; the refund key is the same
+    // either way. A failure here must not mask the original error below — the
+    // sweep closes anything this leaves stuck (unsettled + no/failed job row).
+    try {
+      await refundReservation(key)
+    } catch (refundErr) {
+      console.error('ai video credit refund failed', key, refundErr)
+    }
     if (err instanceof AiVideoUserError) return NextResponse.json({ error: err.message }, { status: 400 })
     console.error('ai video start failed', err)
     return NextResponse.json({ error: 'The AI video could not be started. Please try again.' }, { status: 500 })
