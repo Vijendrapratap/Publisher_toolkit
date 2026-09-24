@@ -58,6 +58,25 @@ async function assertPublicUrl(url: URL): Promise<void> {
   }
 }
 
+const MAX_REDIRECTS = 5
+
+/** fetch that re-runs the public-address check on every redirect hop. */
+async function fetchPublic(url: URL, fetchFn: typeof fetch): Promise<{ res: Response; finalUrl: URL }> {
+  let current = url
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    await assertPublicUrl(current)
+    const res = await fetchFn(current.toString(), {
+      headers: BROWSER_HEADERS,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
+    const location = res.headers.get('location')
+    if (res.status < 300 || res.status >= 400 || !location) return { res, finalUrl: current }
+    current = new URL(location, current)
+  }
+  throw new Error('That link redirects too many times.')
+}
+
 /** Reads a capped number of bytes, so a huge or endless response cannot exhaust memory. */
 async function readCapped(res: Response, maxBytes: number): Promise<Buffer> {
   const declared = Number(res.headers.get('content-length') ?? 0)
@@ -194,24 +213,18 @@ export async function extractBookFromUrl(
   } catch {
     throw new Error('Invalid URL: please enter a valid website address.')
   }
-  await assertPublicUrl(url)
-
-  const res = await fetchFn(url.toString(), {
-    headers: BROWSER_HEADERS,
-    redirect: 'follow',
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  })
+  const { res, finalUrl } = await fetchPublic(url, fetchFn)
   if (!res.ok) {
     throw new Error(`Could not fetch details from this URL (HTTP ${res.status}).`)
   }
 
   const html = (await readCapped(res, MAX_HTML_BYTES)).toString('utf-8')
-  const parsed = parseBookHtml(html, url.toString())
+  const parsed = parseBookHtml(html, finalUrl.toString())
 
   const { rawCoverImageUrl, ...facts } = parsed
   return {
     ...facts,
-    coverUrl: await storeCover(rawCoverImageUrl, url, publisherId, fetchFn),
+    coverUrl: await storeCover(rawCoverImageUrl, finalUrl, publisherId, fetchFn),
   }
 }
 
@@ -226,12 +239,7 @@ async function storeCover(
 
   try {
     const imageUrl = new URL(rawUrl, pageUrl)
-    await assertPublicUrl(imageUrl)
-
-    const res = await fetchFn(imageUrl.toString(), {
-      headers: BROWSER_HEADERS,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    })
+    const { res } = await fetchPublic(imageUrl, fetchFn)
     if (!res.ok) return null
 
     const contentType = res.headers.get('content-type')?.split(';')[0] || 'image/jpeg'

@@ -110,4 +110,17 @@ describe('extractBookFromUrl', () => {
     ).rejects.toThrow(/cannot be reached/)
     expect(mockFetch).not.toHaveBeenCalled()
   })
+
+  it('refuses a redirect to a private address', async () => {
+    vi.mocked(lookup)
+      .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }] as never)
+      .mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }] as never)
+    const mockFetch = vi.fn().mockResolvedValueOnce(
+      new Response(null, { status: 302, headers: { location: 'http://metadata.internal/latest' } })
+    )
+
+    await expect(extractBookFromUrl('https://example.com/book', 'pub_1', mockFetch as never)).rejects.toThrow(/cannot be reached/)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mockFetch.mock.calls[0][1]).toMatchObject({ redirect: 'manual' })
+  })
 })
