@@ -4,12 +4,20 @@ Triaged and deliberately deferred. Everything listed here is reachable but not
 blocking. Items fixed in the platform-hardening pass are recorded at the bottom
 so they are not re-litigated.
 
-## Before anyone sets a real Clerk key
+## Security
 
-- **`createRouteMatcher` is deprecated** — Clerk logs a warning on every boot.
-  Look up the current API once and apply it in `proxy.ts`.
-- **No route test covers the protected/public split.** `proxy.ts` is only
-  exercised by hand. Worth one test once real keys exist.
+- **DNS rebinding in the URL importer.** `assertPublicUrl` resolves the host,
+  then `fetch` resolves it again; a rebinding DNS server can answer
+  differently. Pinning the checked IP needs a custom `undici` dispatcher.
+- **Rate limit is per instance** (`lib/rateLimit.ts`).
+- **`npm audit --omit=dev` reports 3 high-severity findings, all the same
+  advisory:** `deepmerge-ts < 8.0.0` (GHSA-ggr8-5vv4-36mx, stack exhaustion
+  merging recursive object graphs) via `@prisma/config` via `prisma`. No fix
+  is available without `--force`, which would install `prisma@6.12.0` — a
+  downgrade from the pinned `^6.19.3` and a breaking change we don't want to
+  make unreviewed. The vulnerable code path is the `prisma` CLI's own config
+  merging (dev/build tooling), not `@prisma/client` at runtime. Revisit when
+  a non-breaking fix is published.
 
 ## Before enabling Vercel Blob storage
 
