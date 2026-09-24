@@ -8,9 +8,11 @@ export const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image'
 export const DEFAULT_VIDEO_MODEL = 'kwaivgi/kling-v3.0-std'
 
 /**
- * A publisher can bring their own OpenRouter account; the server key is the
- * fallback. Never read `process.env.OPENROUTER_API_KEY` directly elsewhere —
- * that skips the publisher's own key.
+ * All production AI calls run on the platform key
+ * (`process.env.OPENROUTER_API_KEY`) so every generation can be billed in
+ * credits. `apiKey` exists only so tests can inject a key without touching
+ * env vars — no production caller sets it. `model` is the one real override
+ * callers pass.
  */
 export interface AiCredentials {
   apiKey?: string | null

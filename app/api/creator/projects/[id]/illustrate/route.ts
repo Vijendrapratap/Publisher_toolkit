@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { isAiConfigured } from '@/lib/providers/ai'
 import { getCreatorProjectForPublisher, updateCreatorProject } from '@/lib/services/creator/queries'
 import { illustrateProject } from '@/lib/services/creator/illustrate'
@@ -24,29 +23,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Generate the book content before illustrating it.' }, { status: 400 })
   }
 
-  const credentials = await getPublisherAiCredentials(publisherId)
-  if (!isAiConfigured({ apiKey: credentials.apiKey })) {
-    return NextResponse.json(
-      { error: 'Add an OpenRouter API key in Settings to generate illustrations.' },
-      { status: 400 }
-    )
+  if (!isAiConfigured()) {
+    return NextResponse.json({ error: 'Illustrations are not available right now.' }, { status: 400 })
   }
 
   const { regenerate } = bodySchema.parse((await request.json().catch(() => ({}))) ?? {})
 
   try {
-    const result = await illustrateProject(
-      {
-        projectId: project.id,
-        publisherId,
-        title: project.title || 'Untitled Book',
-        styleTheme: project.styleTheme || 'watercolor storybook',
-        content: project.content,
-        regenerate,
-        existingCoverUrl: project.coverImageUrl,
-      },
-      credentials
-    )
+    const result = await illustrateProject({
+      projectId: project.id,
+      publisherId,
+      title: project.title || 'Untitled Book',
+      styleTheme: project.styleTheme || 'watercolor storybook',
+      content: project.content,
+      regenerate,
+      existingCoverUrl: project.coverImageUrl,
+    })
 
     // Persist whatever succeeded: a partial set of illustrations is still worth
     // keeping, and re-running fills only the gaps.

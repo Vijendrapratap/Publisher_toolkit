@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fallbackBrief } from '@/lib/services/ads/aiVideoBriefSchema'
 
 const book = { id: 'book_1', title: 'T' }
@@ -6,11 +6,10 @@ const jobRow = { id: 'job_1', status: 'running', videoUrl: null, posterUrl: null
 
 vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
 vi.mock('@/lib/services/ads/queries', () => ({ getBookForPublisher: vi.fn() }))
-vi.mock('@/lib/publisher/settings', () => ({ getPublisherAiCredentials: vi.fn() }))
-vi.mock('@/lib/providers/ai', () => ({
-  resolveApiKey: (c?: { apiKey?: string | null }) => c?.apiKey || undefined,
-  getVideoModelName: () => 'kwaivgi/kling-v3.0-std',
-}))
+vi.mock('@/lib/providers/ai', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/providers/ai')>()
+  return { ...actual, getVideoModelName: () => 'kwaivgi/kling-v3.0-std' }
+})
 vi.mock('@/lib/providers/aiVideo', () => ({ getVideoModelInfo: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/db', () => ({ prisma: { aiVideoJob: { findFirst: vi.fn() } } }))
 vi.mock('@/lib/services/ads/aiVideoJob', async (importOriginal) => {
@@ -20,7 +19,6 @@ vi.mock('@/lib/services/ads/aiVideoJob', async (importOriginal) => {
 
 import { GET, POST, __resetVideoModelInfoCacheForTests } from './route'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { getVideoModelInfo } from '@/lib/providers/aiVideo'
 import { prisma } from '@/lib/db'
 import { AiVideoUserError, advanceAiVideoJob, startAiVideoJob } from '@/lib/services/ads/aiVideoJob'
@@ -29,11 +27,20 @@ const ctx = { params: Promise.resolve({ id: 'book_1' }) }
 const post = (body: unknown) => new Request('http://localhost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 const brief = fallbackBrief({ title: 'T', pageCount: 0 })
 
+// The route runs on the platform key only, read straight from the env var.
+let prevApiKey: string | undefined
+
 beforeEach(() => {
   vi.clearAllMocks()
   __resetVideoModelInfoCacheForTests()
   vi.mocked(getBookForPublisher).mockResolvedValue(book as any)
-  vi.mocked(getPublisherAiCredentials).mockResolvedValue({ apiKey: 'sk', model: null })
+  prevApiKey = process.env.OPENROUTER_API_KEY
+  process.env.OPENROUTER_API_KEY = 'sk'
+})
+
+afterEach(() => {
+  if (prevApiKey === undefined) delete process.env.OPENROUTER_API_KEY
+  else process.env.OPENROUTER_API_KEY = prevApiKey
 })
 
 describe('POST /api/ads/projects/:id/video/ai', () => {
@@ -63,7 +70,7 @@ describe('POST /api/ads/projects/:id/video/ai', () => {
   })
   it('rejects an invalid brief and a missing key', async () => {
     expect((await POST(post({ brief: { shots: [] } }), ctx)).status).toBe(400)
-    vi.mocked(getPublisherAiCredentials).mockResolvedValue({ apiKey: null, model: null })
+    delete process.env.OPENROUTER_API_KEY
     expect((await POST(post({ brief }), ctx)).status).toBe(400)
   })
 })

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { getVideoModelName, resolveApiKey } from '@/lib/providers/ai'
 import { getVideoModelInfo, type VideoModelInfo } from '@/lib/providers/aiVideo'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
@@ -13,7 +12,7 @@ import { prisma } from '@/lib/db'
 export const maxDuration = 300
 
 const bodySchema = z.object({ brief: aiVideoBriefSchema })
-const NO_KEY = 'Add an OpenRouter API key in Settings to use AI video.'
+const NO_KEY = 'AI video is not available right now.'
 
 // The panel polls this route every 5s while a job is active; the model's
 // price/durations/aspect ratios barely ever change, so re-fetching them from
@@ -47,7 +46,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Check the video prompt' }, { status: 400 })
   }
-  const apiKey = resolveApiKey(await getPublisherAiCredentials(publisherId))
+  const apiKey = resolveApiKey()
   if (!apiKey) return NextResponse.json({ error: NO_KEY }, { status: 400 })
 
   try {
@@ -66,7 +65,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const book = await getBookForPublisher(publisherId, id)
   if (!book) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
-  const apiKey = resolveApiKey(await getPublisherAiCredentials(publisherId))
+  const apiKey = resolveApiKey()
   const latest = await prisma.aiVideoJob.findFirst({ where: { bookId: book.id }, orderBy: { createdAt: 'desc' } })
   let job = latest
   if (latest && apiKey) {

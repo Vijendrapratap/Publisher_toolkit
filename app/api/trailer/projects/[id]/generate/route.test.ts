@@ -3,9 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/providers/auth', () => ({
   requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1'),
 }))
-vi.mock('@/lib/publisher/settings', () => ({
-  getPublisherAiCredentials: vi.fn().mockResolvedValue({ apiKey: null, model: null }),
-}))
 vi.mock('@/lib/providers/storage', () => ({
   storeFile: vi.fn().mockResolvedValue({ url: 'https://blob.example/asset' }),
   readStoredFile: vi.fn().mockResolvedValue({ data: Buffer.from('fake-cover'), contentType: 'image/png' }),

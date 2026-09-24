@@ -10,8 +10,6 @@ export const metadata: Metadata = {
 
 export default async function SettingsPage() {
   const publisherId = await requireCurrentPublisherId()
-  // Redacted: this object is serialised into the client component's props,
-  // and it now carries the publisher's OpenRouter key.
   const settings = redactSettings(await getPublisherSettings(publisherId))
 
   return <SettingsForm initial={settings} />

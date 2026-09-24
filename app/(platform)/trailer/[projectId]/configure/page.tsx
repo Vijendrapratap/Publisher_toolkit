@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { isAiConfigured } from '@/lib/providers/ai'
 import { getTrailerProjectForPublisher } from '@/lib/services/trailer/queries'
 import {
@@ -25,14 +24,12 @@ export default async function TrailerConfigureStepPage({
   const project = await getTrailerProjectForPublisher(publisherId, projectId)
   if (!project) notFound()
 
-  const credentials = await getPublisherAiCredentials(publisherId)
-
   return (
     <TrailerConfigureForm
       projectId={project.id}
       error={error}
       // Only offer the photographic background when a key will actually answer.
-      aiConfigured={isAiConfigured({ apiKey: credentials.apiKey })}
+      aiConfigured={isAiConfigured()}
       proof={{ rating: project.rating, reviewCount: project.reviewCount, price: project.price }}
       initial={{
         aspectRatios: (project.aspectRatios.length > 0 ? project.aspectRatios : ['1:1', '16:9']).map((a) =>

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getLandingProjectForPublisher } from '@/lib/services/landing/queries'
 import { runAuthorLandingAgent, authorLandingAgentInputSchema } from '@/lib/services/landing/agent'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { prisma } from '@/lib/db'
 
 export const maxDuration = 120
@@ -39,8 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     )
   }
 
-  const credentials = await getPublisherAiCredentials(publisherId)
-  const { data: generated, source, reason } = await runAuthorLandingAgent(parseResult.data, credentials)
+  const { data: generated, source, reason } = await runAuthorLandingAgent(parseResult.data)
 
   // Persist the synthesized output into the project record
   const updated = await prisma.landingProject.update({

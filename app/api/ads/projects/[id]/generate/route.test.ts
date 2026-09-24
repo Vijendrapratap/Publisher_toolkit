@@ -7,9 +7,6 @@ const book = {
 
 vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
 vi.mock('@/lib/services/ads/queries', () => ({ getBookForPublisher: vi.fn() }))
-vi.mock('@/lib/publisher/settings', () => ({
-  getPublisherAiCredentials: vi.fn().mockResolvedValue({ apiKey: null, model: null }),
-}))
 vi.mock('@/lib/services/ads/copy', () => ({ generateAdCopy: vi.fn() }))
 vi.mock('@/lib/services/ads/render', () => ({ renderCreativeImages: vi.fn() }))
 vi.mock('@/lib/services/ads/renderVideo', () => ({

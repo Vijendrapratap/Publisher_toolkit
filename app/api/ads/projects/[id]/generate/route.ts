@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { generateAdCopy, type AdPlatform } from '@/lib/services/ads/copy'
 import { renderCreativeImages } from '@/lib/services/ads/render'
@@ -28,10 +27,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const details = { title: book.title ?? '', author: book.author ?? '', blurb: book.blurb ?? '' }
 
   try {
-    const [coverFile, credentials] = await Promise.all([
-      readStoredFile(book.frontCoverUrl),
-      getPublisherAiCredentials(publisherId),
-    ])
+    const coverFile = await readStoredFile(book.frontCoverUrl)
     const objective = getCampaignObjective(book.campaignObjective)
     const ctaText = book.ctaText ?? objective.defaultCta
 
@@ -43,7 +39,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         targetAudience: book.targetAudience ?? undefined,
         customHook: book.customHook ?? undefined,
         ctaText,
-        credentials,
       }),
       renderCreativeImages({
         coverImageUrl: toDataUri(coverFile),

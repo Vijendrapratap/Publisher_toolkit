@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 import { getTrailerProjectForPublisher } from '@/lib/services/trailer/queries'
 import { renderVideoAd, VideoAdRenderError } from '@/lib/services/videoad/render'
 import { generateAdScene, generateAdScript } from '@/lib/services/videoad/copy'
@@ -25,8 +24,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const preset = project.adPreset
     ? getPreset(project.adPreset)
     : inferPreset({ categories: project.categories, title: project.title })
-
-  const credentials = await getPublisherAiCredentials(publisherId)
 
   const readImage = (url: string | null) =>
     url
@@ -58,15 +55,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
               rating: project.rating,
               reviewCount: project.reviewCount,
             },
-            preset.key,
-            credentials
+            preset.key
           ),
       readImage(project.frontCoverUrl),
       Promise.all(project.interiorImageUrls.slice(0, 4).map(readImage)).then((images) =>
         images.filter((image): image is Buffer => image !== null)
       ),
       project.aiScene
-        ? generateAdScene({ title: project.title ?? '', categories: project.categories }, preset.key, credentials)
+        ? generateAdScene({ title: project.title ?? '', categories: project.categories }, preset.key)
         : Promise.resolve(null),
     ])
 

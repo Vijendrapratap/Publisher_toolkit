@@ -3,7 +3,6 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { createBookProjectSchema } from '@/lib/services/creator/options'
 import { generateBookProjectContent } from '@/lib/services/creator/generator'
 import { createCreatorProject, getCreatorProjectsForPublisher } from '@/lib/services/creator/queries'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -25,8 +24,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const credentials = await getPublisherAiCredentials(publisherId)
-    const { data: content, source, reason } = await generateBookProjectContent(parsed.data, credentials)
+    const { data: content, source, reason } = await generateBookProjectContent(parsed.data)
     const project = await createCreatorProject(publisherId, parsed.data, content)
 
     // `source` lets the studio tell the publisher they are looking at sample

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getCreatorProjectForPublisher, updateCreatorProject } from '@/lib/services/creator/queries'
 import { generateIndividualChapter } from '@/lib/services/creator/generator'
-import { getPublisherAiCredentials } from '@/lib/publisher/settings'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -38,7 +37,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const prevChapter = chapterIdx > 0 ? chapters[chapterIdx - 1] : undefined
 
   try {
-    const credentials = await getPublisherAiCredentials(publisherId)
     const {
       data: { content, wordCount },
       source,
@@ -51,7 +49,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       chapterSummary: targetChapter.summary,
       previousChapterSummary: prevChapter ? prevChapter.summary : undefined,
       styleTheme: project.styleTheme || 'thriller_suspense',
-    }, credentials)
+    })
 
     chapters[chapterIdx] = {
       ...targetChapter,
