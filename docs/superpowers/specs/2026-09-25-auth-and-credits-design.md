@@ -173,6 +173,35 @@ Vitest on embedded Postgres:
 Playwright (Clerk test mode): sign up → balance 20 → generate image ads →
 balance 17.
 
+## Refinements from planning (override the sections above)
+
+- **Ads generation charges the price of the book's content goal** (the price
+  the picker showed): A+ 4, Image Ads 3, Video 2; legacy `all` projects 9.
+  Copy is included. A video-goal run whose video fails is refunded.
+- **Reservation keys are server-generated** (`reserve:<uuid>`, `video:<jobId>`);
+  no client `Idempotency-Key` header. Double-submits are prevented by the
+  existing disabled-while-pending buttons and the one-active-AI-video index.
+  Settle/refund stay idempotent per key.
+- **Fallback output is free:** a route whose AI call returned
+  `source: 'fallback'` settles with `usedUnits: 0` (full refund).
+- **AI video:** reserved per started 5-second block per shot; a failed job is
+  refunded in full (the user got nothing usable); settled on completion. The
+  stale sweep skips AI video, whose jobs are closed by the status poll.
+- **Global cap is in credits, not USD:** `PLATFORM_DAILY_CREDIT_LIMIT`
+  (default 5000) over the last 24h of net reservations. `costUsd` is recorded
+  where the provider reports it (AI video today); the credit report shows
+  "cost unknown" counts for the rest.
+- **402 UX:** the error message ("This needs N credits and you have M.") plus a
+  link to a `/credits` page (balance + history, "buying coming soon") instead of
+  a modal.
+- **Proxy:** `clerkMiddleware()` with no path matching; auth is enforced by
+  `auth.protect()` inside `requireCurrentPublisherId()` and in the platform
+  layout. The prod no-keys guard lives in `instrumentation.ts`.
+- **Security finding:** the URL importer followed redirects without re-checking
+  the target, so a public URL could redirect to cloud metadata. Fixed by
+  following redirects manually and checking every hop.
+- **Ops:** `scripts/grant-credits.mjs` for support adjustments.
+
 ## Out of scope
 
 Payments/checkout (3), per-output ads UX (4), scraper (5), prompt/model work (6),
