@@ -28,6 +28,7 @@ import {
   type VoiceModelKey,
   type AudioFormatKey,
 } from '@/lib/services/audiobook/options'
+import { CREDIT_PRICES } from '@/lib/credits/prices'
 
 export interface AudiobookChapterInput {
   id?: string
@@ -398,7 +399,8 @@ export function AudiobookConfigureForm({
           {chapters.length} chapter{chapters.length === 1 ? '' : 's'} ready for synthesis
         </span>
         <Button type="submit" size="lg" loading={pending}>
-          <Sparkles className="size-4" aria-hidden /> Synthesize Audiobook
+          <Sparkles className="size-4" aria-hidden />{' '}
+          {`Synthesize Audiobook · ${CREDIT_PRICES['audiobook.tts']} credits per 10 min`}
         </Button>
       </div>
     </form>

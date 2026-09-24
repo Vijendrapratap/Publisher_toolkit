@@ -7,6 +7,7 @@ import { ServiceSwitcher } from './ServiceSwitcher'
 import { LocalModeBadge } from './LocalModeBadge'
 import { ThemeToggle } from './ThemeToggle'
 import { AccountChip } from './AccountChip'
+import { CreditBalance } from './CreditBalance'
 
 export function TopBar() {
   const status = getCapabilityStatus()
@@ -25,6 +26,7 @@ export function TopBar() {
         <ServiceSwitcher services={SERVICES} />
         <div className="ml-auto flex items-center gap-2">
           <LocalModeBadge />
+          <CreditBalance />
           <ThemeToggle />
           <AccountChip status={status} isClerk={isClerk} />
         </div>

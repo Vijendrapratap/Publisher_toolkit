@@ -18,6 +18,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/components/ui/cn'
 import type { NovelContent, ChapterItem } from '@/lib/services/creator/types'
+import { CREDIT_PRICES } from '@/lib/credits/prices'
 
 export function NovelChapterViewer({
   projectId,
@@ -71,6 +72,7 @@ export function NovelChapterViewer({
       })
     } finally {
       setGenerating(false)
+      window.dispatchEvent(new Event('credits:changed'))
     }
   }
 
@@ -188,7 +190,8 @@ export function NovelChapterViewer({
                     loading={generating}
                     onClick={handleGenerateChapter}
                   >
-                    <Wand2 className="size-3.5" /> Rewrite
+                    <Wand2 className="size-3.5" />
+                    {`Rewrite · ${CREDIT_PRICES['creator.generate']} credits`}
                   </Button>
                 </div>
               ) : null}
@@ -228,7 +231,8 @@ export function NovelChapterViewer({
                     </>
                   ) : (
                     <>
-                      <Wand2 className="size-4" /> Write Chapter {activeChapter.chapterNumber}
+                      <Wand2 className="size-4" />
+                      {`Write Chapter ${activeChapter.chapterNumber} · ${CREDIT_PRICES['creator.generate']} credits`}
                     </>
                   )}
                 </Button>

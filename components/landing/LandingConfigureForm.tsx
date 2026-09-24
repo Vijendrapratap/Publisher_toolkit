@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input, Textarea, Field } from '@/components/ui/field'
 import { cn } from '@/components/ui/cn'
+import { CREDIT_PRICES } from '@/lib/credits/prices'
 import {
   LANDING_TEMPLATES,
   THEME_OPTIONS,
@@ -214,6 +215,7 @@ export function LandingConfigureForm({
       toast.error(err.message || 'Failed to generate landing page with AI')
     } finally {
       setAgentRunning(false)
+      window.dispatchEvent(new Event('credits:changed'))
     }
   }
 
@@ -484,7 +486,8 @@ export function LandingConfigureForm({
                 onClick={handleRunAgent}
                 className="shadow-card"
               >
-                <Sparkles className="size-4" /> Synthesize with DeepSeek v4.1
+                <Sparkles className="size-4" />{' '}
+                {`Synthesize with DeepSeek v4.1 · ${CREDIT_PRICES['landing.agent']} credits`}
               </Button>
             </div>
           </div>

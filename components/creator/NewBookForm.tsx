@@ -26,6 +26,7 @@ import {
   INSPIRATION_TEMPLATES,
   type BookTypeKey,
 } from '@/lib/services/creator/options'
+import { CREDIT_PRICES } from '@/lib/credits/prices'
 
 const ICONS_MAP: Record<string, any> = {
   baby: Baby,
@@ -135,6 +136,7 @@ export function NewBookForm() {
       toast.error('Generation failed', { description: message })
     } finally {
       setPending(false)
+      window.dispatchEvent(new Event('credits:changed'))
     }
   }
 
@@ -391,7 +393,7 @@ export function NewBookForm() {
             ) : (
               <>
                 <Wand2 className="size-4" aria-hidden />
-                Generate Book Project
+                {`Generate Book Project · ${CREDIT_PRICES['creator.generate']} credits`}
               </>
             )}
           </Button>

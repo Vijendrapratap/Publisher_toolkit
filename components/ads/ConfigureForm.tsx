@@ -21,6 +21,7 @@ import {
 import { CustomPalettePicker } from '@/components/ads/CustomPalettePicker'
 import { CustomCampaignPicker } from '@/components/ads/CustomCampaignPicker'
 import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
+import { CREDIT_PRICES, adsGenerationAction } from '@/lib/credits/prices'
 import { sampleAdCopy } from '@/lib/services/ads/sampleCopy'
 import { nextRadioIndex } from '@/lib/ui/radioKeys'
 import {
@@ -572,7 +573,8 @@ export function ConfigureForm({
             : `${CREATIVE_SIZES.filter((s) => platforms.includes(s.platform)).length} image sizes${includeVideo ? ' + 1 HD video trailer' : ''}`}
         </span>
         <Button type="submit" size="lg" loading={pending} disabled={pending}>
-          <Sparkles className="size-4" aria-hidden /> Generate Amazon Creatives & Video
+          <Sparkles className="size-4" aria-hidden />{' '}
+          {`Generate Amazon Creatives & Video · ${CREDIT_PRICES[adsGenerationAction(book.contentGoal ?? null)]} credits`}
         </Button>
       </div>
     </form>

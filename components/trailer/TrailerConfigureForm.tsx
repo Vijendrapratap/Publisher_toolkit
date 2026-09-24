@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/field'
 import { cn } from '@/components/ui/cn'
 import { TrailerLivePreviewPlayer } from './TrailerLivePreviewPlayer'
 import { defaultVideoSpec } from '@/lib/services/ads/videoSpec'
+import { CREDIT_PRICES } from '@/lib/credits/prices'
 import {
   ASPECT_RATIO_OPTIONS,
   LENGTH_OPTIONS,
@@ -417,7 +418,8 @@ export function TrailerConfigureForm({
             : `${aspectRatios.length} video ad${aspectRatios.length === 1 ? '' : 's'} (${length})`}
         </span>
         <Button type="submit" size="lg" loading={pending} disabled={aspectRatios.length === 0}>
-          <Clapperboard className="size-4" aria-hidden /> Generate video ads
+          <Clapperboard className="size-4" aria-hidden />{' '}
+          {`Generate video ads · ${CREDIT_PRICES['trailer.render'] * aspectRatios.length} credits`}
         </Button>
       </div>
     </form>

@@ -154,6 +154,7 @@ export function AiVideoPanel({ projectId, coverUrl, pageUrls, initialBrief, init
       toast.error('The AI video could not be started.', { description: 'Check your connection and try again.' })
     } finally {
       setStarting(false)
+      window.dispatchEvent(new Event('credits:changed'))
     }
   }
 

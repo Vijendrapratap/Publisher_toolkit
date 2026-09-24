@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { AlertCircle, Check, Loader2, RefreshCw, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -50,6 +51,7 @@ export function GenerateRunner({
   const [stage, setStage] = useState(0)
   const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [insufficientCredits, setInsufficientCredits] = useState(false)
 
   function handleCancel() {
     if (cancelling || cancelled.current) return
@@ -87,13 +89,15 @@ export function GenerateRunner({
           return
         }
 
-        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+        setInsufficientCredits(res.status === 402 && body.code === 'insufficient_credits')
         setError(body.error ?? 'Something went wrong. Please try again.')
       } catch (err) {
         if (cancelled.current || (err instanceof Error && err.name === 'AbortError')) return
         setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       } finally {
         clearInterval(timer)
+        if (!cancelled.current) window.dispatchEvent(new Event('credits:changed'))
       }
     })()
 
@@ -112,6 +116,11 @@ export function GenerateRunner({
         <p role="alert" className="text-sm text-danger">
           {error}
         </p>
+        {insufficientCredits && (
+          <Link href="/credits" className="text-sm font-medium text-accent hover:underline">
+            See your credits
+          </Link>
+        )}
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => router.replace(cancelHref)}>
             Back to settings

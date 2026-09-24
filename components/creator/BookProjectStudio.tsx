@@ -24,6 +24,7 @@ import { StoryBookViewer } from './StoryBookViewer'
 import { NovelChapterViewer } from './NovelChapterViewer'
 import { BookPreviewModal } from './BookPreviewModal'
 import type { BookCreatorProjectData } from '@/lib/services/creator/types'
+import { CREDIT_PRICES } from '@/lib/credits/prices'
 
 export function BookProjectStudio({ initialProject }: { initialProject: BookCreatorProjectData }) {
   const router = useRouter()
@@ -95,6 +96,7 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
       })
     } finally {
       setIllustrating(false)
+      window.dispatchEvent(new Event('credits:changed'))
     }
   }
 
@@ -269,7 +271,9 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
               onClick={handleIllustrate}
             >
               <ImageIcon className="size-4" />
-              {missingArt > 0 ? `Illustrate Book (${missingArt} images)` : 'Redraw with AI'}
+              {missingArt > 0
+                ? `Illustrate Book (${missingArt} images) · ${CREDIT_PRICES['creator.illustrate']} credits per image`
+                : `Redraw with AI · ${CREDIT_PRICES['creator.illustrate']} credits per image`}
             </Button>
           )}
 

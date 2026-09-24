@@ -19,6 +19,7 @@ import {
   type AdVideoSpec,
 } from '@/lib/services/ads/videoSpec'
 import { ASPECT_RATIO_OPTIONS, LENGTH_OPTIONS, STYLE_OPTIONS } from '@/lib/services/trailer/options'
+import { CREDIT_PRICES } from '@/lib/credits/prices'
 
 export interface InstantVideoCardProps {
   projectId: string
@@ -157,6 +158,7 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
       toast.error('Export failed', { id: toastId, description: 'Check your connection and try again.' })
     } finally {
       setExporting(false)
+      window.dispatchEvent(new Event('credits:changed'))
     }
   }
 
@@ -182,7 +184,7 @@ export function InstantVideoCard({ projectId, title, author, coverUrl, interiorI
             <Save className="size-3.5" aria-hidden /> Save
           </Button>
           <Button type="button" size="sm" onClick={exportVideo} loading={exporting} disabled={exporting || Boolean(problem)} className="bg-instant text-canvas hover:bg-instant/90">
-            <Film className="size-3.5" aria-hidden /> Save &amp; export MP4
+            <Film className="size-3.5" aria-hidden /> Save &amp; export MP4 · {CREDIT_PRICES['ads.video.instant']} credits
           </Button>
         </div>
       </header>
