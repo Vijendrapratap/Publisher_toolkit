@@ -14,7 +14,8 @@ vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mock
 vi.mock('@/lib/services/ads/queries', () => ({ getBookForPublisher: vi.fn() }))
 vi.mock('@/lib/services/ads/copy', () => ({ generateAdCopy: vi.fn() }))
 vi.mock('@/lib/services/ads/render', () => ({ renderCreativeImages: vi.fn() }))
-vi.mock('@/lib/services/ads/renderVideo', () => ({
+vi.mock('@/lib/services/ads/renderVideo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/services/ads/renderVideo')>()),
   renderAdVideo: vi.fn().mockResolvedValue({
     videoBuffer: Buffer.from('video'), posterBuffer: Buffer.from('poster'), durationSec: 15, width: 1920, height: 1080,
   }),
@@ -52,6 +53,7 @@ describe('POST /api/ads/projects/:id/generate', () => {
     vi.clearAllMocks()
     vi.mocked(getBookForPublisher).mockResolvedValue(book as any)
     vi.mocked(renderCreativeImages).mockResolvedValue([metaImage])
+    vi.mocked(prisma.book.update).mockResolvedValue({} as any)
   })
 
   it('generates with the saved configuration and marks the project generated', async () => {
@@ -153,5 +155,53 @@ describe('POST /api/ads/projects/:id/generate', () => {
     vi.mocked(chargeCredits).mockRejectedValueOnce(new InsufficientCreditsError(4, 1))
     const res = await POST(new Request('http://localhost', { method: 'POST' }), ctx('book_1'))
     expect(res.status).toBe(402)
+  })
+
+  it('settles usedUnits: 0 for a video-goal generation whose trailer failed to render', async () => {
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, contentGoal: 'video' } as any)
+    vi.mocked(renderAdVideo).mockRejectedValueOnce(new Error('render exploded'))
+    let captured: { usedUnits?: number } | undefined
+    vi.mocked(chargeCredits).mockImplementationOnce(async (_i, fn) => {
+      const out = await fn({ key: 'k' } as never)
+      captured = out
+      return out.result
+    })
+
+    const res = await POST(new Request('http://localhost', { method: 'POST' }), ctx('book_1'))
+
+    expect(res.status).toBe(201)
+    expect((await res.json()).videoError).toBeTruthy()
+    expect(captured?.usedUnits).toBe(0)
+  })
+
+  it('does not zero usedUnits for a non-video goal whose trailer failed to render', async () => {
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] }) // book fixture's contentGoal is 'aplus'
+    vi.mocked(renderAdVideo).mockRejectedValueOnce(new Error('render exploded'))
+    let captured: { usedUnits?: number } | undefined
+    vi.mocked(chargeCredits).mockImplementationOnce(async (_i, fn) => {
+      const out = await fn({ key: 'k' } as never)
+      captured = out
+      return out.result
+    })
+
+    await POST(new Request('http://localhost', { method: 'POST' }), ctx('book_1'))
+
+    expect(captured?.usedUnits).toBeUndefined()
+  })
+
+  it('does not zero usedUnits for a video goal whose trailer rendered successfully', async () => {
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, contentGoal: 'video' } as any)
+    let captured: { usedUnits?: number } | undefined
+    vi.mocked(chargeCredits).mockImplementationOnce(async (_i, fn) => {
+      const out = await fn({ key: 'k' } as never)
+      captured = out
+      return out.result
+    })
+
+    await POST(new Request('http://localhost', { method: 'POST' }), ctx('book_1'))
+
+    expect(captured?.usedUnits).toBeUndefined()
   })
 })
