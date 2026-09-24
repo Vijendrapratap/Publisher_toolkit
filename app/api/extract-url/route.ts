@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
+import { rateLimited } from '@/lib/rateLimit'
 import { extractBookFromUrl } from '@/lib/services/extract/urlExtractor'
 
 export const maxDuration = 60
 
 export async function POST(request: Request) {
   const publisherId = await requireCurrentPublisherId()
+  if (rateLimited(`extract:${publisherId}`, 20, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many imports this hour. Please try again later.' }, { status: 429 })
+  }
   const body = await request.json().catch(() => ({}))
   const { url } = body
 
