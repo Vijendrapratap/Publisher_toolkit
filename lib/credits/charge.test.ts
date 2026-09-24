@@ -33,6 +33,19 @@ describe('chargeCredits', () => {
     expect(refundReservation).toHaveBeenCalledWith('k1')
     expect(settleReservation).not.toHaveBeenCalled()
   })
+
+  it('rethrows original error even if refund fails, logging the refund error', async () => {
+    const boom = new Error('boom')
+    const refundFail = new Error('refund failed')
+    vi.mocked(refundReservation).mockRejectedValueOnce(refundFail)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(chargeCredits({ userId: 'u', action: 'ads.image' }, async () => { throw boom })).rejects.toBe(boom)
+    expect(errorSpy).toHaveBeenCalledWith('credit refund failed', 'k1', refundFail)
+    expect(settleReservation).not.toHaveBeenCalled()
+
+    errorSpy.mockRestore()
+  })
 })
 
 describe('creditErrorResponse', () => {

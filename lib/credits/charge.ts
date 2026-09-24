@@ -23,7 +23,11 @@ export async function chargeCredits<T>(
   try {
     out = await fn(reservation)
   } catch (err) {
-    await refundReservation(reservation.key)
+    try {
+      await refundReservation(reservation.key)
+    } catch (refundErr) {
+      console.error('credit refund failed', reservation.key, refundErr)
+    }
     throw err
   }
   await settleReservation(reservation.key, { usedUnits: out.usedUnits, costUsd: out.costUsd })
