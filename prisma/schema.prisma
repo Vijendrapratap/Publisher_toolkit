@@ -253,3 +253,33 @@ model AiVideoJob {
 
   @@index([bookId])
 }
+
+/// Clerk user id. Existing tables keep their plain `publisherId` string
+/// columns — they hold this same id, but no FK is added to them.
+/// `balance` is a cache of SUM(CreditLedger.delta); CHECK (balance >= 0)
+/// lives in migration 20260925120000_users_and_credits (Prisma can't express it).
+model User {
+  id        String         @id
+  email     String
+  balance   Int            @default(0)
+  createdAt DateTime       @default(now())
+  ledger    CreditLedger[]
+}
+
+/// Append-only. Only `settled`/`costUsd` on a `reserve` row are ever updated.
+model CreditLedger {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  delta          Int
+  kind           String   // signup_grant | purchase | reserve | refund | adjust
+  action         String?
+  refId          String?
+  costUsd        Float?
+  settled        Boolean  @default(false)
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([kind, settled, createdAt])
+}
