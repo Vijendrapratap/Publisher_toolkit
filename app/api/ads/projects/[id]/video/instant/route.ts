@@ -6,6 +6,7 @@ import { adVideoImages, inlineMusic } from '@/lib/services/ads/videoAssets'
 import { describeRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
 import { storeFile } from '@/lib/providers/storage'
 import { prisma } from '@/lib/db'
+import { chargeCredits, creditErrorResponse } from '@/lib/credits/charge'
 
 export const maxDuration = 300
 
@@ -20,28 +21,36 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const spec = readVideoSpec(book.videoSpec, bookVideoSource(book))
   try {
-    const video = await renderAdVideo({
-      spec,
-      title: book.title ?? 'Untitled book',
-      author: book.author ?? '',
-      musicSrc: await inlineMusic(resolveMusic(spec), publisherId),
-      ...(await adVideoImages(book)),
-    })
+    const payload = await chargeCredits(
+      { userId: publisherId, action: 'ads.video.instant', refId: book.id },
+      async () => {
+        const video = await renderAdVideo({
+          spec,
+          title: book.title ?? 'Untitled book',
+          author: book.author ?? '',
+          musicSrc: await inlineMusic(resolveMusic(spec), publisherId),
+          ...(await adVideoImages(book)),
+        })
 
-    // A new name per export, so the browser never plays a cached older cut.
-    const stamp = Date.now().toString(36)
-    const dir = `ads/${publisherId}/creatives/${set.id}`
-    const [mp4, poster] = await Promise.all([
-      storeFile(`${dir}/video-${stamp}.mp4`, video.videoBuffer, 'video/mp4'),
-      storeFile(`${dir}/poster-${stamp}.png`, video.posterBuffer, 'image/png'),
-    ])
-    const videoDuration = Math.round(video.durationSec)
-    await prisma.creativeSet.update({
-      where: { id: set.id },
-      data: { videoUrl: mp4.url, videoPosterUrl: poster.url, videoDuration },
-    })
-    return NextResponse.json({ videoUrl: mp4.url, videoPosterUrl: poster.url, videoDuration })
+        // A new name per export, so the browser never plays a cached older cut.
+        const stamp = Date.now().toString(36)
+        const dir = `ads/${publisherId}/creatives/${set.id}`
+        const [mp4, poster] = await Promise.all([
+          storeFile(`${dir}/video-${stamp}.mp4`, video.videoBuffer, 'video/mp4'),
+          storeFile(`${dir}/poster-${stamp}.png`, video.posterBuffer, 'image/png'),
+        ])
+        const videoDuration = Math.round(video.durationSec)
+        await prisma.creativeSet.update({
+          where: { id: set.id },
+          data: { videoUrl: mp4.url, videoPosterUrl: poster.url, videoDuration },
+        })
+        return { result: { videoUrl: mp4.url, videoPosterUrl: poster.url, videoDuration } }
+      }
+    )
+    return NextResponse.json(payload)
   } catch (err) {
+    const creditResponse = creditErrorResponse(err)
+    if (creditResponse) return creditResponse
     console.error('instant video export failed', err)
     return NextResponse.json({ error: describeRenderError(err) }, { status: 500 })
   }

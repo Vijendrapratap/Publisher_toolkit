@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+vi.mock('@/lib/credits/charge', async (orig) => {
+  const actual = await orig<typeof import('@/lib/credits/charge')>()
+  return { ...actual, chargeCredits: vi.fn(async (_i, fn) => (await fn({ key: 'k' })).result) }
+})
+
 const book = {
   id: 'book_1', title: 'T', author: 'A', blurb: 'B', frontCoverUrl: '/api/files/ads/pub_1/cover.png',
-  platforms: ['META'], copyTone: 'punchy', templateKey: 'bold',
+  platforms: ['META'], copyTone: 'punchy', templateKey: 'bold', contentGoal: 'aplus',
 }
 
 vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
@@ -36,6 +41,8 @@ import { renderAdVideo } from '@/lib/services/ads/renderVideo'
 import { inlineMusic } from '@/lib/services/ads/videoAssets'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { prisma } from '@/lib/db'
+import { chargeCredits } from '@/lib/credits/charge'
+import { InsufficientCreditsError } from '@/lib/credits/ledger'
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) })
 const metaImage = { sizeKey: 'meta_feed_1080x1080', platform: 'META' as const, width: 1080, height: 1080, pngBuffer: Buffer.from('png') }
@@ -131,5 +138,20 @@ describe('POST /api/ads/projects/:id/generate', () => {
     vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, title: '' } as any)
     await POST(new Request('http://localhost'), ctx('book_1'))
     expect(renderAdVideo).toHaveBeenCalledWith(expect.objectContaining({ title: 'Untitled book' }))
+  })
+
+  it('charges the price of the book’s content goal', async () => {
+    vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
+    await POST(new Request('http://localhost', { method: 'POST' }), ctx('book_1'))
+    expect(chargeCredits).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'pub_1', action: 'ads.aplus', refId: 'book_1' }),
+      expect.any(Function)
+    )
+  })
+
+  it('returns 402 when the user cannot afford it', async () => {
+    vi.mocked(chargeCredits).mockRejectedValueOnce(new InsufficientCreditsError(4, 1))
+    const res = await POST(new Request('http://localhost', { method: 'POST' }), ctx('book_1'))
+    expect(res.status).toBe(402)
   })
 })

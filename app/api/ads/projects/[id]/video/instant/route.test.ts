@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { defaultVideoSpec } from '@/lib/services/ads/videoSpec'
 
+vi.mock('@/lib/credits/charge', async (orig) => {
+  const actual = await orig<typeof import('@/lib/credits/charge')>()
+  return { ...actual, chargeCredits: vi.fn(async (_i, fn) => (await fn({ key: 'k' })).result) }
+})
+
 const savedSpec = defaultVideoSpec({ title: 'Saved hook' })
 const book = {
   id: 'book_1', title: 'T', author: 'A', blurb: 'B', frontCoverUrl: '/api/files/ads/pub_1/cover.png', interiorImageUrls: [],
@@ -30,6 +35,8 @@ import { getBookForPublisher, getLatestCreativeSetForBook } from '@/lib/services
 import { AdVideoRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
 import { inlineMusic } from '@/lib/services/ads/videoAssets'
 import { prisma } from '@/lib/db'
+import { chargeCredits } from '@/lib/credits/charge'
+import { InsufficientCreditsError } from '@/lib/credits/ledger'
 
 const ctx = { params: Promise.resolve({ id: 'book_1' }) }
 const req = () => new Request('http://localhost', { method: 'POST' })
@@ -89,5 +96,19 @@ describe('POST /api/ads/projects/:id/video/instant', () => {
   it('returns 404 for another publisher’s project', async () => {
     vi.mocked(getBookForPublisher).mockResolvedValue(null)
     expect((await POST(req(), ctx)).status).toBe(404)
+  })
+
+  it('charges for the instant video export', async () => {
+    await POST(req(), ctx)
+    expect(chargeCredits).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'pub_1', action: 'ads.video.instant', refId: 'book_1' }),
+      expect.any(Function)
+    )
+  })
+
+  it('returns 402 when the user cannot afford it', async () => {
+    vi.mocked(chargeCredits).mockRejectedValueOnce(new InsufficientCreditsError(2, 0))
+    const res = await POST(req(), ctx)
+    expect(res.status).toBe(402)
   })
 })
