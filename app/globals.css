@@ -33,6 +33,13 @@
   --color-instant-soft: oklch(0.955 0.014 150);
   --color-ai: oklch(0.45 0.06 250);
   --color-ai-soft: oklch(0.955 0.013 245);
+  /* Ad output types — one hue each, used on the goal picker */
+  --color-goal-aplus: oklch(0.47 0.13 300);
+  --color-goal-aplus-soft: oklch(0.93 0.035 300);
+  --color-goal-image: oklch(0.5 0.11 65);
+  --color-goal-image-soft: oklch(0.935 0.045 75);
+  --color-goal-video: oklch(0.5 0.15 15);
+  --color-goal-video-soft: oklch(0.93 0.035 15);
 
   --radius-card: 1.5rem;
   --shadow-card: 6px 6px 14px oklch(0.7 0.02 70 / 0.42), -6px -6px 14px oklch(1 0 0 / 0.9);
@@ -65,6 +72,12 @@
   --color-instant-soft: oklch(0.245 0.018 160);
   --color-ai: oklch(0.8 0.06 250);
   --color-ai-soft: oklch(0.245 0.02 250);
+  --color-goal-aplus: oklch(0.78 0.11 300);
+  --color-goal-aplus-soft: oklch(0.27 0.05 300);
+  --color-goal-image: oklch(0.8 0.1 70);
+  --color-goal-image-soft: oklch(0.27 0.045 70);
+  --color-goal-video: oklch(0.76 0.12 15);
+  --color-goal-video-soft: oklch(0.27 0.05 15);
 
   /* Subtle, elegant dark-mode depth: natural dark grounding shadows and crisp hairline edge definitions, zero white halos */
   --shadow-card: 0 4px 20px -2px oklch(0 0 0 / 0.5), 0 1px 3px oklch(0 0 0 / 0.35), inset 0 0 0 1px oklch(1 0 0 / 0.07), inset 0 1px 0 0 oklch(1 0 0 / 0.06);

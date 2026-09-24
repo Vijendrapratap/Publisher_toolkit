@@ -33,7 +33,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         blurb: project.promptConcept || 'Created with Publisher Toolkit Book Studio',
         frontCoverUrl: project.coverImageUrl || null,
         interiorImageUrls: interiorImages.slice(0, 5),
-        contentGoal: 'all',
+        contentGoal: 'sponsored',
         platforms: ['AMAZON'],
         campaignName: `${project.title || 'Book'} - Launch Campaign`,
         campaignObjective: 'launch',

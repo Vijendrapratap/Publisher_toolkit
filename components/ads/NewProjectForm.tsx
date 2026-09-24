@@ -9,7 +9,9 @@ import {
   ChevronDown,
   ExternalLink,
   FileUp,
+  Coins,
   Film,
+  Image as ImageIcon,
   Info,
   Layers,
   Library,
@@ -41,6 +43,7 @@ import {
   type CopyTone,
   type TemplateKey,
 } from '@/lib/services/ads/options'
+import { goalCreditLabel, type AdGoal } from '@/lib/credits/prices'
 
 export interface LibraryBookItem {
   id: string
@@ -52,40 +55,48 @@ export interface LibraryBookItem {
   createdAt: string | Date
 }
 
-export type ContentGoalKey = 'all' | 'aplus' | 'video' | 'sponsored'
+export type ContentGoalKey = AdGoal
 
+// Class names spelled out in full so Tailwind can see them.
 export const CONTENT_GOALS = [
   {
-    key: 'all' as ContentGoalKey,
-    title: 'Full Amazon Launch Bundle',
-    badge: 'All-In-One',
-    description: 'A+ Content modules, HD video ad, Sponsored Ads & high-converting ad copy.',
-    tags: ['A+ Content', 'Video Trailer', 'Sponsored Ads', 'Ad Copy'],
-    icon: Sparkles,
+    key: 'sponsored' as ContentGoalKey,
+    title: 'Image Ads',
+    description: 'Scroll-stopping ad images for Amazon, Meta and Google.',
+    formats: 'Display 300×250 · Headline 1200×628 · Feed & Story',
+    icon: ImageIcon,
+    tone: {
+      selected: 'border-goal-image bg-goal-image-soft ring-2 ring-goal-image/30',
+      idle: 'hover:border-goal-image/50',
+      icon: 'bg-goal-image-soft text-goal-image',
+      pill: 'bg-goal-image text-on-accent',
+    },
   },
   {
     key: 'aplus' as ContentGoalKey,
-    title: 'Amazon A+ Content Suite',
-    badge: 'KDP Enhanced',
-    description: 'High-converting listing modules: Hero Banner (970×600), Feature Spread (970×300), and Quad Cards (300×300).',
-    tags: ['Hero 970×600', 'Feature 970×300', 'Quad 300×300'],
+    title: 'A+ Content',
+    description: 'Listing modules that turn your Amazon page into a sales page.',
+    formats: 'Hero 970×600 · Feature 970×300 · Quad 300×300',
     icon: Layers,
+    tone: {
+      selected: 'border-goal-aplus bg-goal-aplus-soft ring-2 ring-goal-aplus/30',
+      idle: 'hover:border-goal-aplus/50',
+      icon: 'bg-goal-aplus-soft text-goal-aplus',
+      pill: 'bg-goal-aplus text-on-accent',
+    },
   },
   {
     key: 'video' as ContentGoalKey,
-    title: 'Amazon Video Trailer',
-    badge: 'HD Video',
-    description: 'Video ads for product pages (16:9) and social feeds (9:16).',
-    tags: ['16:9 Product Video', '9:16 Reels / Shorts', 'HD Video'],
+    title: 'Video',
+    description: 'A short book trailer for product pages, Reels and Shorts.',
+    formats: '16:9 product video · 9:16 Reels / Shorts',
     icon: Film,
-  },
-  {
-    key: 'sponsored' as ContentGoalKey,
-    title: 'Sponsored Display & Banners',
-    badge: 'Amazon Ads',
-    description: 'High-CTR display banners (300×250) and headline search banners (1200×628) for Sponsored Products.',
-    tags: ['300×250 Display', '1200×628 Headline'],
-    icon: Target,
+    tone: {
+      selected: 'border-goal-video bg-goal-video-soft ring-2 ring-goal-video/30',
+      idle: 'hover:border-goal-video/50',
+      icon: 'bg-goal-video-soft text-goal-video',
+      pill: 'bg-goal-video text-on-accent',
+    },
   },
 ]
 
@@ -93,7 +104,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
   const router = useRouter()
 
   // Goal Selector State
-  const [contentGoal, setContentGoal] = useState<ContentGoalKey>('all')
+  const [contentGoal, setContentGoal] = useState<ContentGoalKey>('sponsored')
 
   // Input Method State: 'url' (Creatify style), 'upload' (covers + 2-5 interior pages), 'library', 'pdf'
   const [tab, setTab] = useState<'url' | 'upload' | 'library' | 'pdf'>('url')
@@ -414,10 +425,10 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
           <h2 className="font-display text-lg font-semibold">1. What kind of content do you want to create?</h2>
         </div>
         <p className="mt-1 text-sm text-ink-muted">
-          Select your creative goal to optimize formats, image dimensions, and trailer scripts.
+          Pick one. We generate only that, so you only spend credits on what you need.
         </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {CONTENT_GOALS.map((goal) => {
             const isSelected = contentGoal === goal.key
             const Icon = goal.icon
@@ -425,36 +436,28 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
               <button
                 key={goal.key}
                 type="button"
+                aria-pressed={isSelected}
                 onClick={() => setContentGoal(goal.key)}
                 className={cn(
-                  'flex flex-col items-start rounded-2xl border p-4 text-left transition-all',
-                  isSelected
-                    ? 'border-accent bg-accent-soft/70 shadow-inset ring-2 ring-accent/30'
-                    : 'border-line/70 bg-surface-2/60 hover:border-accent/40 hover:bg-surface-2'
+                  'relative flex flex-col items-start rounded-2xl border p-4 text-left transition-all',
+                  isSelected ? goal.tone.selected : cn('border-line/70 bg-surface-2/60', goal.tone.idle)
                 )}
               >
                 <div className="flex w-full items-center justify-between">
-                  <span className={cn('grid size-9 place-items-center rounded-xl', isSelected ? 'bg-accent text-on-accent' : 'bg-surface text-ink-muted')}>
+                  <span className={cn('grid size-9 place-items-center rounded-xl', goal.tone.icon)}>
                     <Icon className="size-4" aria-hidden />
                   </span>
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                      isSelected ? 'bg-accent text-on-accent' : 'bg-surface text-ink-muted'
-                    )}
-                  >
-                    {goal.badge}
+                  <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold', goal.tone.pill)}>
+                    <Coins className="size-3.5" aria-hidden />
+                    {goalCreditLabel(goal.key)}
                   </span>
                 </div>
-                <h3 className="mt-3 text-sm font-semibold text-ink">{goal.title}</h3>
-                <p className="mt-1 text-xs text-ink-muted leading-relaxed line-clamp-2">{goal.description}</p>
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {goal.tags.slice(0, 2).map((tag) => (
-                    <span key={tag} className="rounded-md bg-surface px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+                <h3 className="mt-3 flex items-center gap-1.5 text-base font-semibold text-ink">
+                  {goal.title}
+                  {isSelected && <CheckCircle2 className="size-4 text-ink" aria-hidden />}
+                </h3>
+                <p className="mt-1 text-sm leading-relaxed text-ink-muted">{goal.description}</p>
+                <p className="mt-3 text-xs font-medium text-ink-muted">{goal.formats}</p>
               </button>
             )
           })}
