@@ -3,6 +3,7 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getLandingProjectForPublisher } from '@/lib/services/landing/queries'
 import { runAuthorLandingAgent, authorLandingAgentInputSchema } from '@/lib/services/landing/agent'
 import { prisma } from '@/lib/db'
+import { chargeCredits, creditErrorResponse } from '@/lib/credits/charge'
 
 export const maxDuration = 120
 
@@ -38,31 +39,41 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     )
   }
 
-  const { data: generated, source, reason } = await runAuthorLandingAgent(parseResult.data)
+  try {
+    const payload = await chargeCredits(
+      { userId: publisherId, action: 'landing.agent', refId: project.id },
+      async () => {
+        const { data: generated, source, reason } = await runAuthorLandingAgent(parseResult.data)
 
-  // Persist the synthesized output into the project record
-  const updated = await prisma.landingProject.update({
-    where: { id: project.id },
-    data: {
-      subtitle: generated.subtitle,
-      authorBio: generated.authorBio,
-      synopsis: generated.synopsis,
-      ctaText: generated.ctaText,
-      template: generated.recommendedTemplate,
-      theme: generated.recommendedTheme,
-      accentColor: generated.recommendedAccent,
-      reviews: generated.reviews as any,
-    },
-  })
+        // Persist the synthesized output into the project record
+        const updated = await prisma.landingProject.update({
+          where: { id: project.id },
+          data: {
+            subtitle: generated.subtitle,
+            authorBio: generated.authorBio,
+            synopsis: generated.synopsis,
+            ctaText: generated.ctaText,
+            template: generated.recommendedTemplate,
+            theme: generated.recommendedTheme,
+            accentColor: generated.recommendedAccent,
+            reviews: generated.reviews as any,
+          },
+        })
 
-  return NextResponse.json(
-    {
-      success: true,
-      agentResult: generated,
-      source,
-      reason,
-      project: updated,
-    },
-    { status: 200 }
-  )
+        return {
+          result: { success: true, agentResult: generated, source, reason, project: updated },
+          usedUnits: source === 'fallback' ? 0 : undefined,
+        }
+      }
+    )
+    return NextResponse.json(payload, { status: 200 })
+  } catch (err) {
+    const creditResponse = creditErrorResponse(err)
+    if (creditResponse) return creditResponse
+    console.error('landing agent failed', err)
+    return NextResponse.json(
+      { error: "We couldn't generate your landing page copy. Please try again." },
+      { status: 500 }
+    )
+  }
 }

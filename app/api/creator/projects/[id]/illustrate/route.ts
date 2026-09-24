@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { isAiConfigured } from '@/lib/providers/ai'
 import { getCreatorProjectForPublisher, updateCreatorProject } from '@/lib/services/creator/queries'
-import { illustrateProject } from '@/lib/services/creator/illustrate'
+import { countIllustrationRequests, illustrateProject } from '@/lib/services/creator/illustrate'
+import { chargeCredits, creditErrorResponse } from '@/lib/credits/charge'
 
 export const dynamic = 'force-dynamic'
 // Image generation is the longest job in the app: a 20-page coloring book is
@@ -19,7 +20,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!project) {
     return NextResponse.json({ error: 'Book project not found' }, { status: 404 })
   }
-  if (!project.content) {
+  const content = project.content
+  if (!content) {
     return NextResponse.json({ error: 'Generate the book content before illustrating it.' }, { status: 400 })
   }
 
@@ -29,13 +31,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { regenerate } = bodySchema.parse((await request.json().catch(() => ({}))) ?? {})
 
-  try {
+  const styleTheme = project.styleTheme || 'watercolor storybook'
+  const requested = countIllustrationRequests({
+    content,
+    styleTheme,
+    regenerate,
+    existingCoverUrl: project.coverImageUrl,
+  })
+
+  const runIllustration = async () => {
     const result = await illustrateProject({
       projectId: project.id,
       publisherId,
       title: project.title || 'Untitled Book',
-      styleTheme: project.styleTheme || 'watercolor storybook',
-      content: project.content,
+      styleTheme,
+      content,
       regenerate,
       existingCoverUrl: project.coverImageUrl,
     })
@@ -48,16 +58,39 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       status: result.failures.length === 0 ? 'illustrated' : project.status,
     })
     if (!updated) {
-      return NextResponse.json({ error: 'Book project not found' }, { status: 404 })
+      return { response: NextResponse.json({ error: 'Book project not found' }, { status: 404 }) }
     }
 
-    return NextResponse.json({
-      project: updated,
-      requested: result.requested,
-      succeeded: result.succeeded,
-      failures: result.failures,
-    })
+    return {
+      response: NextResponse.json({
+        project: updated,
+        requested: result.requested,
+        succeeded: result.succeeded,
+        failures: result.failures,
+      }),
+      usedUnits: result.succeeded,
+    }
+  }
+
+  try {
+    // Nothing left to draw (every page already has art, cover kept) — no work,
+    // so nothing to charge for.
+    if (requested === 0) {
+      const { response } = await runIllustration()
+      return response
+    }
+
+    const response = await chargeCredits(
+      { userId: publisherId, action: 'creator.illustrate', units: requested, refId: project.id },
+      async () => {
+        const out = await runIllustration()
+        return { result: out.response, usedUnits: out.usedUnits }
+      }
+    )
+    return response
   } catch (err) {
+    const creditResponse = creditErrorResponse(err)
+    if (creditResponse) return creditResponse
     console.error('Failed to illustrate book project:', err)
     const message = err instanceof Error ? err.message : 'Failed to generate illustrations'
     return NextResponse.json({ error: message }, { status: 500 })

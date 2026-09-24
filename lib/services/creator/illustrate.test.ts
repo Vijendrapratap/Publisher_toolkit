@@ -6,7 +6,7 @@ vi.mock('@/lib/providers/storage', () => ({
 }))
 
 import { generateAiImage } from '@/lib/providers/ai'
-import { buildStyleBible, countIllustrations, illustrateProject } from './illustrate'
+import { buildStyleBible, countIllustrations, countIllustrationRequests, illustrateProject } from './illustrate'
 import type { GeneratedBookContent } from './types'
 
 const childrenBook = (): GeneratedBookContent => ({
@@ -198,6 +198,22 @@ describe('illustrateProject', () => {
     expect(generateAiImage).toHaveBeenCalledTimes(2)
     expect(result.requested).toBe(2)
     expect(result.succeeded).toBe(2)
+  })
+})
+
+describe('countIllustrationRequests', () => {
+  it('counts the images an illustration run will request', async () => {
+    const input = { content: childrenBook(), styleTheme: 'watercolor', regenerate: false, existingCoverUrl: null }
+    const result = await illustrateProject({ ...input, projectId: 'p', publisherId: 'pub', title: 'T' })
+    expect(countIllustrationRequests(input)).toBe(result.requested)
+  })
+
+  it('matches a gap-filling run that keeps the existing cover', async () => {
+    const content = childrenBook()
+    if (content.type === 'children') content.pages[0].generatedImageUrl = '/already/there.png'
+    const input = { content, styleTheme: 'watercolor', regenerate: false, existingCoverUrl: '/existing/cover.png' }
+    const result = await illustrateProject({ ...input, projectId: 'p', publisherId: 'pub', title: 'T' })
+    expect(countIllustrationRequests(input)).toBe(result.requested)
   })
 })
 

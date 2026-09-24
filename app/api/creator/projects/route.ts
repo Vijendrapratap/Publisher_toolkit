@@ -3,6 +3,7 @@ import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { createBookProjectSchema } from '@/lib/services/creator/options'
 import { generateBookProjectContent } from '@/lib/services/creator/generator'
 import { createCreatorProject, getCreatorProjectsForPublisher } from '@/lib/services/creator/queries'
+import { chargeCredits, creditErrorResponse } from '@/lib/credits/charge'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -24,13 +25,24 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { data: content, source, reason } = await generateBookProjectContent(parsed.data)
-    const project = await createCreatorProject(publisherId, parsed.data, content)
+    const payload = await chargeCredits(
+      { userId: publisherId, action: 'creator.generate' },
+      async () => {
+        const { data: content, source, reason } = await generateBookProjectContent(parsed.data)
+        const project = await createCreatorProject(publisherId, parsed.data, content)
 
-    // `source` lets the studio tell the publisher they are looking at sample
-    // content rather than their concept, instead of passing it off as theirs.
-    return NextResponse.json({ id: project.id, project, source, reason }, { status: 201 })
+        // `source` lets the studio tell the publisher they are looking at sample
+        // content rather than their concept, instead of passing it off as theirs.
+        return {
+          result: { id: project.id, project, source, reason },
+          usedUnits: source === 'fallback' ? 0 : undefined,
+        }
+      }
+    )
+    return NextResponse.json(payload, { status: 201 })
   } catch (err) {
+    const creditResponse = creditErrorResponse(err)
+    if (creditResponse) return creditResponse
     console.error('Failed to create book project:', err)
     const message = err instanceof Error ? err.message : 'Failed to create book project'
     return NextResponse.json({ error: message }, { status: 500 })

@@ -508,7 +508,7 @@ function sampleChapter(params: ChapterRequest): string {
     '',
     'The room had the particular stillness of a place where something was about to be decided.',
     '',
-    'This chapter has not been written yet — add an AI key in Settings to draft it, or write over this text directly.',
+    'This chapter has not been written yet — AI generation was unavailable, so this text is a placeholder. Try again, or write over this text directly.',
   ].join('\n')
 }
 

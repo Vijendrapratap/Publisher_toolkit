@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+vi.mock('@/lib/credits/charge', async (orig) => {
+  const actual = await orig<typeof import('@/lib/credits/charge')>()
+  return { ...actual, chargeCredits: vi.fn(async (_i, fn) => (await fn({ key: 'k' } as never)).result) }
+})
+
 vi.mock('@/lib/providers/auth', () => ({
   requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1'),
 }))
@@ -39,6 +44,8 @@ import { getTrailerProjectForPublisher } from '@/lib/services/trailer/queries'
 import { renderVideoAd, VideoAdRenderError } from '@/lib/services/videoad/render'
 import { generateAdScript, generateAdScene } from '@/lib/services/videoad/copy'
 import { prisma } from '@/lib/db'
+import { chargeCredits } from '@/lib/credits/charge'
+import { InsufficientCreditsError } from '@/lib/credits/ledger'
 
 const project = {
   id: 'proj_1',
@@ -164,5 +171,19 @@ describe('POST /api/trailer/projects/[id]/generate', () => {
   it('returns 404 when the project does not exist', async () => {
     vi.mocked(getTrailerProjectForPublisher).mockResolvedValue(null)
     expect((await post('proj_99')).status).toBe(404)
+  })
+
+  it('charges one unit per requested aspect ratio', async () => {
+    await post()
+    expect(chargeCredits).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'pub_1', action: 'trailer.render', units: 2, refId: 'proj_1' }),
+      expect.any(Function)
+    )
+  })
+
+  it('returns 402 when the user cannot afford it', async () => {
+    vi.mocked(chargeCredits).mockRejectedValueOnce(new InsufficientCreditsError(2, 0))
+    const res = await post()
+    expect(res.status).toBe(402)
   })
 })

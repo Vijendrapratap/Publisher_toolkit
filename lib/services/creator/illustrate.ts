@@ -151,6 +151,22 @@ function collectPrompts(
   return []
 }
 
+function pendingPrompts(content: GeneratedBookContent, styleTheme: string, regenerate?: boolean) {
+  const bible = buildStyleBible(content, styleTheme)
+  return collectPrompts(content, bible).filter((p) => regenerate || !hasImage(content, p.key))
+}
+
+/** How many image calls a run of `illustrateProject` will actually make, so a route can price and skip charging before spending. */
+export function countIllustrationRequests(input: {
+  content: GeneratedBookContent
+  styleTheme: string
+  regenerate?: boolean
+  existingCoverUrl?: string | null
+}): number {
+  const keepCover = Boolean(input.existingCoverUrl) && !input.regenerate
+  return pendingPrompts(input.content, input.styleTheme, input.regenerate).length + (keepCover ? 0 : 1)
+}
+
 async function generateWithRetry(prompt: string, credentials?: AiCredentials) {
   for (let attempt = 1; attempt <= ATTEMPTS_PER_IMAGE; attempt++) {
     const image = await generateAiImage(prompt, { credentials, timeoutMs: 90_000 })
@@ -175,12 +191,7 @@ export async function illustrateProject(
 ): Promise<IllustrationResult> {
   // Mutated in place by `apply`, so clone rather than editing the caller's copy.
   const content = structuredClone(input.content)
-  const bible = buildStyleBible(content, input.styleTheme)
-
-  const prompts = collectPrompts(content, bible).filter((p) => {
-    if (input.regenerate) return true
-    return !hasImage(content, p.key)
-  })
+  const prompts = pendingPrompts(content, input.styleTheme, input.regenerate)
 
   const failures: string[] = []
   let succeeded = 0

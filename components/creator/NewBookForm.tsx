@@ -118,7 +118,7 @@ export function NewBookForm() {
       // publishing a story about a bear they never asked for.
       if (json.source === 'fallback') {
         toast.warning('Created with sample content', {
-          description: 'AI generation was unavailable, so this book is filled with placeholder pages. Add an OpenRouter key in Settings and regenerate.',
+          description: 'AI generation was unavailable, so this book is filled with placeholder pages. Try regenerating shortly.',
         })
       } else {
         toast.success('Book created!', {

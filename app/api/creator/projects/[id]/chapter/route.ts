@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getCreatorProjectForPublisher, updateCreatorProject } from '@/lib/services/creator/queries'
 import { generateIndividualChapter } from '@/lib/services/creator/generator'
+import { chargeCredits, creditErrorResponse } from '@/lib/credits/charge'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -22,11 +23,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Valid chapterNumber is required' }, { status: 400 })
   }
 
-  if (project.bookType !== 'novel_chapter' || !project.content || project.content.type !== 'novel_chapter') {
+  const content = project.content
+  if (project.bookType !== 'novel_chapter' || !content || content.type !== 'novel_chapter') {
     return NextResponse.json({ error: 'Project is not in chapter-by-chapter novel mode' }, { status: 400 })
   }
 
-  const chapters = project.content.novel.chapters
+  const chapters = content.novel.chapters
   const chapterIdx = chapters.findIndex((c) => c.chapterNumber === chapterNumber)
 
   if (chapterIdx === -1) {
@@ -36,14 +38,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const targetChapter = chapters[chapterIdx]
   const prevChapter = chapterIdx > 0 ? chapters[chapterIdx - 1] : undefined
 
-  try {
+  const runGeneration = async () => {
     const {
-      data: { content, wordCount },
+      data: { content: chapterText, wordCount },
       source,
       reason,
     } = await generateIndividualChapter({
       bookTitle: project.title || 'Untitled Book',
-      premise: project.promptConcept || project.content.novel.premise,
+      premise: project.promptConcept || content.novel.premise,
       chapterNumber: targetChapter.chapterNumber,
       chapterTitle: targetChapter.title,
       chapterSummary: targetChapter.summary,
@@ -53,7 +55,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     chapters[chapterIdx] = {
       ...targetChapter,
-      content,
+      content: chapterText,
       wordCount,
       // A placeholder is not a written chapter — leaving it 'draft' keeps the
       // outline honest about what still needs writing.
@@ -66,24 +68,40 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       content: {
         type: 'novel_chapter',
         novel: {
-          ...project.content.novel,
+          ...content.novel,
           chapters,
         },
       },
       wordCount: totalWords,
     })
     if (!updated) {
-      return NextResponse.json({ error: 'Book project not found' }, { status: 404 })
+      return { response: NextResponse.json({ error: 'Book project not found' }, { status: 404 }) }
     }
 
-    return NextResponse.json({
-      chapter: chapters[chapterIdx],
-      totalWords,
-      project: updated,
-      source,
-      reason,
-    })
+    return {
+      response: NextResponse.json({
+        chapter: chapters[chapterIdx],
+        totalWords,
+        project: updated,
+        source,
+        reason,
+      }),
+      usedUnits: source === 'fallback' ? 0 : undefined,
+    }
+  }
+
+  try {
+    const payload = await chargeCredits(
+      { userId: publisherId, action: 'creator.generate', refId: project.id },
+      async () => {
+        const out = await runGeneration()
+        return { result: out.response, usedUnits: out.usedUnits }
+      }
+    )
+    return payload
   } catch (err) {
+    const creditResponse = creditErrorResponse(err)
+    if (creditResponse) return creditResponse
     console.error('Failed to generate chapter:', err)
     const message = err instanceof Error ? err.message : 'Failed to generate chapter'
     return NextResponse.json({ error: message }, { status: 500 })

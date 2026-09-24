@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('@/lib/credits/charge', async (orig) => {
+  const actual = await orig<typeof import('@/lib/credits/charge')>()
+  return { ...actual, chargeCredits: vi.fn(async (_i, fn) => (await fn({ key: 'k' } as never)).result) }
+})
+
 import { GET, POST } from './route'
 import { POST as postChapter } from './[id]/chapter/route'
 import { POST as postSendToAds } from './[id]/send-to-ads/route'
 import { prisma } from '@/lib/db'
+import { chargeCredits } from '@/lib/credits/charge'
+import { InsufficientCreditsError } from '@/lib/credits/ledger'
 
 vi.mock('@/lib/providers/auth', () => ({
   requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_test_123'),
@@ -79,6 +87,51 @@ describe('Book Creator API Routes', () => {
     expect(prisma.bookCreatorProject.create).toHaveBeenCalled()
   })
 
+  const newProjectReq = () =>
+    new Request('http://localhost/api/creator/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Barnaby Bear',
+        bookType: 'children',
+        promptConcept: 'A curious bear discovers a falling star in the forest.',
+        styleTheme: 'watercolor',
+        targetAudience: 'early_readers',
+        pageCount: 6,
+      }),
+    })
+
+  it('charges for generating a book project', async () => {
+    vi.mocked(prisma.bookCreatorProject.create).mockResolvedValueOnce({ id: 'proj_children_2' } as any)
+
+    await POST(newProjectReq())
+
+    expect(chargeCredits).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'pub_test_123', action: 'creator.generate' }),
+      expect.any(Function)
+    )
+  })
+
+  it('returns 402 when the user cannot afford it', async () => {
+    vi.mocked(chargeCredits).mockRejectedValueOnce(new InsufficientCreditsError(3, 0))
+    const res = await POST(newProjectReq())
+    expect(res.status).toBe(402)
+  })
+
+  it('does not charge for fallback book content (no AI key configured in tests)', async () => {
+    vi.mocked(prisma.bookCreatorProject.create).mockResolvedValueOnce({ id: 'proj_children_3' } as any)
+    let reported: { usedUnits?: number } | undefined
+    vi.mocked(chargeCredits).mockImplementationOnce(async (_i, fn) => {
+      const out = await fn({ key: 'k' } as never)
+      reported = out
+      return out.result
+    })
+
+    await POST(newProjectReq())
+
+    expect(reported?.usedUnits).toBe(0)
+  })
+
   it('POST /api/creator/projects/[id]/chapter writes a draft chapter', async () => {
     const mockProject = {
       id: 'proj_novel_1',
@@ -128,6 +181,65 @@ describe('Book Creator API Routes', () => {
     // stay a draft and say so, rather than being reported as written.
     expect(json.source).toBe('fallback')
     expect(json.chapter.status).toBe('draft')
+  })
+
+  const novelProject = {
+    id: 'proj_novel_2',
+    publisherId: 'pub_test_123',
+    title: 'Venetian Clockwork',
+    bookType: 'novel_chapter',
+    styleTheme: 'thriller_suspense',
+    content: {
+      type: 'novel_chapter',
+      novel: {
+        premise: 'Venice 1892 conspiracy',
+        chapters: [
+          { chapterNumber: 1, title: 'The Brass Key', summary: 'Alden opens his workshop.', status: 'draft', content: '', wordCount: 0 },
+        ],
+      },
+    },
+  }
+  const chapterReq = () =>
+    new Request('http://localhost/api/creator/projects/proj_novel_2/chapter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chapterNumber: 1 }),
+    })
+  const chapterCtx = { params: Promise.resolve({ id: 'proj_novel_2' }) }
+
+  it('charges for generating a chapter', async () => {
+    vi.mocked(prisma.bookCreatorProject.findFirst).mockResolvedValue(novelProject as any)
+    vi.mocked(prisma.bookCreatorProject.update).mockResolvedValueOnce({ ...novelProject, wordCount: 1100 } as any)
+
+    await postChapter(chapterReq(), chapterCtx)
+
+    expect(chargeCredits).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'pub_test_123', action: 'creator.generate', refId: 'proj_novel_2' }),
+      expect.any(Function)
+    )
+  })
+
+  it('returns 402 when the user cannot afford it', async () => {
+    vi.mocked(prisma.bookCreatorProject.findFirst).mockResolvedValue(novelProject as any)
+    vi.mocked(chargeCredits).mockRejectedValueOnce(new InsufficientCreditsError(3, 0))
+
+    const res = await postChapter(chapterReq(), chapterCtx)
+    expect(res.status).toBe(402)
+  })
+
+  it('does not charge for a fallback chapter (no AI key configured in tests)', async () => {
+    vi.mocked(prisma.bookCreatorProject.findFirst).mockResolvedValue(novelProject as any)
+    vi.mocked(prisma.bookCreatorProject.update).mockResolvedValueOnce({ ...novelProject, wordCount: 1100 } as any)
+    let reported: { usedUnits?: number } | undefined
+    vi.mocked(chargeCredits).mockImplementationOnce(async (_i, fn) => {
+      const out = await fn({ key: 'k' } as never)
+      reported = out
+      return out.result
+    })
+
+    await postChapter(chapterReq(), chapterCtx)
+
+    expect(reported?.usedUnits).toBe(0)
   })
 
   it('POST /api/creator/projects/[id]/send-to-ads bridges book into ads studio', async () => {

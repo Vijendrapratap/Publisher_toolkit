@@ -58,7 +58,7 @@ export function NovelChapterViewer({
 
       if (data.source === 'fallback') {
         toast.warning('Placeholder text inserted', {
-          description: 'AI drafting was unavailable, so the chapter stays a draft. Add an OpenRouter key in Settings to write it.',
+          description: 'AI drafting was unavailable, so the chapter stays a draft. Try again shortly.',
         })
       } else {
         toast.success(`Chapter ${activeChapter.chapterNumber} written!`, {

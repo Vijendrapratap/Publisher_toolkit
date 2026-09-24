@@ -176,7 +176,7 @@ export function AdStyleSection({
               <span className="text-xs text-ink-muted">
                 {aiConfigured
                   ? 'Generates a real photo scene behind your cover instead of the designed wash. Adds about ten seconds per ad.'
-                  : 'Add an OpenRouter key in Settings to generate photo backgrounds.'}
+                  : 'AI generation is unavailable right now, so photo backgrounds can’t be generated.'}
               </span>
             </span>
           </label>
