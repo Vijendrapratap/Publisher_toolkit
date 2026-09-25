@@ -123,4 +123,69 @@ describe('extractBookFromUrl', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1)
     expect(mockFetch.mock.calls[0][1]).toMatchObject({ redirect: 'manual' })
   })
+
+  // `new URL('http://[::ffff:169.254.169.254]/').hostname` is
+  // `[::ffff:a9fe:a9fe]` — the hex form of an IPv4-mapped address. A regex
+  // that only recognises the dotted form lets cloud metadata through.
+  it('refuses an IPv4-mapped IPv6 host in hex form', async () => {
+    const mockFetch = vi.fn()
+
+    await expect(
+      extractBookFromUrl('http://[::ffff:a9fe:a9fe]/latest', 'pub_1', mockFetch as never)
+    ).rejects.toThrow(/cannot be reached/)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('refuses an IPv4-mapped IPv6 host in dotted form', async () => {
+    const mockFetch = vi.fn()
+
+    await expect(
+      extractBookFromUrl('http://[::ffff:169.254.169.254]/latest', 'pub_1', mockFetch as never)
+    ).rejects.toThrow(/cannot be reached/)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('refuses a redirect whose Location is the hex-mapped form', async () => {
+    vi.mocked(lookup).mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }] as never)
+    const mockFetch = vi.fn().mockResolvedValueOnce(
+      new Response(null, { status: 302, headers: { location: 'http://[::ffff:a9fe:a9fe]/latest' } })
+    )
+
+    await expect(extractBookFromUrl('https://example.com/book', 'pub_1', mockFetch as never)).rejects.toThrow(/cannot be reached/)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a redirect whose Location is the dotted-mapped form', async () => {
+    vi.mocked(lookup).mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }] as never)
+    const mockFetch = vi.fn().mockResolvedValueOnce(
+      new Response(null, { status: 302, headers: { location: 'http://[::ffff:169.254.169.254]/latest' } })
+    )
+
+    await expect(extractBookFromUrl('https://example.com/book', 'pub_1', mockFetch as never)).rejects.toThrow(/cannot be reached/)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops a cover image whose URL redirects to a private address instead of failing the import', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never)
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('image.jpg')) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'http://[::ffff:169.254.169.254]/' },
+        })
+      }
+      return new Response(
+        `
+          <html>
+            <span id="productTitle">Shadows of the Forgotten</span>
+            <meta property="og:image" content="https://mock.example/image.jpg" />
+          </html>
+        `,
+        { headers: { 'content-type': 'text/html' } }
+      )
+    })
+
+    const result = await extractBookFromUrl('https://amazon.com/dp/12345', 'pub_1', mockFetch as never)
+    expect(result.coverUrl).toBeNull()
+  })
 })

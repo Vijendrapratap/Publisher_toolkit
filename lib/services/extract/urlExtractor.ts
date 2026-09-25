@@ -16,15 +16,35 @@ const BROWSER_HEADERS = {
   'Accept-Language': 'en-US,en;q=0.9',
 }
 
+/**
+ * `::ffff:a.b.c.d` (IPv4-mapped) can be written dotted or, per
+ * `new URL(...).hostname`, as two hex groups (`::ffff:xxxx:yyyy`) — both mean
+ * the same v4 address and must be checked as one. Normalizing (rather than
+ * blanket-blocking) keeps public mapped addresses working.
+ */
+function embeddedIPv4(v6: string): string | null {
+  const dotted = v6.match(/^::(?:ffff:)?(\d+\.\d+\.\d+\.\d+)$/)
+  if (dotted) return dotted[1]
+
+  const hexMapped = v6.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+  if (!hexMapped) return null
+  const hi = parseInt(hexMapped[1], 16)
+  const lo = parseInt(hexMapped[2], 16)
+  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`
+}
+
 function isPrivateAddress(ip: string): boolean {
   if (isIP(ip) === 6) {
     const v6 = ip.toLowerCase()
     if (v6 === '::1' || v6 === '::') return true
     // Unique-local (fc00::/7) and link-local (fe80::/10).
     if (/^f[cd]/.test(v6) || /^fe[89ab]/.test(v6)) return true
-    // IPv4-mapped addresses carry the v4 rules with them.
-    const mapped = v6.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
-    return mapped ? isPrivateAddress(mapped[1]) : false
+    // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) embed an arbitrary address
+    // that could itself be private; simplest and safe to block the range.
+    if (v6.startsWith('64:ff9b::') || v6.startsWith('2002:')) return true
+
+    const embedded = embeddedIPv4(v6)
+    return embedded ? isPrivateAddress(embedded) : false
   }
 
   const [a, b] = ip.split('.').map(Number)
