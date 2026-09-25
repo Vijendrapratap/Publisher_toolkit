@@ -19,6 +19,12 @@ export interface SynthesizedAudioResult {
   durationSec: number
   mimeType: string
   format: AudioFormatKey
+  /**
+   * 'ai' when a real TTS provider produced the audio; 'fallback' when there
+   * was no key, the provider call failed, or the engine is 'standard' (a
+   * generated tone). The route must not charge for fallback narration.
+   */
+  source: 'ai' | 'fallback'
 }
 
 /**
@@ -230,6 +236,8 @@ export async function synthesizeChapterAudio(
     }
   }
 
+  const source: 'ai' | 'fallback' = audioBuffer ? 'ai' : 'fallback'
+
   // 3. Fallback to clean local audio synthesis
   if (!audioBuffer) {
     audioBuffer = await generateLocalNarrationAudio(durationSec, input.audioFormat)
@@ -240,6 +248,7 @@ export async function synthesizeChapterAudio(
     durationSec,
     mimeType: input.audioFormat === 'mp3' ? 'audio/mpeg' : 'audio/wav',
     format: input.audioFormat,
+    source,
   }
 }
 

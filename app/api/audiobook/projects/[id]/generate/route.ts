@@ -44,7 +44,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       // Chapters are independent. They render in parallel but in bounded batches,
       // because a 40-chapter book firing 40 concurrent TTS requests gets rate
       // limited, and every provider here charges per call.
-      const rendered: { id: string; buffer: Buffer; url: string; durationSec: number }[] = []
+      const rendered: { id: string; buffer: Buffer; url: string; durationSec: number; source: 'ai' | 'fallback' }[] = []
 
       for (let i = 0; i < project.chapters.length; i += TTS_CONCURRENCY) {
         const batch = project.chapters.slice(i, i + TTS_CONCURRENCY)
@@ -69,6 +69,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
               buffer: synthesized.audioBuffer,
               url: stored.url,
               durationSec: synthesized.durationSec,
+              source: synthesized.source,
             }
           })
         )
@@ -87,6 +88,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
       const chapterBuffers = rendered.map((r) => r.buffer)
       const totalDurationSec = rendered.reduce((sum, r) => sum + r.durationSec, 0)
+      // Fallback narration (no key / provider failure / 'standard' engine) is
+      // free: only real narration is billed, per second actually narrated.
+      const aiDurationSec = rendered
+        .filter((r) => r.source === 'ai')
+        .reduce((sum, r) => sum + r.durationSec, 0)
+      const usedUnits = aiDurationSec === 0 ? 0 : Math.max(1, Math.ceil(aiDurationSec / 600))
 
       // Generate combined full audiobook track
       let fullAudioUrl: string | null = null
@@ -116,6 +123,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
             totalDuration: totalDurationSec,
             fullAudioUrl,
           },
+          usedUnits,
         }
       }
     )

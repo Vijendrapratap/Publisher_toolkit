@@ -1,5 +1,14 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { estimateDuration, synthesizeChapterAudio, concatenateChapters } from './tts'
+
+const originalFetch = global.fetch
+const originalFishKey = process.env.FISH_AUDIO_API_KEY
+
+afterEach(() => {
+  global.fetch = originalFetch
+  if (originalFishKey === undefined) delete process.env.FISH_AUDIO_API_KEY
+  else process.env.FISH_AUDIO_API_KEY = originalFishKey
+})
 
 describe('audiobook tts engine', () => {
   it('estimates narration duration based on word count and pacing', () => {
@@ -27,6 +36,48 @@ describe('audiobook tts engine', () => {
     expect(result.audioBuffer.length).toBeGreaterThan(0)
     expect(result.durationSec).toBeGreaterThan(0)
     expect(result.mimeType).toBe('audio/mpeg')
+    // The 'standard' engine never calls a real provider, so it must be
+    // reported as fallback (the caller must not charge for it).
+    expect(result.source).toBe('fallback')
+  })
+
+  it('reports source: fallback when the configured provider has no API key', async () => {
+    delete process.env.FISH_AUDIO_API_KEY
+    const result = await synthesizeChapterAudio({
+      text: 'A chapter with no provider key configured.',
+      ttsProvider: 'fishaudio',
+      voiceModel: 'warm-literary',
+      voicePacing: 1.0,
+      audioFormat: 'mp3',
+    })
+    expect(result.source).toBe('fallback')
+  })
+
+  it('reports source: fallback when the provider call fails', async () => {
+    process.env.FISH_AUDIO_API_KEY = 'test-key'
+    global.fetch = (async () => new Response('error', { status: 500 })) as never
+    const result = await synthesizeChapterAudio({
+      text: 'A chapter whose provider call errors out.',
+      ttsProvider: 'fishaudio',
+      voiceModel: 'warm-literary',
+      voicePacing: 1.0,
+      audioFormat: 'mp3',
+    })
+    expect(result.source).toBe('fallback')
+  })
+
+  it('reports source: ai when the configured provider succeeds', async () => {
+    process.env.FISH_AUDIO_API_KEY = 'test-key'
+    global.fetch = (async () => new Response(new Uint8Array([1, 2, 3]).buffer, { status: 200 })) as never
+    const result = await synthesizeChapterAudio({
+      text: 'A chapter narrated by a real provider.',
+      ttsProvider: 'fishaudio',
+      voiceModel: 'warm-literary',
+      voicePacing: 1.0,
+      audioFormat: 'mp3',
+    })
+    expect(result.source).toBe('ai')
+    expect(result.audioBuffer.length).toBe(3)
   })
 
   it('concatenates chapter buffers into a full audiobook track', async () => {

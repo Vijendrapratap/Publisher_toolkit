@@ -18,6 +18,7 @@ vi.mock('@/lib/services/audiobook/tts', async (importOriginal) => ({
     durationSec: 60,
     mimeType: 'audio/mpeg',
     format: 'mp3',
+    source: 'ai',
   }),
   concatenateChapters: vi.fn().mockResolvedValue(Buffer.from('full')),
 }))
@@ -34,7 +35,7 @@ vi.mock('@/lib/db', () => ({
 
 import { POST } from './route'
 import { getAudiobookProjectForPublisher } from '@/lib/services/audiobook/queries'
-import { estimateDuration } from '@/lib/services/audiobook/tts'
+import { estimateDuration, synthesizeChapterAudio } from '@/lib/services/audiobook/tts'
 import { chargeCredits } from '@/lib/credits/charge'
 import { InsufficientCreditsError } from '@/lib/credits/ledger'
 
@@ -98,5 +99,56 @@ describe('POST /api/audiobook/projects/:id/generate', () => {
     vi.mocked(chargeCredits).mockRejectedValueOnce(new InsufficientCreditsError(1, 0))
     const res = await post()
     expect(res.status).toBe(402)
+  })
+
+  it('settles usedUnits to 0 when every chapter falls back to placeholder audio', async () => {
+    vi.mocked(synthesizeChapterAudio).mockResolvedValue({
+      audioBuffer: Buffer.from('audio'),
+      durationSec: 60,
+      mimeType: 'audio/mpeg',
+      format: 'mp3',
+      source: 'fallback',
+    })
+    let reported: { usedUnits?: number } | undefined
+    vi.mocked(chargeCredits).mockImplementationOnce(async (_i, fn) => {
+      const out = await fn({ key: 'k' } as never)
+      reported = out
+      return out.result
+    })
+
+    const res = await post()
+
+    expect(res.status).toBe(201)
+    expect(reported?.usedUnits).toBe(0)
+  })
+
+  it('settles usedUnits proportional to only the chapters that got real narration', async () => {
+    vi.mocked(synthesizeChapterAudio)
+      .mockResolvedValueOnce({
+        audioBuffer: Buffer.from('audio'),
+        durationSec: 600,
+        mimeType: 'audio/mpeg',
+        format: 'mp3',
+        source: 'ai',
+      })
+      .mockResolvedValueOnce({
+        audioBuffer: Buffer.from('audio'),
+        durationSec: 900,
+        mimeType: 'audio/mpeg',
+        format: 'mp3',
+        source: 'fallback',
+      })
+    let reported: { usedUnits?: number } | undefined
+    vi.mocked(chargeCredits).mockImplementationOnce(async (_i, fn) => {
+      const out = await fn({ key: 'k' } as never)
+      reported = out
+      return out.result
+    })
+
+    const res = await post()
+
+    expect(res.status).toBe(201)
+    // Only the 600s 'ai' chapter counts: ceil(600 / 600) = 1.
+    expect(reported?.usedUnits).toBe(1)
   })
 })
