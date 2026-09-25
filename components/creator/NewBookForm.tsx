@@ -126,9 +126,9 @@ export function NewBookForm() {
           description: `"${title}" has been generated.`,
         })
       }
-      // Sample text can come from a timed-out text model with a working key,
-      // so still draw the images; the illustrate route reports a missing key.
-      router.push(`/create-book/${json.id}?illustrate=1`)
+      // Illustrating charges credits per image, so it needs its own click —
+      // the studio page shows the total and the publisher decides.
+      router.push(`/create-book/${json.id}`)
       router.refresh()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong during generation.'

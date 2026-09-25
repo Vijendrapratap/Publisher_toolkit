@@ -8,6 +8,7 @@ vi.mock('@/lib/providers/storage', () => ({
 import { generateAiImage } from '@/lib/providers/ai'
 import { buildStyleBible, countIllustrations, countIllustrationRequests, illustrateProject } from './illustrate'
 import type { GeneratedBookContent } from './types'
+import { CREDIT_PRICES } from '@/lib/credits/prices'
 
 const childrenBook = (): GeneratedBookContent => ({
   type: 'children',
@@ -214,6 +215,24 @@ describe('countIllustrationRequests', () => {
     const input = { content, styleTheme: 'watercolor', regenerate: false, existingCoverUrl: '/existing/cover.png' }
     const result = await illustrateProject({ ...input, projectId: 'p', publisherId: 'pub', title: 'T' })
     expect(countIllustrationRequests(input)).toBe(result.requested)
+  })
+
+  it('is what the Illustrate button must show as the total credit charge', () => {
+    // An 11-page book: 11 pages + 1 cover = 12 images, matching the spec's
+    // "Illustrate · 12 images · 36 credits" example (12 × 3 credits).
+    const pages = Array.from({ length: 11 }, (_, i) => ({
+      pageNumber: i + 1,
+      storyText: 'x',
+      illustrationPrompt: 'x',
+    }))
+    const input = {
+      content: { type: 'children' as const, pages },
+      styleTheme: 'watercolor',
+      regenerate: false,
+      existingCoverUrl: null,
+    }
+    expect(countIllustrationRequests(input)).toBe(12)
+    expect(countIllustrationRequests(input) * CREDIT_PRICES['creator.illustrate']).toBe(36)
   })
 })
 

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowLeft,
@@ -25,6 +25,7 @@ import { NovelChapterViewer } from './NovelChapterViewer'
 import { BookPreviewModal } from './BookPreviewModal'
 import type { BookCreatorProjectData } from '@/lib/services/creator/types'
 import { CREDIT_PRICES } from '@/lib/credits/prices'
+import { countIllustrationRequests } from '@/lib/services/creator/illustrate-shared'
 
 export function BookProjectStudio({ initialProject }: { initialProject: BookCreatorProjectData }) {
   const router = useRouter()
@@ -32,8 +33,6 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
   const [sendingToAds, setSendingToAds] = useState(false)
   const [illustrating, setIllustrating] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const searchParams = useSearchParams()
-  const autoIllustrated = useRef(false)
 
   const illustratable = Boolean(project.content)
 
@@ -59,6 +58,18 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
     missingArt += 1
     totalArtItems += 1
   }
+
+  // Same counting logic the route charges by, so the button's total can
+  // never drift from what actually gets billed.
+  const illustrateCount = project.content
+    ? countIllustrationRequests({
+        content: project.content,
+        styleTheme: project.styleTheme || 'watercolor storybook',
+        regenerate: missingArt === 0,
+        existingCoverUrl: project.coverImageUrl,
+      })
+    : 0
+  const illustrateTotalCredits = illustrateCount * CREDIT_PRICES['creator.illustrate']
 
   async function handleIllustrate() {
     setIllustrating(true)
@@ -99,16 +110,6 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
       window.dispatchEvent(new Event('credits:changed'))
     }
   }
-
-  // Arriving from "Generate Book Project": draw the images straight away
-  // instead of making the publisher find the button.
-  useEffect(() => {
-    if (autoIllustrated.current || searchParams.get('illustrate') !== '1') return
-    autoIllustrated.current = true
-    router.replace(`/create-book/${project.id}`)
-    if (missingArt > 0) void handleIllustrate()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   async function handleSendToAds() {
     setSendingToAds(true)
@@ -268,12 +269,13 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
               variant={missingArt > 0 ? 'primary' : 'secondary'}
               size="sm"
               loading={illustrating}
+              disabled={illustrateCount === 0}
               onClick={handleIllustrate}
             >
               <ImageIcon className="size-4" />
-              {missingArt > 0
-                ? `Illustrate Book (${missingArt} images) · ${CREDIT_PRICES['creator.illustrate']} credits per image`
-                : `Redraw with AI · ${CREDIT_PRICES['creator.illustrate']} credits per image`}
+              {illustrateCount === 0
+                ? 'Nothing to illustrate'
+                : `${missingArt > 0 ? 'Illustrate' : 'Redraw with AI'} · ${illustrateCount} image${illustrateCount === 1 ? '' : 's'} · ${illustrateTotalCredits} credits`}
             </Button>
           )}
 
