@@ -8,11 +8,13 @@ const book = {
 vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
 vi.mock('@/lib/services/ads/queries', () => ({ getBookForPublisher: vi.fn() }))
 vi.mock('@/lib/services/ads/aiVideoBrief', () => ({ generateAiVideoBrief: vi.fn() }))
+vi.mock('@/lib/rateLimit', () => ({ rateLimited: vi.fn().mockReturnValue(false) }))
 
 import { POST } from './route'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { generateAiVideoBrief } from '@/lib/services/ads/aiVideoBrief'
 import { fallbackBrief } from '@/lib/services/ads/aiVideoBriefSchema'
+import { rateLimited } from '@/lib/rateLimit'
 
 const ctx = { params: Promise.resolve({ id: 'book_1' }) }
 const req = (body: unknown) => new Request('http://localhost', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -60,5 +62,13 @@ describe('POST /api/ads/projects/:id/video/ai/brief', () => {
     vi.mocked(getBookForPublisher).mockResolvedValueOnce(null)
     const res = await POST(req({}), ctx)
     expect(res.status).toBe(404)
+  })
+
+  it('rate-limits repeated brief requests per publisher', async () => {
+    vi.mocked(rateLimited).mockReturnValueOnce(true)
+    const res = await POST(req({}), ctx)
+    expect(res.status).toBe(429)
+    expect(rateLimited).toHaveBeenCalledWith('brief:pub_1', 30, 60 * 60 * 1000)
+    expect(generateAiVideoBrief).not.toHaveBeenCalled()
   })
 })

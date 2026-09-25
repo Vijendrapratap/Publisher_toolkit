@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { isAiConfigured } from '@/lib/providers/ai'
+import { rateLimited } from '@/lib/rateLimit'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { generateAiVideoBrief } from '@/lib/services/ads/aiVideoBrief'
 import { aiVideoBriefSchema } from '@/lib/services/ads/aiVideoBriefSchema'
@@ -20,6 +21,9 @@ const MAX_PAGES = 5
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const publisherId = await requireCurrentPublisherId()
+  if (rateLimited(`brief:${publisherId}`, 30, 60 * 60 * 1000)) {
+    return NextResponse.json({ error: 'Too many brief requests. Please try again later.' }, { status: 429 })
+  }
   const book = await getBookForPublisher(publisherId, id)
   if (!book) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
