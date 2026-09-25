@@ -16,7 +16,8 @@ test('publisher creates ads end to end in local mode', async ({ page }) => {
   await expect(page).toHaveURL(/\/ads$/)
   await page.getByRole('link', { name: /New (ad )?project/ }).first().click()
 
-  // Upload
+  // Upload — the form opens on the Product URL tab, so switch to PDF upload first.
+  await page.getByRole('button', { name: 'Upload PDF (Optional)' }).click()
   await page.locator('#pdf').setInputFiles(fixture('sample-book.pdf'))
   await expect(page.getByText('sample-book.pdf')).toBeVisible()
   await page.getByRole('button', { name: 'Upload and continue' }).click()
@@ -42,7 +43,7 @@ test('publisher creates ads end to end in local mode', async ({ page }) => {
   await page.getByRole('radiogroup', { name: 'Design template' }).getByRole('radio', { name: /Bold/ }).click()
   await expect(page.getByRole('checkbox', { name: /Meta/ })).toHaveAttribute('aria-checked', 'true')
   await shot(page, 'configure-light')
-  await page.getByRole('button', { name: 'Generate creatives' }).click()
+  await page.getByRole('button', { name: /Generate Amazon Creatives/ }).click()
 
   // Generate → Results
   await expect(page.getByRole('heading', { name: 'Creating your ads' })).toBeVisible()
