@@ -14,18 +14,18 @@ test('publisher creates ads end to end in local mode', async ({ page }) => {
   // Into Ads Creative
   await page.getByRole('link', { name: /Ads Creative/ }).first().click()
   await expect(page).toHaveURL(/\/ads$/)
-  await page.getByRole('link', { name: /New (ad )?project/ }).first().click()
+  await page.getByRole('link', { name: 'New campaign' }).first().click()
 
   // Upload — the form opens on the Product URL tab, so switch to PDF upload first.
   await page.getByRole('button', { name: 'Upload PDF (Optional)' }).click()
   await page.locator('#pdf').setInputFiles(fixture('sample-book.pdf'))
   await expect(page.getByText('sample-book.pdf')).toBeVisible()
-  await page.getByRole('button', { name: 'Upload and continue' }).click()
+  await page.getByRole('button', { name: 'Create project and continue' }).click()
   await expect(page).toHaveURL(/\/ads\/[^/]+\/upload$/)
   await expect(page.getByRole('heading', { name: 'Book details' })).toBeVisible()
 
   // Always use the known-good cover so rendering is deterministic.
-  if (await page.getByText('Add one to continue').isVisible()) {
+  if (await page.getByText('Add a front cover image to generate your ad creatives.').isVisible()) {
     await page.locator('#frontCover').setInputFiles(fixture('cover.png'))
   } else {
     await page.getByRole('button', { name: 'Replace cover' }).click()

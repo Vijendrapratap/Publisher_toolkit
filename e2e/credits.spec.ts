@@ -25,9 +25,9 @@ test('generating ads lowers the balance by the goal price', async ({ page }) => 
   // The form opens on the Product URL tab, so switch to PDF upload first.
   await page.getByRole('button', { name: 'Upload PDF (Optional)' }).click()
   await page.locator('#pdf').setInputFiles(fixture('sample-book.pdf'))
-  await page.getByRole('button', { name: 'Upload and continue' }).click()
+  await page.getByRole('button', { name: 'Create project and continue' }).click()
   await expect(page).toHaveURL(/\/ads\/[^/]+\/upload$/)
-  if (await page.getByText('Add one to continue').isVisible()) {
+  if (await page.getByText('Add a front cover image to generate your ad creatives.').isVisible()) {
     await page.locator('#frontCover').setInputFiles(fixture('cover.png'))
   } else {
     await page.getByRole('button', { name: 'Replace cover' }).click()
