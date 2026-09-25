@@ -56,6 +56,19 @@ so they are not re-litigated.
   job exists.
 - **Deleting a project leaves its files.** `DELETE` removes rows, not blobs.
 
+## Tests
+
+- **`e2e/ads.spec.ts`'s configure→results section is stale.** It drives a
+  "Design template" radiogroup, a "Meta" checkbox, Meta/Google/Amazon image
+  alt texts, and a "Connect & push" button — none of which match the current
+  Amazon-focused ads UI. Needs rewriting against the real flow.
+- **The e2e suite can't start while another `next dev` holds this folder's
+  `.next` lock.** Stop the running dev server (or run e2e against a separate
+  checkout) before `npm run test:e2e`.
+- **`scripts/dev.mjs` prefers a Supabase instance on `:54322`** when
+  `DATABASE_URL` is unset, which is easy to miss if you expect it to fall back
+  to the local Postgres on `:5432`.
+
 ## Smaller items
 
 - **`CreativeGallery` tile layout uses viewport breakpoints** (`sm:`/`xl:`)
