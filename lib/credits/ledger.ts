@@ -170,18 +170,24 @@ export async function sweepStaleReservations(opts: { force?: boolean; now?: numb
     select: { idempotencyKey: true, action: true },
   })
   for (const row of stale) {
-    if (row.action !== 'ads.video.ai') {
-      await refundReservation(row.idempotencyKey)
-      continue
+    try {
+      if (row.action !== 'ads.video.ai') {
+        await refundReservation(row.idempotencyKey)
+        continue
+      }
+      const jobId = row.idempotencyKey.slice('video:'.length)
+      const job = await prisma.aiVideoJob.findUnique({ where: { id: jobId }, select: { status: true, costUsd: true } })
+      if (!job || job.status === 'failed') {
+        await refundReservation(row.idempotencyKey)
+      } else if (job.status === 'completed') {
+        await settleReservation(row.idempotencyKey, { costUsd: job.costUsd ?? undefined })
+      }
+      // running/stitching: still in flight — leave it for the poll (or a later sweep) to close.
+    } catch (err) {
+      // One bad row (a transient DB error, a malformed key) must not stop the
+      // sweep from refunding everything else; it's left for the next sweep to retry.
+      console.error('sweepStaleReservations: failed to process reservation', row.idempotencyKey, err)
     }
-    const jobId = row.idempotencyKey.slice('video:'.length)
-    const job = await prisma.aiVideoJob.findUnique({ where: { id: jobId }, select: { status: true, costUsd: true } })
-    if (!job || job.status === 'failed') {
-      await refundReservation(row.idempotencyKey)
-    } else if (job.status === 'completed') {
-      await settleReservation(row.idempotencyKey, { costUsd: job.costUsd ?? undefined })
-    }
-    // running/stitching: still in flight — leave it for the poll (or a later sweep) to close.
   }
   return stale.length
 }

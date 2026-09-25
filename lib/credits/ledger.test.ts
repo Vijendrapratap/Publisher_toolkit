@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { prisma } from '@/lib/db'
 import {
   InsufficientCreditsError,
@@ -155,6 +155,40 @@ describe('sweepStaleReservations', () => {
       settled: true,
       costUsd: 0.5,
     })
+  })
+
+  it('does not let one row that throws while processing block the rest from being refunded', async () => {
+    const startingBalance = 1000
+    const id = await newUser(startingBalance)
+    const old = new Date(Date.now() - 31 * 60 * 1000)
+
+    const throwingJob = await newVideoJob('failed')
+    const throwingRes = await reserveCredits({ userId: id, action: 'ads.video.ai', key: `video:${throwingJob.id}` })
+    const staleNonVideo = await reserveCredits({ userId: id, action: 'ads.image' })
+
+    await prisma.creditLedger.updateMany({
+      where: { idempotencyKey: { in: [throwingRes.key, staleNonVideo.key] } },
+      data: { createdAt: old },
+    })
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const realFindUnique = prisma.aiVideoJob.findUnique.bind(prisma.aiVideoJob)
+    const findUniqueSpy = vi
+      .spyOn(prisma.aiVideoJob, 'findUnique')
+      .mockImplementation(((args: any) =>
+        args.where.id === throwingJob.id ? Promise.reject(new Error('boom')) : realFindUnique(args)) as never)
+
+    await sweepStaleReservations({ force: true })
+
+    // The row that threw is left unsettled for a later sweep to retry...
+    expect((await prisma.creditLedger.findUniqueOrThrow({ where: { idempotencyKey: throwingRes.key } })).settled).toBe(false)
+    // ...but the other stale row was still refunded.
+    expect((await prisma.creditLedger.findUniqueOrThrow({ where: { idempotencyKey: staleNonVideo.key } })).settled).toBe(true)
+    expect(await getBalance(id)).toBe(startingBalance - throwingRes.credits)
+    expect(consoleErrorSpy).toHaveBeenCalled()
+
+    findUniqueSpy.mockRestore()
+    consoleErrorSpy.mockRestore()
   })
 })
 
