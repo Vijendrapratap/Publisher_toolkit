@@ -11,16 +11,9 @@ export const metadata: Metadata = {
   description: 'Tools for book publishers: book creation, ad creatives and video ads.',
 }
 
-// Runs before paint so the saved theme never flashes. Light is the default —
-// the OS preference is deliberately not consulted.
-const THEME_SCRIPT = `try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const document = (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-      </head>
+    <html lang="en">
       <body>
         {children}
         <Toaster position="bottom-right" richColors closeButton />

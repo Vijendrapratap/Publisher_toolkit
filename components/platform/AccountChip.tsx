@@ -8,14 +8,11 @@ import {
   ChevronDown,
   Sparkles,
   Megaphone,
-  BookOpen,
-  Sun,
-  Moon,
   Sliders,
   Edit3,
-  CheckCircle2,
   Layers,
   ArrowRight,
+  Coins,
 } from 'lucide-react'
 import type { CapabilityStatus } from '@/lib/providers/status'
 import { cn } from '@/components/ui/cn'
@@ -28,14 +25,6 @@ export interface AccountChipProps {
   isClerk?: boolean
 }
 
-const TONES = [
-  { key: 'punchy', label: 'Punchy', hint: 'Short, high-energy hooks' },
-  { key: 'literary', label: 'Literary', hint: 'Rich, atmospheric prose' },
-  { key: 'bold', label: 'Bold', hint: 'Direct, provocative claims' },
-  { key: 'urgent', label: 'Urgent', hint: 'Fast-paced call to action' },
-  { key: 'playful', label: 'Playful', hint: 'Lighthearted, witty voice' },
-] as const
-
 export function AccountChip({
   publisherId = DEFAULT_PUBLISHER_ID,
   status,
@@ -45,8 +34,6 @@ export function AccountChip({
   const [isEditingName, setIsEditingName] = useState(false)
   const [studioName, setStudioName] = useState('Local Publisher Studio')
   const [tempName, setTempName] = useState('Local Publisher Studio')
-  const [defaultTone, setDefaultTone] = useState<string>('punchy')
-  const [dark, setDark] = useState(false)
 
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -60,10 +47,6 @@ export function AccountChip({
         setStudioName(savedName)
         setTempName(savedName)
       }
-      const savedTone = localStorage.getItem('pt_default_tone')
-      if (savedTone) setDefaultTone(savedTone)
-
-      setDark(document.documentElement.classList.contains('dark'))
     } catch {}
   }, [])
 
@@ -104,23 +87,6 @@ export function AccountChip({
       localStorage.setItem('pt_studio_name', trimmed)
       toast.success('Publisher imprint name updated')
     } catch {}
-  }
-
-  const handleToneSelect = (toneKey: string) => {
-    setDefaultTone(toneKey)
-    try {
-      localStorage.setItem('pt_default_tone', toneKey)
-      toast.success(`Default ad copy tone set to "${toneKey}"`)
-    } catch {}
-  }
-
-  const handleToggleTheme = () => {
-    const next = !dark
-    document.documentElement.classList.toggle('dark', next)
-    try {
-      localStorage.setItem('theme', next ? 'dark' : 'light')
-    } catch {}
-    setDark(next)
   }
 
   // Derive monogram from studio name
@@ -260,50 +226,18 @@ export function AccountChip({
             </div>
           </div>
 
-          {/* Preferred Copy Tone */}
-          <div className="mt-3.5 flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
-                Default Ad Voice & Tone
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {TONES.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => handleToneSelect(t.key)}
-                  className={cn(
-                    'flex flex-col items-start rounded-xl p-2 text-left transition-all',
-                    defaultTone === t.key
-                      ? 'bg-accent-soft/70 ring-1 ring-accent text-ink shadow-subtle'
-                      : 'bg-surface-2/40 text-ink-muted hover:bg-surface-2 hover:text-ink'
-                  )}
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="text-xs font-semibold">{t.label}</span>
-                    {defaultTone === t.key && <CheckCircle2 className="size-3 text-accent" />}
-                  </div>
-                  <span className="mt-0.5 text-[10px] leading-tight opacity-75">{t.hint}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Theme Mode Toggle */}
-          <div className="mt-3.5 flex items-center justify-between rounded-xl bg-surface-2/40 p-2.5 text-xs">
-            <span className="flex items-center gap-2 font-medium text-ink">
-              {dark ? <Moon className="size-3.5 text-accent" /> : <Sun className="size-3.5 text-accent" />}
-              Appearance
+          {/* Credits */}
+          <Link
+            href="/credits"
+            onClick={() => setOpen(false)}
+            className="mt-3.5 flex items-center justify-between rounded-xl bg-surface-2/40 p-2.5 text-xs font-medium text-ink transition-colors hover:bg-surface-2 hover:text-accent"
+          >
+            <span className="flex items-center gap-2">
+              <Coins className="size-4 text-accent" />
+              <span>Add credits &amp; billing</span>
             </span>
-            <button
-              type="button"
-              onClick={handleToggleTheme}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-surface px-2.5 py-1 text-xs font-medium shadow-subtle hover:bg-surface-2"
-            >
-              <span>{dark ? 'Dark Mode' : 'Light Mode'}</span>
-            </button>
-          </div>
+            <ArrowRight className="size-3.5" />
+          </Link>
 
           {/* Studio Profile & Settings Link */}
           <div className="mt-3 pt-1">

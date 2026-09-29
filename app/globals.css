@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* Light only. Nothing adds .dark any more, so leftover dark: utilities stay
+   inert (without this they'd follow the OS prefers-color-scheme instead). */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -48,50 +50,9 @@
   --shadow-subtle: 3px 3px 8px oklch(0.7 0.02 70 / 0.32), -3px -3px 8px oklch(1 0 0 / 0.8);
 }
 
-.dark {
-  --color-canvas: oklch(0.17 0.008 65);
-  --color-surface: oklch(0.215 0.01 65);
-  --color-surface-2: oklch(0.255 0.012 65);
-  --color-ink: oklch(0.945 0.008 75);
-  --color-ink-muted: oklch(0.735 0.014 70);
-  --color-line: oklch(0.32 0.01 65);
-  --color-accent: oklch(0.72 0.105 262);
-  --color-accent-strong: oklch(0.79 0.1 262);
-  --color-accent-soft: oklch(0.29 0.045 262);
-  --color-on-accent: oklch(0.18 0.015 65);
-  --color-danger: oklch(0.68 0.18 27);
-  --color-success: oklch(0.72 0.12 150);
-  --color-warning: oklch(0.78 0.09 75);
-  --color-warning-soft: oklch(0.30 0.04 75);
-  --color-tint-ads: oklch(0.29 0.045 262);
-  --color-tint-trailer: oklch(0.29 0.04 300);
-  --color-tint-audiobook: oklch(0.29 0.045 165);
-  --color-tint-landing: oklch(0.29 0.04 230);
-  --color-tint-create-book: oklch(0.29 0.05 45);
-  --color-instant: oklch(0.8 0.06 160);
-  --color-instant-soft: oklch(0.245 0.018 160);
-  --color-ai: oklch(0.8 0.06 250);
-  --color-ai-soft: oklch(0.245 0.02 250);
-  --color-goal-aplus: oklch(0.78 0.11 300);
-  --color-goal-aplus-soft: oklch(0.27 0.05 300);
-  --color-goal-image: oklch(0.8 0.1 70);
-  --color-goal-image-soft: oklch(0.27 0.045 70);
-  --color-goal-video: oklch(0.76 0.12 15);
-  --color-goal-video-soft: oklch(0.27 0.05 15);
-
-  /* Subtle, elegant dark-mode depth: natural dark grounding shadows and crisp hairline edge definitions, zero white halos */
-  --shadow-card: 0 4px 20px -2px oklch(0 0 0 / 0.5), 0 1px 3px oklch(0 0 0 / 0.35), inset 0 0 0 1px oklch(1 0 0 / 0.07), inset 0 1px 0 0 oklch(1 0 0 / 0.06);
-  --shadow-lift: 0 16px 36px -4px oklch(0 0 0 / 0.65), 0 4px 12px oklch(0 0 0 / 0.45), inset 0 0 0 1px oklch(1 0 0 / 0.1), inset 0 1px 0 0 oklch(1 0 0 / 0.08);
-  --shadow-inset: inset 0 2px 4px oklch(0 0 0 / 0.45), inset 0 0 0 1px oklch(0 0 0 / 0.25);
-  --shadow-subtle: 0 1px 3px 0 oklch(0 0 0 / 0.4), inset 0 0 0 1px oklch(1 0 0 / 0.06);
-}
-
 @layer base {
   html {
     color-scheme: light;
-  }
-  html.dark {
-    color-scheme: dark;
   }
   body {
     @apply bg-canvas font-sans text-ink antialiased;
