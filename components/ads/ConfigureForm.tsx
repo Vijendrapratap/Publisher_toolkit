@@ -20,7 +20,7 @@ import {
 } from '@/lib/services/ads/options'
 import { CustomPalettePicker } from '@/components/ads/CustomPalettePicker'
 import { CustomCampaignPicker } from '@/components/ads/CustomCampaignPicker'
-import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
+import { goalSizes, goalWantsVideo } from '@/lib/services/ads/goal'
 import { CREDIT_PRICES, adsGenerationAction } from '@/lib/credits/prices'
 import { sampleAdCopy } from '@/lib/services/ads/sampleCopy'
 import { nextRadioIndex } from '@/lib/ui/radioKeys'
@@ -34,9 +34,6 @@ import {
   type TrailerLength,
   type TrailerAspectRatio,
 } from '@/lib/services/trailer/options'
-
-const sizesFor = (platform: AdPlatform) =>
-  CREATIVE_SIZES.filter((s) => s.platform === platform).map((s) => `${s.width}×${s.height}`)
 
 function handleRadioKeyDown<K extends string>(
   e: KeyboardEvent<HTMLButtonElement>,
@@ -112,6 +109,28 @@ export function ConfigureForm({
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Only offer what the campaign's goal (Image Ads / A+ / Video) will make.
+  const goalSizeList = goalSizes(book.contentGoal, PLATFORMS.map((p) => p.key))
+  const showSponsored = goalSizeList.some((s) => s.category === 'sponsored')
+  const showAplus = goalSizeList.some((s) => s.category === 'aplus')
+  const videoOnly = book.contentGoal === 'video'
+  const videoAllowed = goalWantsVideo(book.contentGoal, true)
+  const wantsVideo = goalWantsVideo(book.contentGoal, includeVideo)
+  const imageCount = goalSizes(book.contentGoal, platforms).length
+  const outputSummary = [
+    imageCount > 0 ? `${imageCount} image sizes` : null,
+    wantsVideo ? '1 HD video trailer' : null,
+  ]
+    .filter(Boolean)
+    .join(' + ')
+  const submitLabel = videoOnly
+    ? 'Generate Video Trailer'
+    : book.contentGoal === 'aplus'
+      ? 'Generate A+ Content'
+      : book.contentGoal === 'sponsored'
+        ? 'Generate Image Ads'
+        : 'Generate Amazon Creatives & Video'
+
   const togglePlatform = (key: AdPlatform) =>
     setPlatforms((current) => (current.includes(key) ? current.filter((p) => p !== key) : [...current, key]))
 
@@ -140,7 +159,7 @@ export function ConfigureForm({
         targetAudience: targetAudience.trim() || undefined,
         customHook: customHook.trim() || undefined,
         ctaText: ctaText.trim() || undefined,
-        includeVideo,
+        includeVideo: wantsVideo,
         videoFormat,
         videoStyle,
         videoMood,
@@ -273,13 +292,19 @@ export function ConfigureForm({
         </fieldset>
       </Card>
 
-      {/* Platforms Selection */}
       {/* Platforms Selection & Amazon Suite */}
+      {!videoOnly && (
       <Card className="p-6">
         <fieldset>
           <div className="flex items-center gap-2">
             <Layers className="size-4 text-accent" aria-hidden />
-            <legend className="font-display text-lg font-semibold">Amazon Advertising & KDP A+ Content Suite</legend>
+            <legend className="font-display text-lg font-semibold">
+              {showAplus && showSponsored
+                ? 'Amazon Advertising & KDP A+ Content Suite'
+                : showAplus
+                  ? 'Amazon KDP A+ Content Modules'
+                  : 'Amazon Sponsored Image Ads'}
+            </legend>
           </div>
           <p className="mt-1 text-sm text-ink-muted">
             Engineered specifically for Amazon Kindle Direct Publishing (KDP) and Amazon Advertising Console.
@@ -321,7 +346,8 @@ export function ConfigureForm({
                     </button>
                   </div>
 
-                  <div className="grid gap-3 pt-2 sm:grid-cols-2">
+                  <div className={cn('grid gap-3 pt-2', showAplus && showSponsored && 'sm:grid-cols-2')}>
+                    {showAplus && (
                     <div className="rounded-xl bg-surface/80 p-3 border border-line/50">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold uppercase tracking-wider text-accent">
@@ -344,11 +370,13 @@ export function ConfigureForm({
                         </li>
                       </ul>
                     </div>
+                    )}
 
+                    {showSponsored && (
                     <div className="rounded-xl bg-surface/80 p-3 border border-line/50">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold uppercase tracking-wider text-accent">
-                          Amazon Sponsored Ads & Video
+                          {videoAllowed ? 'Amazon Sponsored Ads & Video' : 'Amazon Sponsored Ads'}
                         </span>
                         <span className="text-[10px] font-mono text-ink-muted">AMS Console</span>
                       </div>
@@ -361,12 +389,15 @@ export function ConfigureForm({
                           <span>Sponsored Brands Headline Banner</span>
                           <span className="font-mono text-[11px] font-semibold text-ink">1200×628</span>
                         </li>
-                        <li className="flex items-center justify-between">
-                          <span>Sponsored Brands Video Trailer</span>
-                          <span className="font-mono text-[11px] font-semibold text-ink">16:9 HD MP4</span>
-                        </li>
+                        {videoAllowed && (
+                          <li className="flex items-center justify-between">
+                            <span>Sponsored Brands Video Trailer</span>
+                            <span className="font-mono text-[11px] font-semibold text-ink">16:9 HD MP4</span>
+                          </li>
+                        )}
                       </ul>
                     </div>
+                    )}
                   </div>
                 </div>
               )
@@ -374,6 +405,7 @@ export function ConfigureForm({
           </div>
         </fieldset>
       </Card>
+      )}
 
       {/* Copy Tone */}
       <Card className="p-6">
@@ -419,7 +451,8 @@ export function ConfigureForm({
         </fieldset>
       </Card>
 
-      {/* Design Style / Template Selection */}
+      {/* Design Style / Template Selection — image ads only */}
+      {!videoOnly && (
       <Card className="p-6">
         <fieldset>
           <div className="flex items-center gap-2">
@@ -438,8 +471,10 @@ export function ConfigureForm({
           </div>
         </fieldset>
       </Card>
+      )}
 
       {/* Video ad settings */}
+      {videoAllowed && (
       <Card className="p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5">
@@ -453,6 +488,7 @@ export function ConfigureForm({
               </p>
             </div>
           </div>
+          {!videoOnly && (
           <label className="relative inline-flex cursor-pointer items-center gap-2 self-start sm:self-auto">
             <input
               type="checkbox"
@@ -463,9 +499,10 @@ export function ConfigureForm({
             <div className="w-11 h-6 bg-surface-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
             <span className="text-sm font-medium">{includeVideo ? 'Video Enabled' : 'Video Disabled'}</span>
           </label>
+          )}
         </div>
 
-        {includeVideo && (
+        {wantsVideo && (
           <div className="mt-6 flex flex-col gap-6 border-t border-line/60 pt-6">
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-5">
@@ -559,6 +596,7 @@ export function ConfigureForm({
           </div>
         )}
       </Card>
+      )}
 
       {error && (
         <p role="alert" className="rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -570,11 +608,11 @@ export function ConfigureForm({
         <span className="text-sm text-ink-muted">
           {platforms.length === 0
             ? 'No platforms selected'
-            : `${CREATIVE_SIZES.filter((s) => platforms.includes(s.platform)).length} image sizes${includeVideo ? ' + 1 HD video trailer' : ''}`}
+            : outputSummary}
         </span>
         <Button type="submit" size="lg" loading={pending} disabled={pending}>
           <Sparkles className="size-4" aria-hidden />{' '}
-          {`Generate Amazon Creatives & Video · ${CREDIT_PRICES[adsGenerationAction(book.contentGoal ?? null)]} credits`}
+          {`${submitLabel} · ${CREDIT_PRICES[adsGenerationAction(book.contentGoal ?? null)]} credits`}
         </Button>
       </div>
     </form>

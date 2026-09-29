@@ -16,6 +16,7 @@ import { bookVideoSource, readVideoSpec } from '@/lib/services/ads/videoSpec'
 import { aiVideoBriefSchema } from '@/lib/services/ads/aiVideoBriefSchema'
 import { summarizeJob } from '@/lib/services/ads/aiVideoJob'
 import { prisma } from '@/lib/db'
+import { goalWantsVideo } from '@/lib/services/ads/goal'
 
 export default async function ResultsStepPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params
@@ -34,7 +35,16 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
   const primaryCopy = set.adCopies.find((c) => c.platform === 'AMAZON') || set.adCopies[0]
   // A trailer was asked for and none was stored: say so rather than quietly
   // shipping a package that is missing a piece the publisher configured.
-  const trailerMissing = book.includeVideo !== false && !set.videoUrl
+  const wantsVideo = goalWantsVideo(book.contentGoal, book.includeVideo)
+  const trailerMissing = wantsVideo && !set.videoUrl
+  const heading =
+    book.contentGoal === 'video'
+      ? 'Amazon Video Trailer'
+      : book.contentGoal === 'aplus'
+        ? 'Amazon A+ Content'
+        : book.contentGoal === 'sponsored'
+          ? 'Amazon Image Ads'
+          : 'Amazon Campaign & A+ Content Package'
   const videoSpec = readVideoSpec(book.videoSpec, bookVideoSource(book))
   const savedBrief = aiVideoBriefSchema.safeParse(book.aiVideoBrief)
   // Loaded here so a finished AI video is on the page immediately, not after a client fetch.
@@ -46,10 +56,16 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
         <div>
           <div className="flex items-center gap-2">
             <ShoppingBag className="size-5 text-accent" />
-            <h2 className="font-display text-2xl font-semibold tracking-tight">Amazon Campaign & A+ Content Package</h2>
+            <h2 className="font-display text-2xl font-semibold tracking-tight">{heading}</h2>
           </div>
           <p className="mt-1 text-sm text-ink-muted">
-            {set.images.length} creative modules{set.videoUrl ? ' and 1 HD video trailer' : ''} generated for Amazon KDP and Advertising.
+            {[
+              set.images.length > 0 ? `${set.images.length} creative modules` : null,
+              set.videoUrl ? '1 HD video trailer' : null,
+            ]
+              .filter(Boolean)
+              .join(' and ') || 'Ad copy'}{' '}
+            generated for Amazon KDP and Advertising.
           </p>
         </div>
         <div className="flex gap-2">
@@ -68,13 +84,14 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
           <p className="text-sm">
             <span className="font-medium">The video trailer wasn&rsquo;t rendered.</span>{' '}
             <span className="text-ink-muted">
-              Your images and copy are ready. Regenerate to try the trailer again.
+              {set.images.length > 0 ? 'Your images and copy are ready. ' : 'Your ad copy is ready. '}Regenerate to try the
+              trailer again.
             </span>
           </p>
         </Card>
       )}
 
-      {book.includeVideo !== false && (
+      {wantsVideo && (
         <>
           <InstantVideoCard
             projectId={book.id}
@@ -103,7 +120,7 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
                 <h3 className="font-display text-xl font-semibold">{s.label}</h3>
                 <p className="text-sm text-ink-muted">{s.description}</p>
               </div>
-              <CreativeGallery images={s.images} platformLabel={s.label} />
+              {s.images.length > 0 && <CreativeGallery images={s.images} platformLabel={s.label} />}
               {s.copy && (
                 <div className="rounded-2xl bg-surface p-5 shadow-subtle">
                   <h4 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ink-muted">Amazon Ad & Product Copy</h4>

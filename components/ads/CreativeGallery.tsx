@@ -91,7 +91,8 @@ export function CreativeGallery({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Category Filter Tabs */}
+      {/* Category Filter Tabs — only useful when the set mixes A+ and sponsored */}
+      {aplusImages.length > 0 && sponsoredImages.length > 0 && (
       <div className="flex flex-wrap items-center gap-2 border-b border-line/60 pb-3">
         <button
           type="button"
@@ -134,6 +135,7 @@ export function CreativeGallery({
           <span>Sponsored Ads ({sponsoredImages.length})</span>
         </button>
       </div>
+      )}
 
       {/* Image Creatives Grid */}
       {displayedImages.length > 0 && (

@@ -2,7 +2,8 @@ import { notFound, redirect } from 'next/navigation'
 import { Loader2, ShieldCheck } from 'lucide-react'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher, getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
-import { CREATIVE_SIZES } from '@/lib/services/ads/sizes'
+import { goalSizes, goalWantsVideo } from '@/lib/services/ads/goal'
+import type { AdPlatform } from '@/lib/services/ads/copy'
 import { GenerateRunner } from '@/components/platform/GenerateRunner'
 
 const STAGES = [
@@ -24,8 +25,12 @@ export default async function GenerateStepPage({ params }: { params: Promise<{ p
   const set = await getLatestCreativeSetForBook(book.id, publisherId)
   if (book.status === 'generated' && set) redirect(`/ads/${book.id}/results`)
 
-  const sizeCount = CREATIVE_SIZES.filter((s) => book.platforms.includes(s.platform)).length
-  const platformCount = book.platforms.length
+  const sizeCount = goalSizes(book.contentGoal, book.platforms as AdPlatform[]).length
+  const wantsVideo = goalWantsVideo(book.contentGoal, book.includeVideo)
+  const makes = [sizeCount > 0 ? `${sizeCount} image sizes` : null, wantsVideo ? 'a video trailer' : null]
+    .filter(Boolean)
+    .join(' and ')
+  const stages = sizeCount > 0 ? STAGES : ['Synthesizing book metadata', 'Writing ad copy with AI', 'Rendering video trailer', 'Finalizing ad package']
 
   return (
     <GenerateRunner
@@ -33,8 +38,8 @@ export default async function GenerateStepPage({ params }: { params: Promise<{ p
       successHref={`/ads/${book.id}/results`}
       cancelHref={`/ads/${book.id}/configure`}
       title="Creating your ads"
-      subtitle={`${sizeCount} sizes across ${platformCount} ${platformCount === 1 ? 'platform' : 'platforms'}. This usually takes under a minute.`}
-      stages={STAGES}
+      subtitle={`Making ${makes || 'your ad copy'}. This usually takes under a minute.`}
+      stages={stages}
       icon={<Loader2 className="size-7 animate-spin" aria-hidden />}
       successMessage="Your creatives are ready"
       footnote={

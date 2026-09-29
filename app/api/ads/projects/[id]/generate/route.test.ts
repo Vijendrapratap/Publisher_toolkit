@@ -131,13 +131,14 @@ describe('POST /api/ads/projects/:id/generate', () => {
 
   it('resolves music scoped to the requesting publisher, never another one’s upload', async () => {
     vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, contentGoal: 'video' } as any)
     await POST(new Request('http://localhost'), ctx('book_1'))
     expect(inlineMusic).toHaveBeenCalledWith(expect.anything(), 'pub_1')
   })
 
   it('falls back to "Untitled book" for the video title, like the other video routes', async () => {
     vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
-    vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, title: '' } as any)
+    vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, title: '', contentGoal: 'video' } as any)
     await POST(new Request('http://localhost'), ctx('book_1'))
     expect(renderAdVideo).toHaveBeenCalledWith(expect.objectContaining({ title: 'Untitled book' }))
   })
@@ -175,19 +176,15 @@ describe('POST /api/ads/projects/:id/generate', () => {
     expect(captured?.usedUnits).toBe(0)
   })
 
-  it('does not zero usedUnits for a non-video goal whose trailer failed to render', async () => {
+  it('renders only the goal’s images, and no trailer, for an image goal', async () => {
     vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] }) // book fixture's contentGoal is 'aplus'
-    vi.mocked(renderAdVideo).mockRejectedValueOnce(new Error('render exploded'))
-    let captured: { usedUnits?: number } | undefined
-    vi.mocked(chargeCredits).mockImplementationOnce(async (_i, fn) => {
-      const out = await fn({ key: 'k' } as never)
-      captured = out
-      return out.result
-    })
+    vi.mocked(renderAdVideo).mockClear()
 
-    await POST(new Request('http://localhost', { method: 'POST' }), ctx('book_1'))
+    const res = await POST(new Request('http://localhost', { method: 'POST' }), ctx('book_1'))
 
-    expect(captured?.usedUnits).toBeUndefined()
+    expect(res.status).toBe(201)
+    expect(renderCreativeImages).toHaveBeenCalledWith(expect.objectContaining({ contentGoal: 'aplus' }))
+    expect(renderAdVideo).not.toHaveBeenCalled()
   })
 
   it('does not zero usedUnits for a video goal whose trailer rendered successfully', async () => {

@@ -895,6 +895,8 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
             />
           </div>
 
+          {/* The palette styles image creatives; a video-only campaign has none. */}
+          {contentGoal !== 'video' && (
           <div>
             <span className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-muted">
               <Palette className="size-3.5" aria-hidden /> Visual Aesthetic & Color Palette
@@ -907,6 +909,7 @@ export function NewProjectForm({ initialBooks }: { initialBooks?: LibraryBookIte
               badgeText={getCampaignObjective(campaignObjective).badge}
             />
           </div>
+          )}
         </div>
 
         {error && (

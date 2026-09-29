@@ -11,6 +11,7 @@ import { bookVideoSource, readVideoSpec, resolveMusic } from '@/lib/services/ads
 import { prisma } from '@/lib/db'
 import { chargeCredits, creditErrorResponse } from '@/lib/credits/charge'
 import { adsGenerationAction } from '@/lib/credits/prices'
+import { goalWantsVideo } from '@/lib/services/ads/goal'
 
 export const maxDuration = 300
 
@@ -54,6 +55,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
           platforms,
           campaignBadge: objective.badge,
           ctaText,
+          contentGoal: book.contentGoal,
         }),
       ])
 
@@ -83,7 +85,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       let videoDuration: number | null = null
       let videoError: string | null = null
 
-      if (book.includeVideo !== false) {
+      if (goalWantsVideo(book.contentGoal, book.includeVideo)) {
         try {
           const spec = readVideoSpec(book.videoSpec, bookVideoSource(book))
           const video = await renderAdVideo({

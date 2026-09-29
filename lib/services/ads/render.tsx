@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { CREATIVE_SIZES } from './sizes'
+import { goalSizes } from './goal'
 import { CreativeTemplate } from './CreativeTemplate'
 import { getTemplate } from './options'
 import type { AdPlatform } from './copy'
@@ -20,11 +21,13 @@ export async function renderCreativeImages(input: {
   platforms?: AdPlatform[]
   campaignBadge?: string
   ctaText?: string
+  contentGoal?: string | null
 }): Promise<RenderedCreativeImage[]> {
   const { palette } = getTemplate(input.templateKey ?? 'classic')
-  const sizes = input.platforms?.length
-    ? CREATIVE_SIZES.filter((s) => input.platforms!.includes(s.platform))
-    : CREATIVE_SIZES
+  const sizes = goalSizes(
+    input.contentGoal,
+    input.platforms?.length ? input.platforms : CREATIVE_SIZES.map((s) => s.platform)
+  )
 
   // Each size is an independent rasterisation — awaiting them one at a time
   // made a nine-size campaign take nine times as long as it needed to.
