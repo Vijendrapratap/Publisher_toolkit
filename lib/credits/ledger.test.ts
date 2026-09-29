@@ -6,6 +6,7 @@ import {
   SIGNUP_CREDITS,
   ensureUser,
   getBalance,
+  grantPurchase,
   refundReservation,
   reserveCredits,
   settleReservation,
@@ -205,5 +206,15 @@ describe('platform daily limit', () => {
     } finally {
       process.env.PLATFORM_DAILY_CREDIT_LIMIT = previous
     }
+  })
+})
+
+describe('grantPurchase', () => {
+  it('adds the credits once per payment reference, however often it is called', async () => {
+    const id = await newUser()
+    expect(await grantPurchase(id, 100, 'razorpay:order_1')).toBe(true)
+    expect(await grantPurchase(id, 100, 'razorpay:order_1')).toBe(false)
+    expect(await getBalance(id)).toBe(SIGNUP_CREDITS + 100)
+    expect(await ledgerSum(id)).toBe(SIGNUP_CREDITS + 100)
   })
 })

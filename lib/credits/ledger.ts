@@ -60,6 +60,26 @@ export async function ensureUser(id: string, getEmail: () => Promise<string>): P
   }
 }
 
+/**
+ * Credits a paid purchase. `ref` is the payment's unique id, so the checkout
+ * callback and the webhook can both report the same payment safely — only the
+ * first one adds credits. Returns whether this call added them.
+ */
+export async function grantPurchase(userId: string, credits: number, ref: string): Promise<boolean> {
+  try {
+    await prisma.$transaction([
+      prisma.creditLedger.create({
+        data: { userId, delta: credits, kind: 'purchase', action: ref, refId: ref, settled: true, idempotencyKey: `purchase:${ref}` },
+      }),
+      prisma.user.update({ where: { id: userId }, data: { balance: { increment: credits } } }),
+    ])
+    return true
+  } catch (err) {
+    if (isUniqueConstraintError(err)) return false
+    throw err
+  }
+}
+
 export async function getBalance(userId: string): Promise<number> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { balance: true } })
   return user?.balance ?? 0

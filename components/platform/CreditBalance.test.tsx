@@ -6,7 +6,7 @@ describe('CreditBalance', () => {
   it('links to /credits and shows a loading placeholder before the balance loads', () => {
     const html = renderToStaticMarkup(<CreditBalance />)
     expect(html).toContain('href="/credits"')
-    expect(html).toContain('aria-label="Credits"')
+    expect(html).toContain('aria-label="Credits — add credits"')
     expect(html).toContain('–')
   })
 })

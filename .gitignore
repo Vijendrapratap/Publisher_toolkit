@@ -11,3 +11,4 @@ playwright-report/
 blob-report/
 .local-storage/
 .local-storage-test/
+.vercel

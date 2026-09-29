@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Coins } from 'lucide-react'
+import { Coins, Plus } from 'lucide-react'
 
 export function CreditBalance() {
   const [balance, setBalance] = useState<number | null>(null)
@@ -26,10 +26,11 @@ export function CreditBalance() {
     <Link
       href="/credits"
       className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink shadow-subtle hover:bg-surface"
-      aria-label={balance === null ? 'Credits' : `${balance} credits`}
+      aria-label={balance === null ? 'Credits — add credits' : `${balance} credits — add credits`}
     >
       <Coins className="size-4 text-accent" aria-hidden />
       {balance ?? '–'}
+      <Plus className="size-3.5 text-ink-muted" aria-hidden />
     </Link>
   )
 }
