@@ -10,23 +10,13 @@ import {
   toTrailerStyle,
   type TrailerStyle,
 } from '@/lib/services/trailer/options'
+import { AD_FONTS, FPS, clip, type AdFontKey } from './videoBasics'
+import { storyboardSchema } from './storyboard'
 
-/** Fonts offered in the video editor; each has a loader in the composition's fonts.ts. */
-export const AD_FONTS = [
-  { key: 'inter', label: 'Inter' },
-  { key: 'montserrat', label: 'Montserrat' },
-  { key: 'bebas', label: 'Bebas Neue' },
-  { key: 'playfair', label: 'Playfair Display' },
-  { key: 'lora', label: 'Lora' },
-  { key: 'cinzel', label: 'Cinzel' },
-  { key: 'merriweather', label: 'Merriweather' },
-  { key: 'caveat', label: 'Caveat' },
-] as const
-export type AdFontKey = (typeof AD_FONTS)[number]['key']
+export { AD_FONTS, FPS, clip, type AdFontKey }
 
 /** Sized so every line fits the frame at every format without shrinking past legibility. */
 export const SCRIPT_LIMITS = { hook: 60, storyLine: 140, benefit: 28, benefits: 4, cta: 28 } as const
-export const FPS = 30
 
 const FONT_KEYS = AD_FONTS.map((f) => f.key) as [AdFontKey, ...AdFontKey[]]
 const STYLE_KEYS = STYLE_OPTIONS.map((s) => s.key) as [TrailerStyle, ...TrailerStyle[]]
@@ -69,6 +59,8 @@ export const adVideoSpecSchema = z.object({
   mood: z.enum(['suspenseful', 'epic', 'ambient', 'upbeat', 'emotional']),
   // Optional so specs saved before music existed still validate.
   music: musicSchema.optional(),
+  // Written by the director (or saved from the editor); absent means "use the fixed storyboard".
+  storyboard: storyboardSchema.optional(),
 })
 export type AdVideoSpec = z.infer<typeof adVideoSpecSchema>
 
@@ -91,16 +83,6 @@ export function presetStyle(preset: TrailerStyle): AdVideoSpec['style'] {
     font: PRESET_FONTS[preset],
     colors: { bgFrom: palette.surface, bgTo: palette.background, accent: palette.accent, text: palette.ink },
   }
-}
-
-/** Cuts at a word boundary so an automatic default never ends mid-word. */
-export function clip(text: string, max: number): string {
-  const clean = text.replace(/\s+/g, ' ').trim()
-  if (clean.length <= max) return clean
-  const head = clean.slice(0, max + 1)
-  const lastSpace = head.lastIndexOf(' ')
-  const cut = lastSpace > max * 0.5 ? head.slice(0, lastSpace) : clean.slice(0, max)
-  return cut.replace(/[\s,;:•–—-]+$/, '')
 }
 
 export interface VideoSpecSource {
