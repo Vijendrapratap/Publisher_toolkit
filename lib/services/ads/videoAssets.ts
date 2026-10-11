@@ -2,6 +2,8 @@ import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
 import { readStoredFile, toDataUri } from '@/lib/providers/storage'
 import { ownsMusicUpload, type AdVideoSpec } from './videoSpec'
+import type { DirectorImage } from './adDirector'
+import { STORYBOARD_LIMITS } from './storyboard'
 
 /** Headless Chrome and OpenRouter have no session cookie, so stored images travel inline. */
 export async function inlineImage(url: string | null | undefined): Promise<string | null> {
@@ -45,4 +47,25 @@ export async function adVideoImages(book: { frontCoverUrl: string | null; interi
     ...book.interiorImageUrls.slice(0, 2).map(inlineImage),
   ])
   return { coverUrl, interiorImageUrls: interiors.filter((u): u is string => Boolean(u)) }
+}
+
+/** The cover and up to 6 pages as raw bytes for the director; pictures that fail to load are skipped. */
+export async function directorImages(book: { frontCoverUrl: string | null; interiorImageUrls: string[] }): Promise<DirectorImage[]> {
+  const sources = [
+    { label: 'cover', url: book.frontCoverUrl },
+    ...book.interiorImageUrls.slice(0, STORYBOARD_LIMITS.pages).map((url, i) => ({ label: `page ${i + 1}`, url })),
+  ]
+  const loaded = await Promise.all(
+    sources.map(async ({ label, url }) => {
+      if (!url) return null
+      try {
+        const file = await readStoredFile(url)
+        return { label, data: file.data, mediaType: file.contentType }
+      } catch {
+        return null
+      }
+    })
+  )
+  // ponytail: images go at stored size; downscale here if token cost or latency becomes a problem.
+  return loaded.filter((i): i is DirectorImage => i !== null)
 }

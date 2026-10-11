@@ -6,6 +6,8 @@ import { projectUpdateSchema } from '@/lib/services/ads/options'
 import { isAllowedCoverType, storeUploadedImage, COVER_RULE } from '@/lib/services/shared/upload'
 import { adVideoSpecSchema, clip, ownsMusicUpload, presetStyle, SCRIPT_LIMITS, type AdVideoSpec } from '@/lib/services/ads/videoSpec'
 import { prisma } from '@/lib/db'
+import { fitToLength, ownsStoredFile, settingsPath } from '@/lib/services/ads/storyboard'
+import { getDurationForLength } from '@/lib/services/trailer/options'
 import type { Book } from '@prisma/client'
 import type { z } from 'zod'
 
@@ -44,6 +46,9 @@ function deriveVideoSpecUpdate(update: z.infer<typeof projectUpdateSchema>, curr
       ...(changed('ctaText') ? { cta: clip(update.ctaText!, SCRIPT_LIMITS.cta) } : {}),
     },
   }
+  if (changed('videoLength') && spec.storyboard) {
+    spec.storyboard = { ...spec.storyboard, beats: fitToLength(spec.storyboard.beats, getDurationForLength(spec.length)) }
+  }
   const parsed = adVideoSpecSchema.safeParse(spec)
   return parsed.success ? parsed.data : null
 }
@@ -65,6 +70,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const update = parsed.data
     if (update.videoSpec?.music && !ownsMusicUpload(update.videoSpec.music, publisherId)) {
       return NextResponse.json({ error: "That music file doesn't belong to this account." }, { status: 400 })
+    }
+    const settingUrl = update.videoSpec?.storyboard?.theme.settingImageUrl
+    if (settingUrl && !ownsStoredFile(settingUrl, settingsPath(publisherId))) {
+      return NextResponse.json({ error: "That background picture doesn't belong to this account." }, { status: 400 })
     }
 
     let data: typeof update = update

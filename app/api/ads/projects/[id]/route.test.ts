@@ -14,6 +14,7 @@ import { prisma } from '@/lib/db'
 import { storeFile } from '@/lib/providers/storage'
 import { getBookForPublisher } from '@/lib/services/ads/queries'
 import { defaultVideoSpec, presetStyle } from '@/lib/services/ads/videoSpec'
+import { fixedStoryboard, storyboardDurationInFrames } from '@/lib/services/ads/storyboard'
 
 function ctx(id: string) {
   return { params: Promise.resolve({ id }) }
@@ -249,6 +250,26 @@ describe('PATCH /api/ads/projects/:id', () => {
       const call = vi.mocked(prisma.book.update).mock.calls[0][0] as any
       expect(call.data.videoSpec).toEqual(explicitSpec)
     })
+
+    it('rejects a storyboard whose background picture is not this publisher’s file', async () => {
+      const storyboard = fixedStoryboard({ title: 'T', pageCount: 0, cta: 'Go', lengthSec: 15, style: presetStyle('cinematic') })
+      const videoSpec = { ...savedSpec, storyboard: { ...storyboard, theme: { ...storyboard.theme, settingImageUrl: '/api/files/ads/pub_2/settings/x.png' } } }
+      const res = await PATCH(jsonRequest({ videoSpec }), ctx('book_1'))
+      expect(res.status).toBe(400)
+      expect(prisma.book.update).not.toHaveBeenCalled()
+    })
+
+    it('refits a saved storyboard when the Configure page changes the length', async () => {
+      // Beats top out at 4 s, so a length change is checked going shorter, where the fit always moves.
+      const storyboard = fixedStoryboard({ title: 'T', blurb: 'One. Two.', bullets: ['x'], pageCount: 0, cta: 'Go', lengthSec: 15, style: presetStyle('cinematic') })
+      vi.mocked(getBookForPublisher).mockResolvedValueOnce({ id: 'book_1', publisherId: 'pub_1', videoSpec: { ...customSpec, storyboard }, ...bookColumns } as any)
+      const res = await PATCH(jsonRequest({ ...sameAsColumns, videoLength: '6s' }), ctx('book_1'))
+      expect(res.status).toBe(200)
+      const saved = (vi.mocked(prisma.book.update).mock.calls[0][0] as any).data.videoSpec
+      expect(saved.length).toBe('6s')
+      expect(storyboardDurationInFrames(saved.storyboard.beats)).toBeLessThan(storyboardDurationInFrames(storyboard.beats))
+    })
+
   })
 
   describe('uploaded music ownership', () => {
@@ -266,5 +287,6 @@ describe('PATCH /api/ads/projects/:id', () => {
       const res = await PATCH(jsonRequest({ videoSpec: spec }), ctx('book_1'))
       expect(res.status).toBe(200)
     })
+
   })
 })
