@@ -2,17 +2,18 @@ import Link from 'next/link'
 import { BookImage } from 'lucide-react'
 import { SERVICES } from '@/lib/services/registry'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getRecentBooksForPublisher } from '@/lib/services/ads/queries'
-import { statusDisplay } from '@/lib/services/ads/steps'
+import { getAdsProjects } from '@/lib/services/ads/projects'
+import { getCreatorProjectsForPublisher } from '@/lib/services/creator/queries'
+import { mergeRecentWork } from '@/lib/services/shared/recentWork'
 import { timeAgo } from '@/lib/format'
 import { ServiceCard } from '@/components/platform/ServiceCard'
-import { Badge } from '@/components/ui/badge'
 
 export const dynamic = 'force-dynamic'
 
 export default async function HubPage() {
   const publisherId = await requireCurrentPublisherId()
-  const recent = await getRecentBooksForPublisher(publisherId, 4)
+  const [adsProjects, books] = await Promise.all([getAdsProjects(publisherId), getCreatorProjectsForPublisher(publisherId)])
+  const recent = mergeRecentWork(adsProjects, books, 4)
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-12 sm:py-16">
@@ -38,34 +39,28 @@ export default async function HubPage() {
             Pick up where you left off
           </h2>
           <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {recent.map((p) => {
-              const status = statusDisplay(p.status)
-              return (
-                <li key={p.id}>
-                  <Link
-                    href={`/ads/${p.id}`}
-                    className="flex h-full flex-col overflow-hidden rounded-card bg-surface shadow-card transition-all hover:-translate-y-0.5 hover:shadow-lift"
-                  >
-                    <span className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-surface-2 shadow-inset">
-                      {p.frontCoverUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.frontCoverUrl} alt="" className="absolute inset-0 size-full object-cover" />
-                      ) : (
-                        <BookImage className="size-8 text-ink-muted" aria-hidden />
-                      )}
-                    </span>
-                    <span className="flex flex-col gap-2 p-4">
-                      <span className="text-xs font-medium text-accent">Ads Creative</span>
-                      <span className="truncate font-medium">{p.title || 'Untitled book'}</span>
-                      <span className="flex items-center justify-between gap-2">
-                        <Badge tone={status.tone}>{status.label}</Badge>
-                        <span className="text-xs text-ink-muted">{timeAgo(p.updatedAt)}</span>
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
+            {recent.map((p) => (
+              <li key={p.key}>
+                <Link
+                  href={p.href}
+                  className="flex h-full flex-col overflow-hidden rounded-card bg-surface shadow-card transition-all hover:-translate-y-0.5 hover:shadow-lift"
+                >
+                  <span className="relative grid aspect-[4/3] place-items-center overflow-hidden bg-surface-2 shadow-inset">
+                    {p.coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.coverUrl} alt="" className="absolute inset-0 size-full object-cover" />
+                    ) : (
+                      <BookImage className="size-8 text-ink-muted" aria-hidden />
+                    )}
+                  </span>
+                  <span className="flex flex-col gap-2 p-4">
+                    <span className="text-xs font-medium text-accent">{p.kind === 'ads' ? 'Ads Creative' : 'Create Your Book'}</span>
+                    <span className="truncate font-medium">{p.title}</span>
+                    <span className="text-xs text-ink-muted">{timeAgo(p.updatedAt)}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
           </ul>
         </section>
       )}

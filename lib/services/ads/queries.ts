@@ -1,26 +1,6 @@
 import { prisma } from '@/lib/db'
 import type { Book, AdCopy } from '@prisma/client'
 
-/** The rail and the hub both show a short recent list, never the whole table. */
-export const RAIL_SELECT = {
-  id: true,
-  title: true,
-  status: true,
-  frontCoverUrl: true,
-  updatedAt: true,
-} as const
-
-export type RailBook = Pick<Book, 'id' | 'title' | 'status' | 'frontCoverUrl' | 'updatedAt'>
-
-export function getRecentBooksForPublisher(publisherId: string, take: number): Promise<RailBook[]> {
-  return prisma.book.findMany({
-    where: { publisherId },
-    orderBy: { updatedAt: 'desc' },
-    take,
-    select: RAIL_SELECT,
-  })
-}
-
 export function getBookForPublisher(publisherId: string, bookId: string): Promise<Book | null> {
   return prisma.book.findFirst({ where: { id: bookId, publisherId } })
 }
