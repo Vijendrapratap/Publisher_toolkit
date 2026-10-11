@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
 import { Dropzone } from '@/components/platform/Dropzone'
+import { InteriorImagesDropzone } from '@/components/platform/InteriorImagesDropzone'
+import { buildCoverUploadForm } from '@/lib/services/ads/addBook'
 import { COVER_RULE, PDF_RULE } from '@/lib/services/shared/upload'
 
 type Mode = 'link' | 'upload' | 'pdf'
@@ -35,6 +37,7 @@ export function AddBookForm() {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [cover, setCover] = useState<File | null>(null)
+  const [insidePages, setInsidePages] = useState<File[]>([])
   const [pdf, setPdf] = useState<File | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -92,11 +95,7 @@ export function AddBookForm() {
     }
     if (mode === 'upload') {
       if (!cover || !title.trim()) return setError('Add a cover image and the book title.')
-      const form = new FormData()
-      form.append('title', title.trim())
-      form.append('author', author.trim())
-      form.append('frontCover', cover)
-      return void create(form, false)
+      return void create(buildCoverUploadForm({ title, author, cover, insidePages }), false)
     }
     if (!pdf) return setError('Choose your book PDF.')
     const form = new FormData()
@@ -152,7 +151,15 @@ export function AddBookForm() {
         )}
 
         {mode === 'upload' && (
-          <Dropzone id="frontCover" label="Cover image" rule={COVER_RULE} file={cover} onFileChange={setCover} compact />
+          <>
+            <Dropzone id="frontCover" label="Cover image" rule={COVER_RULE} file={cover} onFileChange={setCover} compact />
+            <InteriorImagesDropzone
+              files={insidePages}
+              onFilesChange={setInsidePages}
+              label="Inside pages (optional)"
+              description="Add 2–5 pages or illustrations. They make your A+ images and video ad richer."
+            />
+          </>
         )}
 
         {showDetails && (
