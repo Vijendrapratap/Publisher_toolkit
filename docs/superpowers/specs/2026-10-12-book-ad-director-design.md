@@ -56,7 +56,7 @@ storyboard: {
     particles: 'leaves' | 'snow' | 'dust' | 'embers' | 'none'
     cornerCover: boolean           // small cover pinned top-left on dark beats
   }
-  beats: Beat[]                    // 5–9 beats
+  beats: Beat[]                    // 2–9 beats; the director aims for 5–9, a bare book may get fewer
 }
 
 Beat =
