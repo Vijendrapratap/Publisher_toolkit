@@ -1,6 +1,7 @@
 // Renders a real ad for a book in the dev database and a contact sheet of its frames.
 //   npm run remotion:bundle
 //   DATABASE_URL=… node scripts/render-sample-ad.mjs <bookId> [--direct] [--format 16:9] [--out dir]
+// --no-cover and --title "…" render edge cases (no cover, long title) without touching the database.
 // --direct asks the AI director (costs a few cents) and draws the setting; otherwise the fixed storyboard.
 import path from 'node:path'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -23,7 +24,8 @@ const { bookAdImages, inlineMusic, directorImages } = await jiti.import('@/lib/s
 const { renderAdVideo } = await jiti.import('@/lib/services/ads/renderVideo.ts')
 const { getDurationForLength } = await jiti.import('@/lib/services/trailer/options.ts')
 
-const book = await prisma.book.findUniqueOrThrow({ where: { id: bookId } })
+const stored = await prisma.book.findUniqueOrThrow({ where: { id: bookId } })
+const book = { ...stored, ...(flag('--no-cover') ? { frontCoverUrl: null } : {}), ...(args.includes('--title') ? { title: value('--title') } : {}) }
 const base = readVideoSpec(book.videoSpec, bookVideoSource(book))
 const spec = { ...base, format: value('--format', base.format) }
 let storyboard = resolveStoryboard(spec, book)
@@ -38,7 +40,8 @@ if (flag('--direct')) {
   storyboard = { ...result.data, theme: { ...result.data.theme, settingImageUrl } }
   console.log(`director: ${result.source}${result.reason ? ` (${result.reason})` : ''}`)
 }
-const out = value('--out', path.join(root, 'test-results', 'sample-ads', `${bookId}-${spec.format.replace(':', 'x')}`))
+const variant = [flag('--no-cover') && 'nocover', args.includes('--title') && 'longtitle'].filter(Boolean).join('-')
+const out = value('--out', path.join(root, 'test-results', 'sample-ads', `${bookId}-${spec.format.replace(':', 'x')}${variant ? `-${variant}` : ''}`))
 mkdirSync(out, { recursive: true })
 writeFileSync(path.join(out, 'storyboard.json'), JSON.stringify(storyboard, null, 2))
 

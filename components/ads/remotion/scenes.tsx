@@ -136,11 +136,11 @@ export function EndCardScene({ beat, frames, ctx }: SceneProps<'endCard'>) {
         <Book3D coverUrl={ctx.coverUrl} height={book.h} turn={interpolate(frame, [0, frames], [10, 4])} spine={ctx.theme.palette.bg} accent={ctx.theme.palette.accent} title={ctx.title} />
       </div>
       <div style={{ position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: stacked ? 'center' : 'flex-start', gap: ctx.height * 0.025 }}>
-        <BeatText text={beat.title} frames={frames + 30} font={ctx.font} color={ctx.theme.palette.ink} accent={ctx.theme.palette.ink} size={ctx.textSize * 0.82} align={stacked ? 'center' : 'left'} delay={4} />
+        <BeatText text={beat.title} frames={frames + 30} font={ctx.font} color={ctx.theme.palette.ink} accent={ctx.theme.palette.ink} size={ctx.textSize * 1.05} align={stacked ? 'center' : 'left'} delay={4} />
         {beat.subtitle && (
-          <BeatText text={beat.subtitle} frames={frames + 30} font={ctx.font} color={ctx.theme.palette.ink} accent={ctx.theme.palette.accent} size={ctx.textSize * 0.4} align={stacked ? 'center' : 'left'} delay={10} />
+          <BeatText text={beat.subtitle} frames={frames + 30} font={ctx.font} color={ctx.theme.palette.ink} accent={ctx.theme.palette.accent} size={ctx.textSize * 0.55} align={stacked ? 'center' : 'left'} delay={10} />
         )}
-        <div style={{ scale: String(Math.max(0, pop)), fontFamily: ctx.font, fontWeight: 700, fontSize: ctx.textSize * 0.42, color: ctx.theme.palette.bg, background: ctx.theme.palette.accent, padding: `${ctx.textSize * 0.22}px ${ctx.textSize * 0.55}px`, borderRadius: 999, boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
+        <div style={{ scale: String(Math.max(0, pop)), fontFamily: ctx.font, fontWeight: 700, fontSize: ctx.textSize * 0.6, color: ctx.theme.palette.bg, background: ctx.theme.palette.accent, padding: `${ctx.textSize * 0.28}px ${ctx.textSize * 0.7}px`, borderRadius: 999, boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
           {beat.cta}
         </div>
       </div>
