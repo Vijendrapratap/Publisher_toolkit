@@ -18,7 +18,7 @@ vi.mock('@/lib/services/ads/queries', () => ({
   getLatestCreativeSetForBook: vi.fn(),
 }))
 vi.mock('@/lib/services/ads/videoAssets', () => ({
-  adVideoImages: vi.fn().mockResolvedValue({ coverUrl: 'data:cover', interiorImageUrls: [] }),
+  bookAdImages: vi.fn().mockResolvedValue({ coverUrl: 'data:cover', pageUrls: [], settingUrl: null }),
   inlineMusic: vi.fn().mockResolvedValue('data:audio/mpeg;base64,AA'),
 }))
 vi.mock('@/lib/services/ads/renderVideo', async (importOriginal) => ({
@@ -51,11 +51,20 @@ describe('POST /api/ads/projects/:id/video/instant', () => {
     })
   })
 
+  it('renders the BookAd composition with the book’s storyboard', async () => {
+    await POST(req(), ctx)
+    const [props, compositionId] = vi.mocked(renderAdVideo).mock.calls[0]
+    expect(compositionId).toBe('BookAd')
+    expect((props as any).storyboard.beats.at(-1).kind).toBe('endCard')
+    expect((props as any).coverUrl).toBe('data:cover')
+  })
+
   it('renders the saved spec and replaces the set video', async () => {
     const res = await POST(req(), ctx)
     expect(res.status).toBe(200)
     expect(renderAdVideo).toHaveBeenCalledWith(
-      expect.objectContaining({ spec: savedSpec, coverUrl: 'data:cover', title: 'T', musicSrc: 'data:audio/mpeg;base64,AA' })
+      expect.objectContaining({ spec: savedSpec, coverUrl: 'data:cover', title: 'T', musicSrc: 'data:audio/mpeg;base64,AA' }),
+      'BookAd'
     )
     const json = await res.json()
     expect(json.videoUrl).toMatch(/creatives\/set_1\/video-.+\.mp4$/)

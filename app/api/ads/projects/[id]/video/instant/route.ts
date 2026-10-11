@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
 import { getBookForPublisher, getLatestCreativeSetForBook } from '@/lib/services/ads/queries'
 import { bookVideoSource, readVideoSpec, resolveMusic } from '@/lib/services/ads/videoSpec'
-import { adVideoImages, inlineMusic } from '@/lib/services/ads/videoAssets'
+import { bookAdImages, inlineMusic } from '@/lib/services/ads/videoAssets'
+import { resolveStoryboard } from '@/lib/services/ads/storyboard'
 import { describeRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
 import { storeFile } from '@/lib/providers/storage'
 import { prisma } from '@/lib/db'
@@ -24,13 +25,18 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const payload = await chargeCredits(
       { userId: publisherId, action: 'ads.video.instant', refId: book.id },
       async () => {
-        const video = await renderAdVideo({
-          spec,
-          title: book.title ?? 'Untitled book',
-          author: book.author ?? '',
-          musicSrc: await inlineMusic(resolveMusic(spec), publisherId),
-          ...(await adVideoImages(book)),
-        })
+        const storyboard = resolveStoryboard(spec, book)
+        const video = await renderAdVideo(
+          {
+            spec,
+            storyboard,
+            title: book.title ?? 'Untitled book',
+            author: book.author ?? '',
+            musicSrc: await inlineMusic(resolveMusic(spec), publisherId),
+            ...(await bookAdImages(book, storyboard, publisherId)),
+          },
+          'BookAd'
+        )
 
         // A new name per export, so the browser never plays a cached older cut.
         const stamp = Date.now().toString(36)

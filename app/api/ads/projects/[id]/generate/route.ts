@@ -6,9 +6,10 @@ import { renderCreativeImages } from '@/lib/services/ads/render'
 import { readStoredFile, storeFile, toDataUri } from '@/lib/providers/storage'
 import { getCampaignObjective, type CopyTone } from '@/lib/services/ads/options'
 import { describeRenderError, renderAdVideo } from '@/lib/services/ads/renderVideo'
-import { adVideoImages, inlineMusic } from '@/lib/services/ads/videoAssets'
+import { bookAdImages, inlineMusic } from '@/lib/services/ads/videoAssets'
 import { bookVideoSource, readVideoSpec, resolveMusic } from '@/lib/services/ads/videoSpec'
 import { prisma } from '@/lib/db'
+import { resolveStoryboard } from '@/lib/services/ads/storyboard'
 import { chargeCredits, creditErrorResponse } from '@/lib/credits/charge'
 import { adsGenerationAction } from '@/lib/credits/prices'
 import { goalWantsVideo } from '@/lib/services/ads/goal'
@@ -88,13 +89,18 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       if (goalWantsVideo(book.contentGoal, book.includeVideo)) {
         try {
           const spec = readVideoSpec(book.videoSpec, bookVideoSource(book))
-          const video = await renderAdVideo({
-            spec,
-            title: details.title || 'Untitled book',
-            author: details.author,
-            musicSrc: await inlineMusic(resolveMusic(spec), publisherId),
-            ...(await adVideoImages(book)),
-          })
+          const storyboard = resolveStoryboard(spec, book)
+          const video = await renderAdVideo(
+            {
+              spec,
+              storyboard,
+              title: details.title || 'Untitled book',
+              author: details.author,
+              musicSrc: await inlineMusic(resolveMusic(spec), publisherId),
+              ...(await bookAdImages(book, storyboard, publisherId)),
+            },
+            'BookAd'
+          )
 
           const [videoUpload, posterUpload] = await Promise.all([
             storeFile(`${setDir}/video-trailer.mp4`, video.videoBuffer, 'video/mp4'),

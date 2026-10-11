@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { readStoredFile, toDataUri } from '@/lib/providers/storage'
 import { ownsMusicUpload, type AdVideoSpec } from './videoSpec'
 import type { DirectorImage } from './adDirector'
-import { STORYBOARD_LIMITS } from './storyboard'
+import { STORYBOARD_LIMITS, ownsStoredFile, pagesUsed, settingsPath, type Storyboard } from './storyboard'
 
 /** Headless Chrome and OpenRouter have no session cookie, so stored images travel inline. */
 export async function inlineImage(url: string | null | undefined): Promise<string | null> {
@@ -41,12 +41,20 @@ export async function musicFile(music: NonNullable<AdVideoSpec['music']>, dir: s
   }
 }
 
-export async function adVideoImages(book: { frontCoverUrl: string | null; interiorImageUrls: string[] }) {
-  const [coverUrl, ...interiors] = await Promise.all([
+/** Everything BookAd draws, inline for headless Chrome; pages the storyboard doesn't show stay null. */
+export async function bookAdImages(
+  book: { frontCoverUrl: string | null; interiorImageUrls: string[] },
+  storyboard: Storyboard,
+  publisherId: string
+) {
+  const used = new Set(pagesUsed(storyboard))
+  const setting = storyboard.theme.settingImageUrl
+  const [coverUrl, settingUrl, ...pageUrls] = await Promise.all([
     inlineImage(book.frontCoverUrl),
-    ...book.interiorImageUrls.slice(0, 2).map(inlineImage),
+    setting && ownsStoredFile(setting, settingsPath(publisherId)) ? inlineImage(setting) : Promise.resolve(null),
+    ...book.interiorImageUrls.map((url, i) => (used.has(i + 1) ? inlineImage(url) : Promise.resolve(null))),
   ])
-  return { coverUrl, interiorImageUrls: interiors.filter((u): u is string => Boolean(u)) }
+  return { coverUrl, settingUrl, pageUrls }
 }
 
 /** The cover and up to 6 pages as raw bytes for the director; pictures that fail to load are skipped. */

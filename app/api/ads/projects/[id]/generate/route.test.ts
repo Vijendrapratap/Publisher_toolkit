@@ -8,6 +8,7 @@ vi.mock('@/lib/credits/charge', async (orig) => {
 const book = {
   id: 'book_1', title: 'T', author: 'A', blurb: 'B', frontCoverUrl: '/api/files/ads/pub_1/cover.png',
   platforms: ['META'], copyTone: 'punchy', templateKey: 'bold', contentGoal: 'aplus',
+  interiorImageUrls: [], bullets: [],
 }
 
 vi.mock('@/lib/providers/auth', () => ({ requireCurrentPublisherId: vi.fn().mockResolvedValue('pub_1') }))
@@ -21,7 +22,7 @@ vi.mock('@/lib/services/ads/renderVideo', async (importOriginal) => ({
   }),
 }))
 vi.mock('@/lib/services/ads/videoAssets', () => ({
-  adVideoImages: vi.fn().mockResolvedValue({ coverUrl: 'data:cover', interiorImageUrls: [] }),
+  bookAdImages: vi.fn().mockResolvedValue({ coverUrl: 'data:cover', pageUrls: [], settingUrl: null }),
   inlineMusic: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/lib/providers/storage', () => ({
@@ -140,7 +141,7 @@ describe('POST /api/ads/projects/:id/generate', () => {
     vi.mocked(generateAdCopy).mockResolvedValue({ source: 'ai', data: [] })
     vi.mocked(getBookForPublisher).mockResolvedValueOnce({ ...book, title: '', contentGoal: 'video' } as any)
     await POST(new Request('http://localhost'), ctx('book_1'))
-    expect(renderAdVideo).toHaveBeenCalledWith(expect.objectContaining({ title: 'Untitled book' }))
+    expect(renderAdVideo).toHaveBeenCalledWith(expect.objectContaining({ title: 'Untitled book' }), 'BookAd')
   })
 
   it('charges the price of the book’s content goal', async () => {

@@ -11,7 +11,9 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
 
 import { readStoredFile } from '@/lib/providers/storage'
 import { writeFile } from 'node:fs/promises'
-import { inlineMusic, musicFile } from './videoAssets'
+import { bookAdImages, inlineMusic, musicFile } from './videoAssets'
+import { fixedStoryboard } from './storyboard'
+import { presetStyle } from './videoSpec'
 
 const ownedUpload = { kind: 'upload' as const, url: '/api/files/ads/pub_1/music/track.mp3', name: 'track.mp3' }
 const foreignUpload = { kind: 'upload' as const, url: '/api/files/ads/pub_evil/music/track.mp3', name: 'track.mp3' }
@@ -49,5 +51,30 @@ describe('musicFile', () => {
     expect(file).toBeNull()
     expect(readStoredFile).not.toHaveBeenCalled()
     expect(writeFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('bookAdImages', () => {
+  const style = presetStyle('cinematic')
+  const book = { frontCoverUrl: '/api/files/c.png', interiorImageUrls: ['/p1', '/p2', '/p3', '/p4'] }
+  it('inlines the cover, only the pages the storyboard shows, and the owned setting', async () => {
+    const storyboard = {
+      ...fixedStoryboard({ title: 'T', pageCount: 0, cta: 'Go', lengthSec: 15, style }),
+      beats: [
+        { kind: 'pageZoom' as const, page: 3, focus: { x: 0.5, y: 0.5, zoom: 1.5 }, seconds: 3 },
+        { kind: 'endCard' as const, title: 'T', cta: 'Go', seconds: 3 },
+      ],
+    }
+    storyboard.theme = { ...storyboard.theme, settingImageUrl: '/api/files/ads/pub_1/settings/s.png' }
+    const out = await bookAdImages(book, storyboard, 'pub_1')
+    expect(out.coverUrl).toMatch(/^data:/)
+    expect(out.pageUrls.map(Boolean)).toEqual([false, false, true, false])
+    expect(out.settingUrl).toMatch(/^data:/)
+  })
+  it('never reads a setting picture another publisher owns', async () => {
+    const storyboard = fixedStoryboard({ title: 'T', pageCount: 0, cta: 'Go', lengthSec: 15, style })
+    storyboard.theme = { ...storyboard.theme, settingImageUrl: '/api/files/ads/pub_2/settings/s.png' }
+    expect((await bookAdImages(book, storyboard, 'pub_1')).settingUrl).toBeNull()
+    expect(readStoredFile).not.toHaveBeenCalledWith('/api/files/ads/pub_2/settings/s.png')
   })
 })
