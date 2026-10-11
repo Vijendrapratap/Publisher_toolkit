@@ -15,6 +15,8 @@ export default async function UploadStepPage({ params }: { params: Promise<{ pro
       projectId={book.id}
       coverUrl={book.frontCoverUrl}
       initial={{ title: book.title ?? '', author: book.author ?? '', blurb: book.blurb ?? '' }}
+      // A book being added (a root) goes to its project page; a creation goes on to configure.
+      nextHref={book.parentBookId ? `/ads/${book.id}/configure` : `/ads/books/${book.id}`}
     />
   )
 }

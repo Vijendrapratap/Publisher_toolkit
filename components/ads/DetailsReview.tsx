@@ -13,10 +13,13 @@ export function DetailsReview({
   projectId,
   initial,
   coverUrl,
+  nextHref,
 }: {
   projectId: string
   initial: { title: string; author: string; blurb: string }
   coverUrl: string | null
+  /** Where Save and continue goes next. */
+  nextHref: string
 }) {
   const router = useRouter()
   const [details, setDetails] = useState(initial)
@@ -58,7 +61,7 @@ export function DetailsReview({
     }
 
     toast.success('Details saved')
-    router.push(`/ads/${projectId}/configure`)
+    router.push(nextHref)
     router.refresh()
   }
 

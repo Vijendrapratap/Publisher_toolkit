@@ -1,67 +1,67 @@
 import Link from 'next/link'
-import { Megaphone, Plus, Sparkles, Settings2, Upload, Images } from 'lucide-react'
+import { BookImage, Megaphone, Plus } from 'lucide-react'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { countBooksForPublisher } from '@/lib/services/ads/queries'
+import { getAdsProjects } from '@/lib/services/ads/projects'
 import { EmptyState } from '@/components/platform/EmptyState'
 import { buttonClasses } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { timeAgo } from '@/lib/format'
 
-const HOW = [
-  { icon: Upload, title: 'Upload', text: 'Drop in your book PDF. We pull the cover, title and blurb.' },
-  { icon: Settings2, title: 'Configure', text: 'Choose platforms, a copy tone and a design template.' },
-  { icon: Sparkles, title: 'Generate', text: 'AI writes the copy and composes every ad size.' },
-  { icon: Images, title: 'Results', text: 'Polish the copy, download a ZIP, or push to your ad account.' },
-]
+export const dynamic = 'force-dynamic'
 
 export default async function AdsHomePage() {
   const publisherId = await requireCurrentPublisherId()
-  const projectCount = await countBooksForPublisher(publisherId)
-  const newButton = (
+  const projects = await getAdsProjects(publisherId)
+  const addButton = (
     <Link href="/ads/new" className={buttonClasses({ size: 'lg' })}>
-      <Plus className="size-4" aria-hidden /> New campaign
+      <Plus className="size-4" aria-hidden /> Add a book
     </Link>
   )
 
   return (
     <div className="flex flex-col gap-8">
-      <header>
-        <p className="text-sm font-semibold uppercase tracking-widest text-accent">Ads Creative</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Ads that sell your book</h1>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-widest text-accent">Ads Creative</p>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Your books</h1>
+          <p className="mt-2 text-ink-muted">Open a book to make A+ images, a video ad or ad images for it.</p>
+        </div>
+        {projects.length > 0 && addButton}
       </header>
-      {projectCount === 0 ? (
+
+      {projects.length === 0 ? (
         <EmptyState
           icon={<Megaphone className="size-7" aria-hidden />}
-          title="Create your first ad campaign"
-          description="Upload a book or choose an existing title to generate ready-to-run creatives for Meta, Google and Amazon in minutes."
-          action={newButton}
+          title="Add your first book"
+          description="Paste a store link or upload a cover. Then make A+ images, a video ad or ad images for it."
+          action={addButton}
         />
       ) : (
-        <Card className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-display text-xl font-semibold">Campaigns & book library</h2>
-            <p className="text-sm text-ink-muted">
-              Select an ongoing campaign from the left, or launch a new campaign for any previously uploaded book.
-            </p>
-          </div>
-          {newButton}
-        </Card>
-      )}
-      <section aria-labelledby="how-heading">
-        <h2 id="how-heading" className="text-xs font-semibold uppercase tracking-widest text-ink-muted">How it works</h2>
-        <ol className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {HOW.map(({ icon: Icon, title, text }, i) => (
-            <li key={title} className="rounded-card bg-surface p-5 shadow-subtle">
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <span className="grid size-8 place-items-center rounded-lg bg-accent-soft text-accent shadow-subtle">
-                  <Icon className="size-4" aria-hidden />
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {projects.map((p) => (
+            <li key={p.id}>
+              <Link
+                href={`/ads/books/${p.id}`}
+                className="flex h-full gap-4 rounded-card bg-surface p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-lift"
+              >
+                <span className="grid aspect-[3/4] w-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2 shadow-inset">
+                  {p.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.coverUrl} alt="" className="size-full object-cover" />
+                  ) : (
+                    <BookImage className="size-5 text-ink-muted" aria-hidden />
+                  )}
                 </span>
-                {i + 1}. {title}
-              </span>
-              <p className="mt-3 text-sm text-ink-muted">{text}</p>
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate font-medium">{p.title}</span>
+                  {p.author && <span className="truncate text-sm text-ink-muted">{p.author}</span>}
+                  <span className="mt-auto text-xs text-ink-muted">{p.summary}</span>
+                  <span className="text-xs text-ink-muted">{timeAgo(p.activityAt)}</span>
+                </span>
+              </Link>
             </li>
           ))}
-        </ol>
-      </section>
+        </ul>
+      )}
     </div>
   )
 }
