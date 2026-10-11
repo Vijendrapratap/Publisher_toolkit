@@ -10,6 +10,8 @@ import {
   PDF_RULE,
 } from '@/lib/services/shared/upload'
 import { prisma } from '@/lib/db'
+import { getCreatorProjectForPublisher } from '@/lib/services/creator/queries'
+import { syncProjectFromCreator } from '@/lib/services/ads/projects'
 
 export async function POST(request: Request) {
   const publisherId = await requireCurrentPublisherId()
@@ -39,11 +41,16 @@ export async function POST(request: Request) {
     } = json
 
     if (existingBookId) {
-      const sourceBook = await prisma.book.findFirst({
+      let sourceBook = await prisma.book.findFirst({
         where: { id: existingBookId, publisherId },
       })
       if (!sourceBook) {
         return NextResponse.json({ error: 'Selected book not found' }, { status: 404 })
+      }
+      // A written book's project copies whatever cover and pages it has right now.
+      if (sourceBook.creatorProjectId) {
+        const creator = await getCreatorProjectForPublisher(publisherId, sourceBook.creatorProjectId)
+        if (creator) sourceBook = await syncProjectFromCreator(publisherId, creator)
       }
 
       const rootId = sourceBook.parentBookId ?? sourceBook.id

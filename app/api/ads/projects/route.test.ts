@@ -11,6 +11,8 @@ vi.mock('@/lib/services/ads/extract', () => ({
     backCoverPng: Buffer.from('png'),
   }),
 }))
+vi.mock('@/lib/services/creator/queries', () => ({ getCreatorProjectForPublisher: vi.fn() }))
+vi.mock('@/lib/services/ads/projects', () => ({ syncProjectFromCreator: vi.fn() }))
 vi.mock('@/lib/db', () => ({
   prisma: {
     book: {
@@ -181,6 +183,44 @@ describe('POST /api/ads/projects', () => {
           templateKey: 'fantasy',
           copyTone: 'intriguing',
           parentBookId: 'existing_book_1',
+        }),
+      })
+    )
+  })
+
+  it('refreshes a written book’s project before copying it into a new creation', async () => {
+    const { getCreatorProjectForPublisher } = await import('@/lib/services/creator/queries')
+    const { syncProjectFromCreator } = await import('@/lib/services/ads/projects')
+    vi.mocked(prisma.book.findFirst).mockResolvedValueOnce({
+      id: 'root_1', parentBookId: null, creatorProjectId: 'cp_1', title: 'Stale', frontCoverUrl: null,
+      interiorImageUrls: [], platforms: ['AMAZON'], contentGoal: null,
+    } as never)
+    vi.mocked(getCreatorProjectForPublisher).mockResolvedValueOnce({ id: 'cp_1' } as never)
+    vi.mocked(syncProjectFromCreator).mockResolvedValueOnce({
+      id: 'root_1', parentBookId: null, creatorProjectId: 'cp_1', title: 'Fresh', author: 'Eliza', blurb: '',
+      pdfUrl: null, frontCoverUrl: 'https://img/cover.png', backCoverUrl: null, sourceUrl: null,
+      interiorImageUrls: ['https://img/p1.png'], platforms: ['AMAZON'], contentGoal: null,
+      templateKey: 'classic', copyTone: 'literary',
+    } as never)
+
+    const res = await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ existingBookId: 'root_1', contentGoal: 'aplus' }),
+      })
+    )
+
+    expect(res.status).toBe(201)
+    expect(getCreatorProjectForPublisher).toHaveBeenCalledWith('pub_1', 'cp_1')
+    expect(prisma.book.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Fresh',
+          frontCoverUrl: 'https://img/cover.png',
+          interiorImageUrls: ['https://img/p1.png'],
+          parentBookId: 'root_1',
+          contentGoal: 'aplus',
         }),
       })
     )
