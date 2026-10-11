@@ -36,7 +36,7 @@ function BookAndLine({ side, text, frames, ctx, pageUrl }: { side: 'left' | 'rig
         {pageUrl ? (
           <Img src={pageUrl} style={{ height: book.h, width: book.w, objectFit: 'cover', rotate: `${side === 'left' ? 3 : -3}deg`, boxShadow: '0 30px 60px rgba(0,0,0,0.5)' }} />
         ) : (
-          <Book3D coverUrl={ctx.coverUrl} height={book.h} turn={turn} spine={ctx.theme.palette.bg} title={ctx.title} />
+          <Book3D coverUrl={ctx.coverUrl} height={book.h} turn={turn} spine={ctx.theme.palette.bg} accent={ctx.theme.palette.accent} title={ctx.title} />
         )}
       </div>
       <div style={{ position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, display: 'flex', alignItems: 'center', justifyContent: stacked ? 'center' : 'flex-start' }}>
@@ -85,7 +85,9 @@ export function PageZoomScene({ beat, frames, ctx }: SceneProps<'pageZoom'>) {
       <Img
         src={url}
         style={{
-          ...(portrait ? { width: ctx.width * 0.92 } : { height: ctx.height * 0.94 }),
+          // Fits single pages and wide spreads alike, so the zoom starts from the whole page.
+          maxWidth: ctx.width * (portrait ? 0.92 : 0.86),
+          maxHeight: ctx.height * (portrait ? 0.8 : 0.9),
           boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
           transformOrigin: `${beat.focus.x * 100}% ${beat.focus.y * 100}%`,
           scale: String(scale),
@@ -111,7 +113,7 @@ export function BookOpenScene({ beat, frames, ctx }: SceneProps<'bookOpen'>) {
   return (
     <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ position: 'absolute', left: ctx.width / 2 - w / 2 - (w / 2) * open, top: (ctx.height - h) / 2 - (beat.text ? ctx.height * 0.05 : 0), scale: String(push) }}>
-        <Book3D coverUrl={ctx.coverUrl} height={h} turn={-12} open={open} spine={ctx.theme.palette.bg} title={ctx.title} leftPageUrl={ctx.pageUrls[beat.page - 1] ?? null} rightPageUrl={ctx.pageUrls[beat.page] ?? null} />
+        <Book3D coverUrl={ctx.coverUrl} height={h} turn={-12} open={open} spine={ctx.theme.palette.bg} accent={ctx.theme.palette.accent} title={ctx.title} leftPageUrl={ctx.pageUrls[beat.page - 1] ?? null} rightPageUrl={ctx.pageUrls[beat.page] ?? null} />
       </div>
       {beat.text && (
         <div style={{ position: 'absolute', left: ctx.width * 0.08, right: ctx.width * 0.08, bottom: ctx.height * 0.06, display: 'flex', justifyContent: 'center' }}>
@@ -131,7 +133,7 @@ export function EndCardScene({ beat, frames, ctx }: SceneProps<'endCard'>) {
   return (
     <AbsoluteFill>
       <div style={{ position: 'absolute', left: book.x, top: book.y }}>
-        <Book3D coverUrl={ctx.coverUrl} height={book.h} turn={interpolate(frame, [0, frames], [10, 4])} spine={ctx.theme.palette.bg} title={ctx.title} />
+        <Book3D coverUrl={ctx.coverUrl} height={book.h} turn={interpolate(frame, [0, frames], [10, 4])} spine={ctx.theme.palette.bg} accent={ctx.theme.palette.accent} title={ctx.title} />
       </div>
       <div style={{ position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: stacked ? 'center' : 'flex-start', gap: ctx.height * 0.025 }}>
         <BeatText text={beat.title} frames={frames + 30} font={ctx.font} color={ctx.theme.palette.ink} accent={ctx.theme.palette.ink} size={ctx.textSize * 0.82} align={stacked ? 'center' : 'left'} delay={4} />

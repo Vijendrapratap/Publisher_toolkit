@@ -44,4 +44,4 @@ export function transitionFor(_prev: BeatKind, next: BeatKind): TransitionKind {
 }
 
 /** Base size for a beat line; fitFontSize shrinks long lines from here. */
-export const textSizeFor = (width: number, height: number) => Math.round(Math.min(width, height) * 0.078)
+export const textSizeFor = (width: number, height: number) => Math.round(Math.min(width, height) * 0.092)

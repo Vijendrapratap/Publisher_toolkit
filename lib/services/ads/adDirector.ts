@@ -27,6 +27,7 @@ Beat types:
 - titleCard: one sentence alone on a dark card, like a film trailer. For stories, tell the premise in 2 to 4 short cards.
 - pageZoom: one inside page fills the screen and the camera moves in to the part you choose (focus x and y from 0 to 1 across and down the page, zoom 1.3 to 2.5). Use it to prove a line with the page itself; its text is a short caption.
 - bookOpen: the book opens on a page and the page after it. Use it to show what is inside.
+- Only show attached pictures that are clearly this book's own inside pages. If a picture is something else (a screenshot, a photo, an advert), never use it in pageZoom, bookOpen or proof.
 - proof: a concrete, checkable fact, shown beside the cover or a page ("120 cases. One per page.").
 - audience: who the book is for, or who it is a gift for.
 - endCard: the title, an optional series or subtitle line, and the call to action. Always last, exactly once.
@@ -137,7 +138,7 @@ const SHAPE_WORDS: Record<AdVideoSpec['format'], string> = {
 export async function drawSetting(prompt: string, format: AdVideoSpec['format'], publisherId: string): Promise<string | null> {
   if (!prompt.trim()) return null
   const image = await generateAiImage(
-    `${prompt.trim()}. ${SHAPE_WORDS[format]}. Cinematic photograph, soft directional light, shallow depth of field, rich but uncluttered. Leave clear empty space for a book and a line of text. No text, letters, logos, books or faces.`,
+    `${prompt.trim()}. ${SHAPE_WORDS[format]}. Cinematic photograph, soft directional light, shallow depth of field, rich but uncluttered, with a calm open area. A plain photograph only: no boxes, panels, frames, banners, signs or placeholders. No text, letters, logos, books or faces.`,
     { timeoutMs: 90_000 }
   )
   if (!image) return null

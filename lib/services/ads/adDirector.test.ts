@@ -36,7 +36,7 @@ beforeEach(() => {
 
 describe('DIRECTOR_SYSTEM', () => {
   it('carries the rules that make the reference ads work', () => {
-    for (const rule of ['sound off', 'Use only numbers and claims', '7 words', 'end card', 'No text, no book']) {
+    for (const rule of ['sound off', 'Use only numbers and claims', '7 words', 'end card', 'No text, no book', "clearly this book's own inside pages"]) {
       expect(DIRECTOR_SYSTEM).toContain(rule)
     }
   })
@@ -94,7 +94,8 @@ describe('drawSetting', () => {
   it('draws the setting in the video’s shape and stores it under the publisher', async () => {
     vi.mocked(generateAiImage).mockResolvedValue({ buffer: Buffer.from('img'), contentType: 'image/png', dataUri: '' })
     const url = await drawSetting('a library desk at night', '9:16', 'pub_1')
-    expect(vi.mocked(generateAiImage).mock.calls[0][0]).toMatch(/Tall portrait frame.*No text/s)
+    expect(vi.mocked(generateAiImage).mock.calls[0][0]).toMatch(/Tall portrait frame.*no boxes, panels.*No text/s)
+    expect(vi.mocked(generateAiImage).mock.calls[0][0]).not.toMatch(/line of text/)
     expect(url).toMatch(/^\/api\/files\/ads\/pub_1\/settings\/.+\.png$/)
   })
   it('returns null when nothing could be drawn', async () => {

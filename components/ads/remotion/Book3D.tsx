@@ -13,6 +13,7 @@ export function Book3D({
   turn = 0,
   open = 0,
   spine,
+  accent = '#8a8a8a',
   title,
 }: {
   coverUrl: string | null
@@ -22,6 +23,8 @@ export function Book3D({
   turn?: number
   open?: number
   spine: string
+  /** Colours the placeholder cover when the book has none. */
+  accent?: string
   title: string
 }) {
   const width = height * BOOK_RATIO
@@ -65,7 +68,7 @@ export function Book3D({
             {coverUrl ? (
               <Img src={coverUrl} style={pageImg} />
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: width * 0.1, color: '#fff', fontSize: height * 0.06, fontWeight: 700, textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: width * 0.1, color: '#fff', fontSize: height * 0.06, fontWeight: 700, textAlign: 'center', background: `linear-gradient(160deg, ${accent}, ${spine})`, textShadow: '0 2px 10px rgba(0,0,0,0.4)' }}>
                 {title}
               </div>
             )}
