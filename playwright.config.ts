@@ -5,6 +5,9 @@ const PORT = 3100
 export default defineConfig({
   testDir: './e2e',
   timeout: 180_000,
+  // Every test signs in as the same local publisher with one credit balance, so
+  // parallel workers make balance assertions see each other's charges.
+  workers: 1,
   expect: { timeout: 15_000 },
   webServer: {
     command: `npm run dev -- --port ${PORT}`,

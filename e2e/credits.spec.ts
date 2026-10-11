@@ -14,28 +14,25 @@ test('the header shows the credit balance and links to the credits page', async 
 
 test('generating ads lowers the balance by the goal price', async ({ page }) => {
   const balance = async () => {
-    const chip = page.getByRole('link', { name: /^\d+ credits$/ })
+    const chip = page.getByRole('link', { name: /^\d+ credits/ })
     await expect(chip).toBeVisible()
     return Number((await chip.getAttribute('aria-label'))!.split(' ')[0])
   }
 
-  // Same upload → details → configure steps as e2e/ads.spec.ts (default goal: Image Ads).
+  // Same add-a-book → Ad images → configure steps as e2e/ads.spec.ts.
   await page.goto('/ads/new')
   const before = await balance()
-  // The form opens on the Product URL tab, so switch to PDF upload first.
-  await page.getByRole('button', { name: 'Upload PDF (Optional)' }).click()
-  await page.locator('#pdf').setInputFiles(fixture('sample-book.pdf'))
-  await page.getByRole('button', { name: 'Create project and continue' }).click()
-  await expect(page).toHaveURL(/\/ads\/[^/]+\/upload$/)
-  if (await page.getByText('Add a front cover image to generate your ad creatives.').isVisible()) {
-    await page.locator('#frontCover').setInputFiles(fixture('cover.png'))
-  } else {
-    await page.getByRole('button', { name: 'Replace cover' }).click()
-    await page.locator('#frontCover').setInputFiles(fixture('cover.png'))
-  }
-  await page.getByLabel('Title').fill('Credits Test')
+  await page.getByRole('tab', { name: 'Upload a cover' }).click()
+  await page.locator('#frontCover').setInputFiles(fixture('cover.png'))
+  await page.getByLabel('Book title').fill('Credits Test')
   await page.getByLabel('Author').fill('Jane Coder')
-  await page.getByRole('button', { name: 'Save and continue' }).click()
+  await page.getByRole('button', { name: 'Add this book' }).click()
+  await expect(page).toHaveURL(/\/ads\/books\/[^/]+$/)
+  await page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('heading', { name: 'Ad images' }) })
+    .getByRole('button', { name: 'Create' })
+    .click()
   await expect(page).toHaveURL(/\/configure$/)
   await expect(page.getByRole('button', { name: /· 3 credits/ })).toBeVisible()
   await page.getByRole('button', { name: /· 3 credits/ }).click()
