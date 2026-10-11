@@ -48,9 +48,8 @@ Until D ships, a project's "Create" buttons hand off to the existing configure �
 
 ### `/ads/new` — Add a book
 
-Replaces today's long form with one job: identify the book.
+Replaces today's long form with one job: add a new book. (Existing books are already the grid on `/ads`, so this page doesn't repeat them.)
 
-- If the library has books: their covers first ("Pick one of your books") — choosing one goes straight to its project page.
 - **Add a new book**: paste an Amazon / Goodreads link → *Get details* (existing `/api/extract-url`); or *upload a cover instead* (cover, title, author, optional inside pages); "Have a PDF?" link for the PDF path.
 - Submit: existing `POST /api/ads/projects` payloads without campaign settings → `/ads/books/[newRootId]` (or the existing `/ads/[id]/upload` when `needsManualCover`).
 
