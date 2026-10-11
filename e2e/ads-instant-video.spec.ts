@@ -9,17 +9,17 @@ for (const width of [1440, 1180, 1024]) {
   test(`results page fits at ${width}px and the hook edits the preview`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.goto(`/ads/${PROJECT}/results`)
-    const card = page.getByRole('region', { name: 'Instant Video' })
+    const card = page.getByRole('region', { name: 'Video ad' })
     await expect(card).toBeVisible()
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(0)
 
-    const hook = card.getByLabel('Hook')
-    await hook.fill('A brand new hook line')
-    await card.getByRole('button', { name: '1. Hook' }).click()
+    const first = card.getByLabel('Scene 1 text')
+    await first.fill('A brand new opening line')
+    await card.getByRole('button', { name: '1. Opening line' }).click()
     // Input values are not text content, so this only matches the player's frame.
-    await expect(card).toContainText('A brand new hook line')
+    await expect(card).toContainText('A brand new opening line')
     await expect(card.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
     await expect(page.getByText(/remotion|hyperframe/i)).toHaveCount(0)
 
@@ -58,10 +58,10 @@ for (const width of [1440, 1180, 1024]) {
   })
 }
 
-test('stacks the mobile editor in the brief order at 390px: hook, music, format, colours', async ({ page }) => {
+test('stacks the mobile editor in the brief order at 390px: scenes, music, format, colours', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 1600 })
   await page.goto(`/ads/${PROJECT}/results`)
-  const card = page.getByRole('region', { name: 'Instant Video' })
+  const card = page.getByRole('region', { name: 'Video ad' })
   await expect(card).toBeVisible()
 
   const top = async (locator: ReturnType<typeof card.getByLabel>) => {
@@ -70,7 +70,7 @@ test('stacks the mobile editor in the brief order at 390px: hook, music, format,
     return box.y
   }
 
-  const hookTop = await top(card.getByLabel('Hook'))
+  const hookTop = await top(card.getByLabel('Scene 1 text'))
   const musicTop = await top(card.getByLabel('Music track'))
   const formatTop = await top(card.getByLabel('Format'))
   const coloursTop = await top(card.locator('legend', { hasText: 'Colours' }))

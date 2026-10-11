@@ -13,6 +13,7 @@ import { AmazonPackagePanel } from '@/components/ads/AmazonPackagePanel'
 import { InstantVideoCard } from '@/components/ads/InstantVideoCard'
 import { AiVideoPanel } from '@/components/ads/AiVideoPanel'
 import { bookVideoSource, readVideoSpec } from '@/lib/services/ads/videoSpec'
+import { STORYBOARD_LIMITS, resolveStoryboard } from '@/lib/services/ads/storyboard'
 import { aiVideoBriefSchema } from '@/lib/services/ads/aiVideoBriefSchema'
 import { summarizeJob } from '@/lib/services/ads/aiVideoJob'
 import { prisma } from '@/lib/db'
@@ -98,8 +99,10 @@ export default async function ResultsStepPage({ params }: { params: Promise<{ pr
             title={book.title ?? 'Untitled book'}
             author={book.author ?? ''}
             coverUrl={book.frontCoverUrl}
-            interiorImageUrls={book.interiorImageUrls}
-            initialSpec={videoSpec}
+            pageUrls={book.interiorImageUrls}
+            pageCount={Math.min(book.interiorImageUrls.length, STORYBOARD_LIMITS.pages)}
+            initialSpec={{ ...videoSpec, storyboard: resolveStoryboard(videoSpec, book) }}
+            directed={Boolean(videoSpec.storyboard)}
             video={{ videoUrl: set.videoUrl, videoPosterUrl: set.videoPosterUrl, videoDuration: set.videoDuration }}
           />
           <AiVideoPanel
