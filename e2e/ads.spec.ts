@@ -36,6 +36,30 @@ test('add a book, make ad images, and find them on the book page', async ({ page
   await expect(page).toHaveURL(/\/results$/, { timeout: 120_000 })
   await expect(page.getByRole('img', { name: /ad, 300×250/ }).first()).toBeVisible()
 
+  // Results page: per-tile download stays inside its (overflow-hidden) tile
+  const tileDownload = page.getByRole('link', { name: 'Download', exact: true }).first()
+  await tileDownload.scrollIntoViewIfNeeded()
+  await expect(tileDownload).toBeInViewport({ ratio: 1 })
+
+  // Lightbox
+  await page.getByRole('button', { name: /^Preview .*ad, 300×250/ }).first().click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.getByRole('button', { name: 'Close preview' }).click()
+
+  // Copy edits survive a reload
+  await page.getByLabel('Headline').first().fill('Ship less. Read more.')
+  await page.getByRole('button', { name: 'Save copy' }).first().click()
+  await expect(page.getByText('Copy saved')).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Headline').first()).toHaveValue('Ship less. Read more.')
+
+  // ZIP download
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('link', { name: 'Download all (.zip)' }).click(),
+  ])
+  expect(download.suggestedFilename()).toBe('the-lazy-developer-ad-creatives.zip')
+
   // Back to the book: the ad images are saved in their row, other rows untouched
   await page.getByRole('link', { name: 'The Lazy Developer' }).first().click()
   await expect(page).toHaveURL(bookUrl)
