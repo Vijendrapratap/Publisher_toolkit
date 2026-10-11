@@ -3,6 +3,7 @@ import { storeFile } from '@/lib/providers/storage'
 import { assetPath } from '@/lib/services/shared/upload'
 import type { GeneratedBookContent } from './types'
 import { pendingPrompts } from './illustrate-shared'
+import { describeStyle } from './options'
 
 export { buildStyleBible, countIllustrationRequests } from './illustrate-shared'
 
@@ -48,7 +49,7 @@ function coverPromptFor(
 
   return [
     `Front cover artwork for a book called "${title}".`,
-    `Style: ${styleTheme}.`,
+    `Style: ${describeStyle(styleTheme)}.`,
     `Subject: ${subject ?? title}.`,
     // The model cannot spell reliably at poster sizes, and the title is set in
     // the layout anyway; asking for lettering only produces garbled shapes.

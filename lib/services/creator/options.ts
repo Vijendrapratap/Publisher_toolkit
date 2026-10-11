@@ -208,6 +208,14 @@ export const STYLES_BY_TYPE: Record<BookTypeKey, StyleOption[]> = {
   ],
 }
 
+/** What the AI is told for a style: its full description when it is one of ours, else the text as given. */
+export function describeStyle(styleTheme: string): string {
+  const style = Object.values(STYLES_BY_TYPE)
+    .flat()
+    .find((s) => s.key === styleTheme)
+  return style?.samplePromptSnippet ?? styleTheme
+}
+
 export const TARGET_AUDIENCES = [
   { key: 'toddlers', label: 'Toddlers (Ages 2–4)' },
   { key: 'early_readers', label: 'Early Readers (Ages 5–7)' },

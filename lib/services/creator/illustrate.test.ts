@@ -56,6 +56,12 @@ describe('buildStyleBible', () => {
     expect(bible).toContain('Pip')
   })
 
+  it('spells out a chosen style instead of passing its key', () => {
+    const bible = buildStyleBible(childrenBook(), 'pixar_3d')
+    expect(bible).toContain('vibrant 3D animated movie style')
+    expect(bible).not.toContain('pixar_3d')
+  })
+
   it('does not repeat a character that appears on several pages', () => {
     const content = childrenBook()
     content.type === 'children' && (content.pages[1].characterFocus = content.pages[0].characterFocus)

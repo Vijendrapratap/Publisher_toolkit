@@ -1,4 +1,5 @@
 import type { GeneratedBookContent } from './types'
+import { describeStyle } from './options'
 
 /**
  * The pure "how many images / which prompts" logic for illustrating a book
@@ -13,7 +14,7 @@ import type { GeneratedBookContent } from './types'
  * Restating a locked description in every prompt is what holds a book together.
  */
 export function buildStyleBible(content: GeneratedBookContent, styleTheme: string): string {
-  const parts = [`Consistent art style throughout: ${styleTheme}.`]
+  const parts = [`Consistent art style throughout: ${describeStyle(styleTheme)}.`]
 
   if (content.type === 'children') {
     const focuses = content.pages

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -27,6 +27,8 @@ import {
   type BookTypeKey,
 } from '@/lib/services/creator/options'
 import { CREDIT_PRICES } from '@/lib/credits/prices'
+import { nextRadioIndex } from '@/lib/ui/radioKeys'
+import { PICTURE_STYLE_TYPES, StyleSample, styleSampleUrl } from '@/components/creator/StyleSample'
 
 const ICONS_MAP: Record<string, any> = {
   baby: Baby,
@@ -51,6 +53,13 @@ export function NewBookForm() {
 
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Warm every type's sample pictures, so switching book type shows them at once.
+  useEffect(() => {
+    for (const type of PICTURE_STYLE_TYPES) {
+      for (const style of STYLES_BY_TYPE[type]) new Image().src = styleSampleUrl(type, style.key)
+    }
+  }, [])
 
   function handleTypeChange(type: BookTypeKey) {
     setBookType(type)
@@ -227,23 +236,39 @@ export function NewBookForm() {
             Tailor the art style prompts, line weights, or authorial voice for your selected format.
           </p>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {currentStyles.map((style) => {
+          <div role="radiogroup" aria-label="Style" className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {currentStyles.map((style, i) => {
               const isSelected = styleTheme === style.key
               return (
                 <button
                   key={style.key}
                   type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  tabIndex={isSelected ? 0 : -1}
                   onClick={() => setStyleTheme(style.key)}
+                  onKeyDown={(e) => {
+                    const next = nextRadioIndex(e.key, i, currentStyles.length)
+                    if (next === null) return
+                    e.preventDefault()
+                    setStyleTheme(currentStyles[next].key)
+                    e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus()
+                  }}
                   className={cn(
-                    'flex flex-col items-start rounded-xl border p-3.5 text-left transition-all',
+                    'group relative flex flex-col overflow-hidden rounded-xl border text-left transition-all',
                     isSelected
                       ? 'border-accent bg-accent-soft/80 shadow-inset ring-2 ring-accent/30'
-                      : 'border-line/70 bg-surface shadow-subtle hover:border-accent/40'
+                      : 'border-line/70 bg-surface shadow-subtle hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lift'
                   )}
                 >
-                  <span className="text-xs font-bold text-ink">{style.label}</span>
-                  <span className="mt-1 line-clamp-2 text-[11px] text-ink-muted leading-relaxed">{style.description}</span>
+                  <StyleSample type={bookType} styleKey={style.key} label={style.label} />
+                  {isSelected && (
+                    <CheckCircle2 className="absolute right-2 top-2 size-6 rounded-full bg-surface text-accent shadow" aria-hidden />
+                  )}
+                  <span className="flex flex-col p-3.5">
+                    <span className="text-xs font-bold text-ink">{style.label}</span>
+                    <span className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-ink-muted">{style.description}</span>
+                  </span>
                 </button>
               )
             })}

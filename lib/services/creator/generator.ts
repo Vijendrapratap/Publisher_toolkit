@@ -17,6 +17,7 @@ import type {
   GeneratedBookContent,
 } from './types'
 import type { BookTypeKey, CreateBookProjectInput } from './options'
+import { describeStyle } from './options'
 
 /**
  * Generates a valid NxN word search matrix with words placed into the grid
@@ -388,7 +389,7 @@ function buildPrompt(input: CreateBookProjectInput): string {
     `Concept the publisher gave you: ${input.promptConcept}`,
     input.genre ? `Genre: ${input.genre}` : null,
     `Intended reader: ${input.targetAudience || 'general audience'}`,
-    `Visual and narrative style: ${input.styleTheme || 'classic'}`,
+    `Visual and narrative style: ${describeStyle(input.styleTheme || 'classic')}`,
     input.difficultyLevel ? `Difficulty: ${input.difficultyLevel}` : null,
     `Produce exactly ${input.pageCount ?? 8} ${countLabel}.`,
   ]
@@ -523,7 +524,7 @@ export async function generateIndividualChapter(
     prompt: [
       `Book: ${params.bookTitle}`,
       `Premise: ${params.premise}`,
-      `Voice and style: ${params.styleTheme}`,
+      `Voice and style: ${describeStyle(params.styleTheme)}`,
       `Chapter ${params.chapterNumber}: ${params.chapterTitle}`,
       `What must happen in it: ${params.chapterSummary}`,
       params.previousChapterSummary ? `Where the previous chapter left off: ${params.previousChapterSummary}` : null,
