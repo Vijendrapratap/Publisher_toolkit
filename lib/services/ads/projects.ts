@@ -126,3 +126,32 @@ export async function getAdsProject(publisherId: string, rootId: string): Promis
   })
   return { root, groups: groupProjectAssets(rows.map(toProjectRow)) }
 }
+
+/** Home's "Pick up where you left off": newest books by any activity, without loading their creations. */
+export async function getRecentAdsProjects(
+  publisherId: string,
+  take: number
+): Promise<{ id: string; title: string; coverUrl: string | null; activityAt: Date }[]> {
+  // ponytail: scans the newest take×10 rows; a publisher who touched one book many times
+  // in a row can see fewer than `take` cards. Widen the window if that ever shows up.
+  const recent = await prisma.book.findMany({
+    where: { publisherId },
+    orderBy: { updatedAt: 'desc' },
+    take: take * 10,
+    select: { id: true, parentBookId: true, updatedAt: true },
+  })
+  // A new creation lives on a child row, so activity is credited to its book.
+  const activity = new Map<string, Date>()
+  for (const r of recent) {
+    const rootId = r.parentBookId ?? r.id
+    if (!activity.has(rootId)) activity.set(rootId, r.updatedAt)
+    if (activity.size === take) break
+  }
+  const roots = await prisma.book.findMany({
+    where: { publisherId, parentBookId: null, id: { in: [...activity.keys()] } },
+    select: { id: true, title: true, frontCoverUrl: true },
+  })
+  return roots
+    .map((r) => ({ id: r.id, title: r.title || 'Untitled book', coverUrl: r.frontCoverUrl, activityAt: activity.get(r.id)! }))
+    .sort((a, b) => b.activityAt.getTime() - a.activityAt.getTime())
+}

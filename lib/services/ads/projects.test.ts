@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { prisma } from '@/lib/db'
 import type { BookCreatorProjectData } from '@/lib/services/creator/types'
-import { getAdsProject, getAdsProjects, projectFieldsFromCreator, syncProjectFromCreator } from './projects'
+import { getAdsProject, getAdsProjects, getRecentAdsProjects, projectFieldsFromCreator, syncProjectFromCreator } from './projects'
 
 // Shared test DB, parallel workers: this file only touches its own prefix.
 const PREFIX = 'projects_'
@@ -107,5 +107,18 @@ describe('getAdsProjects / getAdsProject', () => {
     expect(project?.groups.aplus.latest).toMatchObject({ rowId: child.id, imageUrls: ['hero.png'] })
     expect(await getAdsProject(other, root.id)).toBeNull()
     expect(await getAdsProject(pub, child.id)).toBeNull()
+  })
+})
+
+describe('getRecentAdsProjects', () => {
+  it('ranks books by their latest activity, including a child creation, and returns only what home shows', async () => {
+    const old = await prisma.book.create({ data: { publisherId: pub, title: 'Old root', updatedAt: new Date('2026-01-01') } })
+    await prisma.book.create({ data: { publisherId: pub, title: 'Newer', updatedAt: new Date('2026-02-01') } })
+    await prisma.book.create({ data: { publisherId: pub, title: 'Old root', parentBookId: old.id, contentGoal: 'aplus' } })
+    await prisma.book.create({ data: { publisherId: other, title: 'Not mine' } })
+
+    const recent = await getRecentAdsProjects(pub, 1)
+    expect(recent).toHaveLength(1)
+    expect(recent[0]).toEqual({ id: old.id, title: 'Old root', coverUrl: null, activityAt: expect.any(Date) })
   })
 })

@@ -11,6 +11,16 @@ export async function getCreatorProjectsForPublisher(publisherId: string): Promi
   return projects as unknown as BookCreatorProjectData[]
 }
 
+/** Home's recent list: just what a card shows, never the book's content. */
+export function getRecentCreatorProjects(publisherId: string, take: number) {
+  return prisma.bookCreatorProject.findMany({
+    where: { publisherId },
+    orderBy: { updatedAt: 'desc' },
+    take,
+    select: { id: true, title: true, coverImageUrl: true, updatedAt: true },
+  })
+}
+
 export async function getCreatorProjectForPublisher(
   publisherId: string,
   id: string

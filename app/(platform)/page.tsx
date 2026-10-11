@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { BookImage } from 'lucide-react'
 import { SERVICES } from '@/lib/services/registry'
 import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getAdsProjects } from '@/lib/services/ads/projects'
-import { getCreatorProjectsForPublisher } from '@/lib/services/creator/queries'
+import { getRecentAdsProjects } from '@/lib/services/ads/projects'
+import { getRecentCreatorProjects } from '@/lib/services/creator/queries'
 import { mergeRecentWork } from '@/lib/services/shared/recentWork'
 import { timeAgo } from '@/lib/format'
 import { ServiceCard } from '@/components/platform/ServiceCard'
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function HubPage() {
   const publisherId = await requireCurrentPublisherId()
-  const [adsProjects, books] = await Promise.all([getAdsProjects(publisherId), getCreatorProjectsForPublisher(publisherId)])
+  const [adsProjects, books] = await Promise.all([getRecentAdsProjects(publisherId, 4), getRecentCreatorProjects(publisherId, 4)])
   const recent = mergeRecentWork(adsProjects, books, 4)
 
   return (
