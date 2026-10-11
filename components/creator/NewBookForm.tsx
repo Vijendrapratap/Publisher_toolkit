@@ -38,18 +38,21 @@ const ICONS_MAP: Record<string, any> = {
   feather: Feather,
 }
 
-export function NewBookForm() {
+export function NewBookForm({ initialType }: { initialType?: BookTypeKey }) {
   const router = useRouter()
 
-  const [bookType, setBookType] = useState<BookTypeKey>('children')
+  const startType = initialType ?? 'children'
+  const [bookType, setBookType] = useState<BookTypeKey>(startType)
+  // Chosen on the dashboard already: show it once with a way to change it, not the four cards again.
+  const [pickingType, setPickingType] = useState(!initialType)
   const [title, setTitle] = useState('')
   const [subtitle, setSubtitle] = useState('')
   const [author, setAuthor] = useState('')
   const [promptConcept, setPromptConcept] = useState('')
-  const [styleTheme, setStyleTheme] = useState(STYLES_BY_TYPE['children'][0].key)
+  const [styleTheme, setStyleTheme] = useState(STYLES_BY_TYPE[startType][0].key)
   const [targetAudience, setTargetAudience] = useState<string>('early_readers')
   const [difficultyLevel, setDifficultyLevel] = useState<'easy' | 'medium' | 'hard'>('medium')
-  const [pageCount, setPageCount] = useState(8)
+  const [pageCount, setPageCount] = useState(BOOK_TYPES.find((b) => b.key === startType)?.defaultPages ?? 8)
 
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -150,10 +153,13 @@ export function NewBookForm() {
   }
 
   const currentStyles = STYLES_BY_TYPE[bookType] || []
+  // Once the type is settled, only offer starting points of that type.
+  const templates = pickingType ? INSPIRATION_TEMPLATES : INSPIRATION_TEMPLATES.filter((t) => t.bookType === bookType)
 
   return (
     <Card className="p-6 sm:p-8">
       {/* Quick Inspiration Bar */}
+      {templates.length > 0 && (
       <div className="mb-8 rounded-2xl border border-accent/25 bg-accent-soft/20 p-4">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent">
           <Wand2 className="size-4" aria-hidden /> Quick Inspiration & Pre-Filled Presets
@@ -162,7 +168,7 @@ export function NewBookForm() {
           Click any genre template to pre-fill prompt concepts, styles, and chapter settings:
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {INSPIRATION_TEMPLATES.map((tmpl) => (
+          {templates.map((tmpl) => (
             <button
               key={tmpl.title}
               type="button"
@@ -175,9 +181,11 @@ export function NewBookForm() {
           ))}
         </div>
       </div>
+      )}
 
       <form onSubmit={onSubmit} className="flex flex-col gap-8" noValidate>
         {/* STEP 1: BOOK TYPE */}
+        {pickingType ? (
         <div>
           <div className="flex items-center gap-2">
             <Layers className="size-5 text-accent" aria-hidden />
@@ -225,12 +233,15 @@ export function NewBookForm() {
             })}
           </div>
         </div>
+        ) : (
+          <ChosenType type={bookType} onChange={() => setPickingType(true)} />
+        )}
 
         {/* STEP 2: STYLE & AESTHETIC */}
         <div>
           <div className="flex items-center gap-2">
             <Palette className="size-5 text-accent" aria-hidden />
-            <h2 className="font-display text-lg font-semibold">2. Choose Visual & Narrative Style</h2>
+            <h2 className="font-display text-lg font-semibold">{pickingType ? '2. ' : ''}Choose Visual & Narrative Style</h2>
           </div>
           <p className="mt-1 text-sm text-ink-muted">
             Tailor the art style prompts, line weights, or authorial voice for your selected format.
@@ -425,5 +436,24 @@ export function NewBookForm() {
         </div>
       </form>
     </Card>
+  )
+}
+
+function ChosenType({ type, onChange }: { type: BookTypeKey; onChange: () => void }) {
+  const def = BOOK_TYPES.find((b) => b.key === type)!
+  const Icon = ICONS_MAP[def.icon] || BookOpen
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-accent/30 bg-accent-soft/40 p-4">
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-on-accent">
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-ink">{def.title}</p>
+        <p className="truncate text-xs text-ink-muted">{def.subtitle}</p>
+      </div>
+      <Button type="button" variant="secondary" size="sm" onClick={onChange} aria-label="Change book type">
+        Change
+      </Button>
+    </div>
   )
 }

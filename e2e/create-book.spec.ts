@@ -25,3 +25,22 @@ test('every book style shows a sample you can see before choosing it', async ({ 
   await expect(second).toHaveAttribute('aria-checked', 'true')
   await expect(styles.getByRole('radio').first()).toHaveAttribute('aria-checked', 'false')
 })
+
+test('picking a book type on the dashboard does not ask for it again', async ({ page }) => {
+  await page.goto('/create-book')
+  await page.getByRole('link', { name: /Coloring Book & Pages/ }).click()
+  await expect(page).toHaveURL(/\/create-book\/new\?type=coloring$/)
+
+  // The choice is kept and shown once, with a way to change it — not the four cards again.
+  await expect(page.getByRole('heading', { name: /Choose What Kind of Book/ })).toHaveCount(0)
+  await expect(page.getByText('Coloring Book & Pages', { exact: true })).toBeVisible()
+  await expect(page.getByRole('radiogroup', { name: 'Style' }).getByRole('radio').first()).toContainText('Bold Lines for Kids')
+
+  await page.getByRole('button', { name: 'Change book type' }).click()
+  await expect(page.getByRole('heading', { name: /Choose What Kind of Book/ })).toBeVisible()
+})
+
+test('starting without a type still lets you choose one', async ({ page }) => {
+  await page.goto('/create-book/new?type=not-a-type')
+  await expect(page.getByRole('heading', { name: /Choose What Kind of Book/ })).toBeVisible()
+})

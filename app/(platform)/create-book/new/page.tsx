@@ -1,13 +1,18 @@
 import Link from 'next/link'
 import { ArrowLeft, Wand2 } from 'lucide-react'
 import { NewBookForm } from '@/components/creator/NewBookForm'
+import { BOOK_TYPES } from '@/lib/services/creator/options'
 
 export const metadata = {
   title: 'Create Your Book | Publisher Toolkit',
   description: 'Generate children books, coloring books, story books, and puzzle games with AI images.',
 }
 
-export default function NewBookPage() {
+export default async function NewBookPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
+  // The dashboard's type cards link here with ?type=…; that choice must not be asked again.
+  const { type } = await searchParams
+  const initialType = BOOK_TYPES.find((b) => b.key === type)?.key
+
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:py-14">
       <div className="mb-6 flex items-center gap-3">
@@ -31,7 +36,7 @@ export default function NewBookPage() {
         </p>
       </div>
 
-      <NewBookForm />
+      <NewBookForm initialType={initialType} />
     </div>
   )
 }
