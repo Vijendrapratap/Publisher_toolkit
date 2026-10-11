@@ -6,6 +6,7 @@ export const DEFAULT_PROCESSING_MODEL = 'deepseek/deepseek-v4.1-flash'
 export const DEFAULT_LANDING_MODEL = 'deepseek/deepseek-v4.1-flash'
 export const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image'
 export const DEFAULT_VIDEO_MODEL = 'kwaivgi/kling-v3.0-std'
+export const DEFAULT_VISION_MODEL = 'google/gemini-3.8-flash'
 
 /**
  * All production AI calls run on the platform key
@@ -76,6 +77,8 @@ export interface GenerateStructuredOptions<T> {
   schema: ZodType<T>
   system: string
   prompt: string
+  /** Pictures the model should look at, sent after the prompt in the same message. */
+  images?: { data: Buffer; mediaType: string }[]
   /** Used when AI is unconfigured, times out, or returns unusable output. */
   fallback: () => T
   credentials?: AiCredentials
@@ -109,7 +112,19 @@ export async function generateStructured<T>(
       model,
       output: Output.object({ schema: options.schema }),
       system: options.system,
-      prompt: options.prompt,
+      ...(options.images?.length
+        ? {
+            messages: [
+              {
+                role: 'user' as const,
+                content: [
+                  { type: 'text' as const, text: options.prompt },
+                  ...options.images.map((img) => ({ type: 'file' as const, mediaType: img.mediaType, data: img.data })),
+                ],
+              },
+            ],
+          }
+        : { prompt: options.prompt }),
       temperature: options.temperature ?? 0.7,
       maxOutputTokens: options.maxOutputTokens,
       abortSignal: AbortSignal.timeout(options.timeoutMs ?? 45_000),
@@ -129,6 +144,11 @@ export function getImageModelName(credentials?: AiCredentials): string {
 /** Never the publisher's text-model setting: a chat model cannot make video. */
 export function getVideoModelName(): string {
   return process.env.OPENROUTER_VIDEO_MODEL || DEFAULT_VIDEO_MODEL
+}
+
+/** A model that can look at the cover and pages; never the publisher's text-model setting. */
+export function getVisionModelName(): string {
+  return process.env.OPENROUTER_VISION_MODEL || DEFAULT_VISION_MODEL
 }
 
 export interface GeneratedAiImage {

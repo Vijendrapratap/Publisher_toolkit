@@ -17,6 +17,8 @@ import {
   DEFAULT_PROCESSING_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
+  DEFAULT_VISION_MODEL,
+  getVisionModelName,
 } from './ai'
 
 const env = { ...process.env }
@@ -96,5 +98,41 @@ describe('generateStructured', () => {
     expect(result.source).toBe('fallback')
     expect(result.reason).toBe('No AI key configured')
     expect(generateText).not.toHaveBeenCalled()
+  })
+})
+
+describe('generateStructured with images', () => {
+  it('sends the prompt and each image as file parts of one user message', async () => {
+    vi.mocked(generateText).mockResolvedValue({ output: { ok: true } } as never)
+    const png = Buffer.from([137, 80, 78, 71])
+    const result = await generateStructured({
+      label: 'vision',
+      schema: z.object({ ok: z.boolean() }),
+      system: 'look',
+      prompt: 'What is on the cover?',
+      images: [{ data: png, mediaType: 'image/png' }],
+      fallback: () => ({ ok: false }),
+      credentials: { apiKey: 'k' },
+    })
+    expect(result.source).toBe('ai')
+    const call = vi.mocked(generateText).mock.calls[0][0] as any
+    expect(call.prompt).toBeUndefined()
+    expect(call.system).toBe('look')
+    expect(call.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What is on the cover?' },
+          { type: 'file', mediaType: 'image/png', data: png },
+        ],
+      },
+    ])
+  })
+
+  it('reads the vision model from OPENROUTER_VISION_MODEL', () => {
+    delete process.env.OPENROUTER_VISION_MODEL
+    expect(getVisionModelName()).toBe(DEFAULT_VISION_MODEL)
+    process.env.OPENROUTER_VISION_MODEL = 'anthropic/claude-haiku-5.5'
+    expect(getVisionModelName()).toBe('anthropic/claude-haiku-5.5')
   })
 })
