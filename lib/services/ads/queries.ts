@@ -1,11 +1,5 @@
 import { prisma } from '@/lib/db'
 import type { Book, AdCopy } from '@prisma/client'
-import {
-  dedupeByTitle,
-  LIBRARY_ROW_LIMIT,
-  LIBRARY_SELECT,
-  type LibraryEntry,
-} from '@/lib/services/shared/library'
 
 /** The rail and the hub both show a short recent list, never the whole table. */
 export const RAIL_SELECT = {
@@ -45,16 +39,6 @@ export function getLatestCreativeSetForBook(bookId: string, publisherId: string)
 
 export function getAdCopyForPublisher(publisherId: string, copyId: string): Promise<AdCopy | null> {
   return prisma.adCopy.findFirst({ where: { id: copyId, creativeSet: { book: { publisherId } } } })
-}
-
-export async function getPublisherBookLibrary(publisherId: string): Promise<LibraryEntry[]> {
-  const rows = await prisma.book.findMany({
-    where: { publisherId },
-    orderBy: { createdAt: 'desc' },
-    take: LIBRARY_ROW_LIMIT,
-    select: LIBRARY_SELECT,
-  })
-  return dedupeByTitle([{ rows, source: 'book' }])
 }
 
 export async function getCampaignsForBook(publisherId: string, bookId: string): Promise<Book[]> {

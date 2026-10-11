@@ -1,34 +1,21 @@
 import type { Metadata } from 'next'
-import { requireCurrentPublisherId } from '@/lib/providers/auth'
-import { getPublisherBookLibrary } from '@/lib/services/ads/queries'
-import { NewProjectForm } from '@/components/ads/NewProjectForm'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
+import { AddBookForm } from '@/components/ads/AddBookForm'
 
-export const metadata: Metadata = { title: 'New campaign' }
+export const metadata: Metadata = { title: 'Add a book' }
 
-export default async function NewAdsProjectPage() {
-  const publisherId = await requireCurrentPublisherId()
-  const library = await getPublisherBookLibrary(publisherId)
-
+export default function AddBookPage() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <Link href="/ads" className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-ink-muted hover:text-ink">
+        <ArrowLeft className="size-4" aria-hidden /> Your books
+      </Link>
       <header>
-        <p className="text-sm font-semibold uppercase tracking-widest text-accent">Step 1 of 4</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight">Create an ad campaign</h1>
-        <p className="mt-2 text-ink-muted">
-          Pick a book from your library or drop in a new PDF to generate high-converting ad creatives.
-        </p>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Add a book</h1>
+        <p className="mt-2 text-ink-muted">We’ll use its cover and details to make your A+ images, video and ad images.</p>
       </header>
-      <NewProjectForm
-        initialBooks={library.map((b) => ({
-          id: b.id,
-          title: b.title,
-          author: b.author,
-          blurb: b.blurb,
-          frontCoverUrl: b.frontCoverUrl,
-          campaignCount: b.campaignCount,
-          createdAt: b.createdAt.toISOString(),
-        }))}
-      />
+      <AddBookForm />
     </div>
   )
 }
