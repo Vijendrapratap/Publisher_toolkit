@@ -49,23 +49,26 @@ it under "A+ content" in Your creations.
 - No books yet: the add form is shown open.
 - An unknown kind returns 404.
 
-### 3. `/ads/<id>/configure` — A few choices (trimmed)
+### 3. `/ads/<id>/configure` — choices on the left, live preview on the right
 
-Only what matters for that type is shown open; everything else moves under a closed
-**More options** (`<details>`):
+Two columns on desktop; on phones the preview comes first
+and Generate is a bar pinned to the bottom.
+
+- **Live preview:** for image ads and A+, the real `CreativeTemplate` scaled down, with a
+  chip per size you'll get. For video, a frame in the chosen shape and motion-style colours,
+  with "30 seconds · Suspenseful · Classic Film" under it. Under both: the sample ad
+  text for the chosen tone, what you'll get, and Generate with its price.
+- **Chips, not cards or dropdowns.** Shown per type:
 
 | Type | Shown | Under More options |
 |---|---|---|
-| Ad images | Copy tone, Design style | Campaign label, objective and CTA, audience, headline hook |
-| A+ content | Copy tone, Design style | same |
-| Video ad | Shape (16:9 / 1:1 / 9:16), length, mood, motion style, Copy tone | same |
+| Ad images / A+ | Style (+ Your colours), Badge on the ad (+ Write your own), Button text (+ Write your own), Writing tone | Headline hook, who it's for, name |
+| Video ad | Shape, Length, Mood, Motion style, Writing tone | Badge, Button text, headline hook, who it's for, name |
 
-- The "Goal: …" banner and the Platforms card go. Amazon is the only platform and is
-  always on; a single line above the button says what will be made
-  (e.g. "2 image sizes: 300×250, 1200×628").
-- Older all-in-one creations (`contentGoal` `all` or NULL) keep today's full form so
-  they still work.
-- The button and price are unchanged.
+- Picking a badge suggests its button text until the person picks or writes one.
+- The Goal banner and Platforms card are gone; Amazon stays on.
+- Older all-in-one creations show both, with an "Also make a video ad" switch.
+- Saved fields and price are unchanged.
 
 ### Generate and results
 

@@ -32,8 +32,29 @@ test('add a book, make ad images, and find them on the book page', async ({ page
   const adRow = page.getByRole('listitem').filter({ has: page.getByRole('heading', { name: 'Ad images' }) })
   await adRow.getByRole('button', { name: 'Create' }).click()
   await expect(page).toHaveURL(/\/ads\/[^/]+\/configure$/)
+  const configureUrl = page.url()
+
+  // Every choice shows up straight away in the live preview of the real ad.
+  const preview = page.getByTestId('ad-preview').locator(':scope > div')
+  await page.getByRole('radiogroup', { name: 'Style' }).getByRole('radio', { name: /Bold/ }).click()
+  await expect(preview).toHaveCSS('background-color', 'rgb(159, 18, 57)')
+  await page.getByRole('radiogroup', { name: 'Badge on the ad' }).getByRole('radio', { name: 'Pre-order' }).click()
+  await expect(preview).toContainText('PRE-ORDER NOW')
+  await page.getByRole('radiogroup', { name: 'Badge on the ad' }).getByRole('radio', { name: /Write your own/ }).click()
+  await page.getByLabel('Your badge').fill('Book club pick')
+  await expect(preview).toContainText('BOOK CLUB PICK')
+  await page.getByRole('radio', { name: '1200×628' }).click()
+  await expect(preview).toHaveCSS('width', '1200px')
+  await shot(page, 'configure')
+
   await page.getByRole('button', { name: /Generate Image Ads/ }).click()
   await expect(page).toHaveURL(/\/results$/, { timeout: 120_000 })
+  const resultsUrl = page.url()
+
+  // The badge you wrote is kept.
+  await page.goto(configureUrl)
+  await expect(page.getByLabel('Your badge')).toHaveValue('BOOK CLUB PICK')
+  await page.goto(resultsUrl)
   await expect(page.getByRole('img', { name: /ad, 300×250/ }).first()).toBeVisible()
 
   // Results page: per-tile download stays inside its (overflow-hidden) tile
