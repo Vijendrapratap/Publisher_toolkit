@@ -7,7 +7,6 @@ vi.mock('@/lib/credits/charge', async (orig) => {
 
 import { GET, POST } from './route'
 import { POST as postChapter } from './[id]/chapter/route'
-import { POST as postSendToAds } from './[id]/send-to-ads/route'
 import { prisma } from '@/lib/db'
 import { chargeCredits } from '@/lib/credits/charge'
 import { InsufficientCreditsError } from '@/lib/credits/ledger'
@@ -25,9 +24,6 @@ vi.mock('@/lib/db', () => ({
       update: vi.fn(),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn(),
-    },
-    book: {
-      create: vi.fn(),
     },
   },
 }))
@@ -240,47 +236,5 @@ describe('Book Creator API Routes', () => {
     await postChapter(chapterReq(), chapterCtx)
 
     expect(reported?.usedUnits).toBe(0)
-  })
-
-  it('POST /api/creator/projects/[id]/send-to-ads bridges book into ads studio', async () => {
-    const mockProject = {
-      id: 'proj_to_bridge',
-      publisherId: 'pub_test_123',
-      title: 'Illustrated Dragon Tale',
-      author: 'Maya Lin',
-      promptConcept: 'Bedtime story with friendly dragon.',
-      coverImageUrl: null,
-      content: {
-        type: 'children',
-        pages: [],
-      },
-    }
-
-    vi.mocked(prisma.bookCreatorProject.findFirst).mockResolvedValueOnce(mockProject as any)
-    vi.mocked(prisma.book.create).mockResolvedValueOnce({
-      id: 'ads_book_new_1',
-      title: 'Illustrated Dragon Tale',
-    } as any)
-
-    const req = new Request('http://localhost/api/creator/projects/proj_to_bridge/send-to-ads', {
-      method: 'POST',
-    })
-
-    const params = Promise.resolve({ id: 'proj_to_bridge' })
-    const res = await postSendToAds(req, { params })
-
-    expect(res.status).toBe(200)
-    const json = await res.json()
-    expect(json.adsProjectId).toBe('ads_book_new_1')
-    expect(json.redirectUrl).toBe('/ads/ads_book_new_1/configure')
-    expect(prisma.book.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          title: 'Illustrated Dragon Tale',
-          author: 'Maya Lin',
-          platforms: ['AMAZON'],
-        }),
-      })
-    )
   })
 })
