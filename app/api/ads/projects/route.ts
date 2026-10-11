@@ -10,6 +10,7 @@ import {
   PDF_RULE,
 } from '@/lib/services/shared/upload'
 import { prisma } from '@/lib/db'
+import type { Book } from '@prisma/client'
 import { getCreatorProjectForPublisher } from '@/lib/services/creator/queries'
 import { syncProjectFromCreator } from '@/lib/services/ads/projects'
 
@@ -30,6 +31,9 @@ export async function POST(request: Request) {
       interiorImageUrls = [],
       rating,
       reviewCount,
+      price,
+      categories,
+      bullets,
       campaignName,
       campaignObjective,
       templateKey,
@@ -63,7 +67,7 @@ export async function POST(request: Request) {
           pdfUrl: sourceBook.pdfUrl,
           frontCoverUrl: sourceBook.frontCoverUrl,
           backCoverUrl: sourceBook.backCoverUrl,
-          sourceUrl: sourceBook.sourceUrl,
+          ...storeFacts(sourceBook),
           contentGoal: contentGoal || sourceBook.contentGoal || 'all',
           interiorImageUrls: Array.isArray(interiorImageUrls) && interiorImageUrls.length > 0 ? interiorImageUrls : sourceBook.interiorImageUrls,
           status: 'configured',
@@ -96,6 +100,9 @@ export async function POST(request: Request) {
           interiorImageUrls: Array.isArray(interiorImageUrls) ? interiorImageUrls : [],
           rating: typeof rating === 'number' ? rating : null,
           reviewCount: typeof reviewCount === 'number' ? reviewCount : null,
+          price: typeof price === 'string' ? price.slice(0, 40) : null,
+          categories: stringList(categories, 5),
+          bullets: stringList(bullets, 8),
           status: frontCoverUrl ? 'configured' : 'uploaded',
           platforms: Array.isArray(platforms) && platforms.length > 0 ? platforms : ['AMAZON'],
           campaignName: campaignName?.trim() || 'New Campaign',
@@ -142,6 +149,7 @@ export async function POST(request: Request) {
         pdfUrl: sourceBook.pdfUrl,
         frontCoverUrl: sourceBook.frontCoverUrl,
         backCoverUrl: sourceBook.backCoverUrl,
+        ...storeFacts(sourceBook),
         status: 'configured',
         parentBookId: rootId,
         campaignName: typeof campaignName === 'string' && campaignName.trim() ? campaignName.trim() : 'New Campaign',
@@ -350,4 +358,20 @@ export async function POST(request: Request) {
     { id: book.id, needsManualCover: !frontCoverUrl, isDirect: true },
     { status: 201 }
   )
+}
+
+/** What a pasted store link told us about the book; every creation carries it for copy and video briefs. */
+function storeFacts(book: Book) {
+  return {
+    sourceUrl: book.sourceUrl,
+    price: book.price,
+    categories: book.categories,
+    bullets: book.bullets,
+    rating: book.rating,
+    reviewCount: book.reviewCount,
+  }
+}
+
+function stringList(value: unknown, max: number): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string').slice(0, max) : []
 }

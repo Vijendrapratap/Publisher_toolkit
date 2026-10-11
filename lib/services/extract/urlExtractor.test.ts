@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { lookup } from 'node:dns/promises'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { parseBookHtml, extractBookFromUrl } from './urlExtractor'
 
 vi.mock('@/lib/providers/storage', () => ({
@@ -65,6 +67,36 @@ describe('parseBookHtml', () => {
     expect(parsed.author).toBe('Elena Rostova')
     expect(parsed.blurb).toBe('In a galaxy torn by war, one pilot carries the code.')
     expect(parsed.rawCoverImageUrl).toBe('https://example.com/cover.png')
+  })
+  it('reads schema.org book data and the full description, as on Goodreads', () => {
+    const goodreadsHtml = `
+      <html><head>
+        <meta property="og:title" content="Project Hail Mary" />
+        <meta property="og:description" content="Ryland Grace is the sole survivor on a desperate, last-…" />
+        <script type="application/ld+json">{"@context":"https://schema.org","@type":"Book","name":"Project Hail Mary",
+          "image":"https://images.example/phm.jpg","numberOfPages":476,"isbn":"9780593135204",
+          "author":[{"@type":"Person","name":"Andy Weir"}],
+          "aggregateRating":{"@type":"AggregateRating","ratingValue":4.51,"ratingCount":1902725,"reviewCount":262462}}</script>
+      </head><body>
+        <div data-testid="description" class="BookPageMetadataSection__description"><div class="TruncatedContent">
+          <span>Ryland Grace is the sole survivor on a desperate, last-chance mission—and if he fails, humanity will perish.</span>
+        </div></div>
+      </body></html>
+    `
+
+    const parsed = parseBookHtml(goodreadsHtml, 'https://www.goodreads.com/book/show/54493401-project-hail-mary')
+    expect(parsed.title).toBe('Project Hail Mary')
+    expect(parsed.author).toBe('Andy Weir')
+    expect(parsed.blurb).toBe('Ryland Grace is the sole survivor on a desperate, last-chance mission—and if he fails, humanity will perish.')
+    expect(parsed.rawCoverImageUrl).toBe('https://images.example/phm.jpg')
+    expect(parsed.rating).toBe(4.51)
+    expect(parsed.reviewCount).toBe(1902725)
+    expect(parsed.printLength).toBe(476)
+  })
+
+  it('ignores broken structured data', () => {
+    const html = `<script type="application/ld+json">{not json</script><meta property="og:title" content="Fine" />`
+    expect(parseBookHtml(html, 'https://example.com/b').title).toBe('Fine')
   })
 })
 
@@ -187,5 +219,14 @@ describe('extractBookFromUrl', () => {
 
     const result = await extractBookFromUrl('https://amazon.com/dp/12345', 'pub_1', mockFetch as never)
     expect(result.coverUrl).toBeNull()
+  })
+
+  it('refuses a robot-check page instead of saving it as an untitled book', async () => {
+    const robotCheck = readFileSync(join(__dirname, 'fixtures', 'amazon-robot-check.html'), 'utf8')
+    const mockFetch = vi.fn().mockResolvedValue(new Response(robotCheck, { headers: { 'content-type': 'text/html' } }))
+
+    await expect(extractBookFromUrl('https://www.amazon.com/dp/0593135202', 'pub_1', mockFetch as never)).rejects.toThrow(
+      /Amazon didn’t let us read that page/
+    )
   })
 })

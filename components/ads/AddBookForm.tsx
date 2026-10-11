@@ -6,20 +6,12 @@ import { Card } from '@/components/ui/card'
 import { cn } from '@/components/ui/cn'
 import { Dropzone } from '@/components/platform/Dropzone'
 import { InteriorImagesDropzone } from '@/components/platform/InteriorImagesDropzone'
-import { buildCoverUploadForm } from '@/lib/services/ads/addBook'
+import { buildCoverUploadForm, buildLinkBookBody } from '@/lib/services/ads/addBook'
 import { COVER_RULE, PDF_RULE } from '@/lib/services/shared/upload'
+import type { ExtractedBookData } from '@/lib/services/extract/urlExtractor'
 
 type Mode = 'link' | 'upload' | 'pdf'
 
-interface Extracted {
-  title: string
-  author: string
-  blurb: string
-  coverUrl: string | null
-  sourceUrl: string
-  rating?: number | null
-  reviewCount?: number | null
-}
 
 const MODES: { key: Mode; label: string }[] = [
   { key: 'link', label: 'Paste a store link' },
@@ -33,7 +25,7 @@ export function AddBookForm() {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>('link')
   const [url, setUrl] = useState('')
-  const [extracted, setExtracted] = useState<Extracted | null>(null)
+  const [extracted, setExtracted] = useState<ExtractedBookData | null>(null)
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [cover, setCover] = useState<File | null>(null)
@@ -80,18 +72,7 @@ export function AddBookForm() {
     e.preventDefault()
     if (mode === 'link') {
       if (!extracted) return void getDetails()
-      return void create(
-        JSON.stringify({
-          title: title.trim() || extracted.title,
-          author: author.trim(),
-          blurb: extracted.blurb,
-          frontCoverUrl: extracted.coverUrl,
-          sourceUrl: extracted.sourceUrl,
-          rating: extracted.rating ?? null,
-          reviewCount: extracted.reviewCount ?? null,
-        }),
-        true
-      )
+      return void create(JSON.stringify(buildLinkBookBody(extracted, { title, author })), true)
     }
     if (mode === 'upload') {
       if (!cover || !title.trim()) return setError('Add a cover image and the book title.')

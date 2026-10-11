@@ -27,6 +27,15 @@ describe('extractAmazonFacts', () => {
     expect(facts.reviewCount).not.toBe(935)
   })
 
+  it('reads the price-to-pay block when the core price block is empty', () => {
+    const page = `
+      <div id="corePrice_feature_div"><div data-csa-c-slot-id="apex_dp_offer_display"> </div></div>
+      <div id="tmmSwatches"><span class="a-offscreen">$4.99</span></div>
+      <div id="corePriceDisplay_desktop_feature_div"><span class="a-offscreen"> </span><span class="a-offscreen">$18.00</span></div>
+    `
+    expect(extractAmazonFacts(page, 'https://www.amazon.com/dp/0593135202').price).toBe('$18.00')
+  })
+
   it('reads the price from the core price block', () => {
     expect(facts.price).toBe('$13.99')
   })

@@ -83,7 +83,11 @@ export function extractReviewCount(html: string): number | null {
 }
 
 export function extractPrice(html: string): string | null {
-  const block = innerHtmlById(html, 'div', 'corePrice_feature_div') ?? html
+  // corePrice is sometimes an empty shell filled in later; the price-to-pay block then holds it.
+  const block =
+    [innerHtmlById(html, 'div', 'corePrice_feature_div'), innerHtmlById(html, 'div', 'corePriceDisplay_desktop_feature_div')].find(
+      (b) => b && /class="a-offscreen"[^>]*>\s*[^<\s]/i.test(b)
+    ) ?? html
   // The screen-reader copy is the whole formatted price when present.
   const offscreen = /class="a-offscreen"[^>]*>\s*([^<\s][^<]*)</i.exec(block)
   if (offscreen) return decodeHtmlEntities(offscreen[1]).trim()

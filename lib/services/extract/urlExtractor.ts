@@ -2,7 +2,8 @@ import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import { storeFile } from '@/lib/providers/storage'
 import { extractAmazonFacts, isAmazonUrl } from './amazon'
-import { attr, decodeHtmlEntities, innerHtmlById, metaContent, stripHtml } from './html'
+import { attr, decodeHtmlEntities, innerHtmlByAttr, innerHtmlById, metaContent, stripHtml } from './html'
+import { pageFetch } from './pageFetch'
 
 /** Hard ceilings for anything fetched from a URL a user typed. */
 const FETCH_TIMEOUT_MS = 15_000
@@ -134,12 +135,56 @@ export interface ExtractedBookData {
 
 export type ParsedBook = Omit<ExtractedBookData, 'coverUrl'> & { rawCoverImageUrl: string | null }
 
+/** The schema.org Book (or Product) most book sites embed — Goodreads, publishers, many shops. */
+interface LdBook {
+  name?: string
+  author?: string
+  description?: string
+  image?: string
+  rating?: number
+  ratingCount?: number
+  pages?: number
+  publisher?: string
+  datePublished?: string
+}
+
+function readLdBook(html: string): LdBook {
+  for (const [, json] of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    let data: unknown
+    try {
+      data = JSON.parse(json)
+    } catch {
+      continue
+    }
+    const nodes = [data].flat().flatMap((n: any) => (n?.['@graph'] ? n['@graph'] : [n]))
+    const book = nodes.find((n: any) => [n?.['@type']].flat().some((t) => t === 'Book' || t === 'Product'))
+    if (!book) continue
+    const name = (v: any): string | undefined => (typeof v === 'string' ? v : v?.name)
+    const num = (v: any) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : undefined)
+    const rating = book.aggregateRating ?? {}
+    const image = [book.image].flat()[0]
+    return {
+      name: name(book.name),
+      author: name([book.author].flat()[0]),
+      description: typeof book.description === 'string' ? stripHtml(book.description) : undefined,
+      image: typeof image === 'string' ? image : image?.url,
+      rating: num(rating.ratingValue),
+      ratingCount: num(rating.ratingCount ?? rating.reviewCount),
+      pages: num(book.numberOfPages),
+      publisher: name(book.publisher),
+      datePublished: typeof book.datePublished === 'string' ? book.datePublished : undefined,
+    }
+  }
+  return {}
+}
+
 /** Amazon puts the real title here; generic sites fall back to og:title. */
-function extractTitle(html: string): string {
+function extractTitle(html: string, ld: LdBook): string {
   const productTitle =
     innerHtmlById(html, 'span', 'productTitle') ?? innerHtmlById(html, 'span', 'ebooksProductTitle')
   const raw =
     (productTitle && stripHtml(productTitle)) ||
+    ld.name ||
     metaContent(html, 'og:title') ||
     decodeHtmlEntities(/<title>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? '')
 
@@ -150,7 +195,7 @@ function extractTitle(html: string): string {
     .trim()
 }
 
-function extractAuthor(html: string): string {
+function extractAuthor(html: string, ld: LdBook): string {
   const byline = innerHtmlById(html, 'div', 'bylineInfo')
   if (byline) {
     // The byline lists contributors as links; the first is the author.
@@ -170,36 +215,41 @@ function extractAuthor(html: string): string {
   const goodreads = /<span\b[^>]*class="[^"]*ContributorLink__name[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(html)
   if (goodreads) return stripHtml(goodreads[1])
 
-  return metaContent(html, 'author') ?? ''
+  return ld.author ?? metaContent(html, 'author') ?? ''
 }
 
-function extractBlurb(html: string): string {
+function extractBlurb(html: string, ld: LdBook): string {
   for (const id of ['bookDescription_feature_div', 'productDescription', 'editorialReviews_feature_div']) {
     const block = innerHtmlById(html, 'div', id)
     const text = block ? stripHtml(block) : ''
     if (text.length > 40) return text.replace(/\s*Read more\s*$/i, '').trim()
   }
+  // Goodreads: og:description is cut at ~50 characters; the page holds the full text.
+  const described = innerHtmlByAttr(html, 'div', 'data-testid', 'description')
+  if (described && stripHtml(described).length > 40) return stripHtml(described)
+  if (ld.description && ld.description.length > 40) return ld.description
   return metaContent(html, 'og:description') ?? metaContent(html, 'description') ?? ''
 }
 
 export function parseBookHtml(html: string, sourceUrl: string): ParsedBook {
   const amazon = isAmazonUrl(safeUrl(sourceUrl)) ? extractAmazonFacts(html, sourceUrl) : null
+  const ld = readLdBook(html)
 
   return {
-    title: extractTitle(html) || 'Untitled Book',
-    author: extractAuthor(html) || 'Unknown Author',
-    blurb: extractBlurb(html),
-    rawCoverImageUrl: amazon?.coverImageUrl ?? metaContent(html, 'og:image') ?? extractGenericCover(html),
+    title: extractTitle(html, ld) || 'Untitled Book',
+    author: extractAuthor(html, ld) || 'Unknown Author',
+    blurb: extractBlurb(html, ld),
+    rawCoverImageUrl: amazon?.coverImageUrl ?? ld.image ?? metaContent(html, 'og:image') ?? extractGenericCover(html),
     sourceUrl,
-    rating: amazon?.rating ?? null,
-    reviewCount: amazon?.reviewCount ?? null,
+    rating: amazon?.rating ?? ld.rating ?? null,
+    reviewCount: amazon?.reviewCount ?? ld.ratingCount ?? null,
     price: amazon?.price ?? null,
     asin: amazon?.asin ?? null,
     categories: amazon?.categories ?? [],
     bullets: amazon?.bullets ?? [],
-    printLength: amazon?.printLength ?? null,
-    publisher: amazon?.publisher ?? null,
-    publicationDate: amazon?.publicationDate ?? null,
+    printLength: amazon?.printLength ?? ld.pages ?? null,
+    publisher: amazon?.publisher ?? ld.publisher ?? null,
+    publicationDate: amazon?.publicationDate ?? ld.datePublished ?? null,
   }
 }
 
@@ -222,10 +272,13 @@ function extractGenericCover(html: string): string | null {
   return null
 }
 
+/** Amazon's "are you a robot" interstitial — a 200 that holds no book. */
+const ROBOT_CHECK = /validateCaptcha|automated access to Amazon data/i
+
 export async function extractBookFromUrl(
   urlStr: string,
   publisherId: string,
-  fetchFn: typeof fetch = fetch
+  fetchFn: typeof fetch = pageFetch as typeof fetch
 ): Promise<ExtractedBookData> {
   let url: URL
   try {
@@ -239,6 +292,9 @@ export async function extractBookFromUrl(
   }
 
   const html = (await readCapped(res, MAX_HTML_BYTES)).toString('utf-8')
+  if (ROBOT_CHECK.test(html)) {
+    throw new Error('Amazon didn’t let us read that page just now. Try again in a minute, or upload the cover instead.')
+  }
   const parsed = parseBookHtml(html, finalUrl.toString())
 
   const { rawCoverImageUrl, ...facts } = parsed

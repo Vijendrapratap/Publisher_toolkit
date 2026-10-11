@@ -46,9 +46,14 @@ export function attr(tagHtml: string, name: string): string | null {
 
 /** The opening tag whose attributes include the given id, whatever their order. */
 export function findTagById(html: string, tag: string, id: string): string | null {
+  return findTagByAttr(html, tag, 'id', id)
+}
+
+/** The opening tag with this exact attribute value, e.g. `data-testid="description"`. */
+export function findTagByAttr(html: string, tag: string, name: string, value: string): string | null {
   const openings = html.matchAll(new RegExp(`<${tag}\\b[^>]*>`, 'gi'))
   for (const [opening] of openings) {
-    if (attr(opening, 'id') === id) return opening
+    if (attr(opening, name) === value) return opening
   }
   return null
 }
@@ -67,7 +72,11 @@ export function findTagByClass(html: string, tag: string, className: string): st
  * `[\\s\\S]*?</div>` never stops at the first descendant's closing tag.
  */
 export function innerHtmlById(html: string, tag: string, id: string): string | null {
-  const opening = findTagById(html, tag, id)
+  return innerHtmlByAttr(html, tag, 'id', id)
+}
+
+export function innerHtmlByAttr(html: string, tag: string, name: string, value: string): string | null {
+  const opening = findTagByAttr(html, tag, name, value)
   if (!opening) return null
 
   const contentStart = html.indexOf(opening) + opening.length

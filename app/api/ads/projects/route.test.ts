@@ -281,6 +281,74 @@ describe('POST /api/ads/projects', () => {
     )
   })
 
+  it('keeps the store facts from a pasted link: price, categories and bullets', async () => {
+    vi.mocked(prisma.book.create).mockResolvedValueOnce({ id: 'linked_book' } as any)
+
+    await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Project Hail Mary',
+          sourceUrl: 'https://www.amazon.com/dp/0593135202',
+          price: '$18.00',
+          categories: ['Hard Science Fiction', 'Space Opera', 'c', 'd', 'e', 'f'],
+          bullets: ['Now a major motion picture'],
+          rating: 4.7,
+          reviewCount: 283800,
+        }),
+      })
+    )
+
+    expect(prisma.book.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          price: '$18.00',
+          categories: ['Hard Science Fiction', 'Space Opera', 'c', 'd', 'e'],
+          bullets: ['Now a major motion picture'],
+          rating: 4.7,
+          reviewCount: 283800,
+        }),
+      })
+    )
+  })
+
+  it('copies the book’s store facts into each new creation', async () => {
+    vi.mocked(prisma.book.findFirst).mockResolvedValueOnce({
+      id: 'root_1',
+      publisherId: 'pub_1',
+      title: 'Project Hail Mary',
+      parentBookId: null,
+      platforms: ['AMAZON'],
+      price: '$18.00',
+      categories: ['Hard Science Fiction'],
+      bullets: ['Now a major motion picture'],
+      rating: 4.7,
+      reviewCount: 283800,
+    } as any)
+    vi.mocked(prisma.book.create).mockResolvedValueOnce({ id: 'creation_1' } as any)
+
+    await POST(
+      new Request('http://localhost/api/ads/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ existingBookId: 'root_1', contentGoal: 'video' }),
+      })
+    )
+
+    expect(prisma.book.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          price: '$18.00',
+          categories: ['Hard Science Fiction'],
+          bullets: ['Now a major motion picture'],
+          rating: 4.7,
+          reviewCount: 283800,
+        }),
+      })
+    )
+  })
+
   it('creates a project directly via JSON with frontCoverUrl and sets status to configured', async () => {
     vi.mocked(prisma.book.create).mockResolvedValueOnce({ id: 'direct_json_book_2' } as any)
 
