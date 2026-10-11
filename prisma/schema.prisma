@@ -41,6 +41,7 @@ model Book {
   videoSpec         Json?
   aiVideoBrief      Json?
   parentBookId      String?
+  creatorProjectId  String?       @unique
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @default(now()) @updatedAt
   creativeSets      CreativeSet[]
