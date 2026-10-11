@@ -30,7 +30,7 @@ import { countIllustrationRequests } from '@/lib/services/creator/illustrate-sha
 export function BookProjectStudio({ initialProject }: { initialProject: BookCreatorProjectData }) {
   const router = useRouter()
   const [project, setProject] = useState<BookCreatorProjectData>(initialProject)
-  const [sendingToAds, setSendingToAds] = useState(false)
+  const [promoting, setPromoting] = useState(false)
   const [illustrating, setIllustrating] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -111,25 +111,16 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
     }
   }
 
-  async function handleSendToAds() {
-    setSendingToAds(true)
+  async function handlePromote() {
+    setPromoting(true)
     try {
-      const res = await fetch(`/api/creator/projects/${project.id}/send-to-ads`, {
-        method: 'POST',
-      })
+      const res = await fetch(`/api/creator/projects/${project.id}/promote`, { method: 'POST' })
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to bridge to Ads Studio')
-      }
-
-      toast.success('Book bridged to Ads & A+ Content!', {
-        description: 'Opening Amazon A+ Content and Ads Studio…',
-      })
-      router.push(data.redirectUrl)
-    } catch (err: any) {
-      toast.error('Could not send to Ads Studio', { description: err.message })
-    } finally {
-      setSendingToAds(false)
+      if (!res.ok) throw new Error(data.error || 'Could not open Ads Creative')
+      router.push(data.projectUrl)
+    } catch (err) {
+      toast.error('Could not open Ads Creative', { description: err instanceof Error ? err.message : undefined })
+      setPromoting(false)
     }
   }
 
@@ -279,25 +270,16 @@ export function BookProjectStudio({ initialProject }: { initialProject: BookCrea
             </Button>
           )}
 
-          {/* 5. CREATE AMAZON ADS */}
+          {/* Secondary on purpose: it leaves this tool for Ads Creative. */}
           <Button
             type="button"
-            variant="primary"
+            variant="ghost"
             size="sm"
-            loading={sendingToAds}
-            onClick={handleSendToAds}
+            loading={promoting}
+            onClick={handlePromote}
+            title="Opens this book in Ads Creative to make A+ images, a video ad or ad images"
           >
-            {sendingToAds ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Bridging to Ads…
-              </>
-            ) : (
-              <>
-                <Megaphone className="size-4" />
-                Amazon Ads & A+
-              </>
-            )}
+            <Megaphone className="size-4" /> Promote this book
           </Button>
         </div>
       </div>
